@@ -1,0 +1,29 @@
+// replaceShape with instance
+// the last selected object will be the source shape object
+
+global proc replaceShapeInstance () {
+
+	string $selectedObjs[] = `ls -sl`;
+	int $i;
+
+	string $objSource = $selectedObjs[size($selectedObjs)-1];
+	string $objSourceShapes[] = `listRelatives -fullPath -s -ni $objSource`;
+	
+	for ($i=0; $i<size($selectedObjs)-1;$i++){
+		string $oldObjShapes[] = `listRelatives -fullPath -s -ni $selectedObjs[$i]`;
+		
+		string $each;
+		for ($each in $oldObjShapes){
+			if (`objExists $each`){
+				evalEcho("delete "+$each);
+			}
+		}
+		parent -r -add -shape $objSourceShapes[0] $selectedObjs[$i];
+
+
+	}	
+
+
+
+
+}

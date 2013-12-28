@@ -1,0 +1,7 @@
+global proc addRec709GammaNode (){
+    shadingNode -asUtility gammaCorrect;
+    $gammaNodeB = `ls -sl`;
+    setAttr ($gammaNodeB[0] + ".gammaZ") .511;
+    setAttr ($gammaNodeB[0] + ".gammaX") .511;
+    setAttr ($gammaNodeB[0] + ".gammaY") .511;
+}

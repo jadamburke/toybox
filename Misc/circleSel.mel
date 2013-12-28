@@ -1,0 +1,18 @@
+global proc circleSel(){
+	$selected = `ls -sl`;
+	for ($each in $selected){
+		string $newLoc2[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+		//string $newLoc2[] =`listRelatives -p $newLoc`;
+		$alignRot = `xform -q -a -ws -ro $each`;
+		$alignPos = `xform -q -a -ws -piv $each`;
+		rotate -a -ws $alignRot[0] $alignRot[1] $alignRot[2] $newLoc2[0];
+		move -a -ws $alignPos[0] $alignPos[1] $alignPos[2] $newLoc2[0];
+		copyKey $each;
+		catch("pasteKey -option fitReplace "+$newLoc2[0]);
+		print ($newLoc2[0]);
+		rename $newLoc2[0] ($each+"_circle");
+		
+		
+	}
+
+}// circleSel

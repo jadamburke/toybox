@@ -1,0 +1,15 @@
+//
+//
+ global proc showLORES ()
+ {
+      source "smResSwitch.mel";
+       string $sel[] =`ls -sl`;
+ for ($each in $sel)
+        {
+        select -r $each;
+        smResSwitch "" "LORES";
+        }
+ if (`size $sel` <= 0)
+ smResSwitch "" "LORES";
+
+}

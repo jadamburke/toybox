@@ -1,0 +1,1024 @@
+string $autoCacheVersionStr = "1.18b";
+
+float $autoCacheData[];
+string $autoCacheSceneNames[];
+string $autoCacheWarnings[];
+
+string $autoCacheTSSceneList;
+
+eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/ppPlayblast.mel\"");
+if (!`exists abxShots`)
+	eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/abxShots.mel\"");
+
+global proc autoCache ()  {
+	global string $autoCacheVersionStr;
+	global string $autoCacheTSSceneList;
+
+	if (`window -ex autoCacheWindow` != true)  {
+		string $window = `window -w 800 -title ("autoCache Generator v" + $autoCacheVersionStr) autoCacheWindow`;
+		formLayout autoCacheFrmLyt;
+		columnLayout;
+		$autoCacheTSSceneList = `textScrollList -w 800 -numberOfRows 10 -allowMultiSelection true -dkc "autoCacheDeleteSelected" autoCacheTScrlList`;
+		rowLayout -nc 13;
+		button -label "Run Cloth AutoCache" -command ("window -e -visible 0 " + $window + "; autoCacheRun \"clothSim\"");
+		button -label "Run Hair AutoCache" -command ("window -e -visible 0 " + $window + "; autoCacheRun \"hairSim\"");
+
+		button -label "Run Cloth ReCache" -command ("window -e -visible 0 " + $window + "; autoCacheReCacheFX \"clothSim\"");
+		button -label "Run Hair ReCache" -command ("window -e -visible 0 " + $window + "; autoCacheReCacheFX \"hairSim\"");
+
+		button -label "Add Scene(s)" -command "autoCacheAddScene";
+		text -label "   ";
+		button -label "Delete Selected" -command "autoCacheDeleteSelected";
+		button -label "Clear List" -command ("textScrollList -e -removeAll " + $autoCacheTSSceneList);
+		text -label "   ";
+		button -label "Move Up" -command "autoCacheMoveSelected -1";
+		button -label "Move Down" -command "autoCacheMoveSelected 1";
+		text -label "   ";
+		button -label "Cancel" -command ("window -e -visible 0 " + $window);
+
+		formLayout -e autoCacheFrmLyt;
+		showWindow $window;
+	} else
+		showWindow autoCacheWindow;
+}
+
+global proc autoCacheAddScene ()  {
+	global string $autoCacheTSSceneList;
+
+	string $multipleFilters = "Maya Files (*.ma *.mb);;Maya ASCII (*.ma);;Maya Binary (*.mb);;All Files (*.*)";
+	string $result[] = `fileDialog2 -fileFilter $multipleFilters -selectFileFilter "Maya Files" -dialogStyle 2 -fm 4 -cap "Choose scene file(s)" -okc "Choose"`;
+	if (size($result) > 0)  {
+		string $sceneFile;
+		for ($sceneFile in $result)  {
+			string $sceneList[] = `textScrollList -q -allItems $autoCacheTSSceneList`;
+			if (!stringArrayContains($sceneFile, $sceneList))
+				textScrollList -e -append $sceneFile $autoCacheTSSceneList;
+			else
+				warning("Scene file is already in autoCache Scene List");
+		}
+	}
+}
+
+global proc autoCacheDeleteSelected ()  {
+	global string $autoCacheTSSceneList;
+	
+	int $delIdx[] = `textScrollList -q -sii $autoCacheTSSceneList`;
+	for ($i = size($delIdx)-1; $i >= 0; --$i)
+		textScrollList -e -rii $delIdx[$i] $autoCacheTSSceneList;
+}
+
+global proc autoCacheMoveSelected (int $dir)  {
+	global string $autoCacheTSSceneList;
+
+	int $numItems = `textScrollList -q -ni $autoCacheTSSceneList`;
+	string $selItems[] = `textScrollList -q -si $autoCacheTSSceneList`;
+	int $selItemsIdx[] = `textScrollList -q -sii $autoCacheTSSceneList`;
+
+	string $newIdxStr = "";
+	int $numSel = size($selItemsIdx);
+	if ($dir == -1)  {
+		for ($i = 0; $i < $numSel; ++$i)  {
+			string $sel = $selItems[$i];
+			int $selIdx = $selItemsIdx[$i];
+			if ($selIdx > ($i+1))  {
+				textScrollList -e -rii $selIdx $autoCacheTSSceneList;
+				textScrollList -e -ap ($selIdx-1) $sel $autoCacheTSSceneList;
+				$newIdxStr += (" -sii " + ($selIdx-1));
+			}
+		}
+	} else  {
+		for ($i = 0; $i < $numSel; ++$i)  {
+			string $sel = $selItems[$numSel-$i-1];
+			int $selIdx = $selItemsIdx[$numSel-$i-1];
+			if ($selIdx < ($numItems-$i))  {
+				textScrollList -e -rii $selIdx $autoCacheTSSceneList;
+				textScrollList -e -ap ($selIdx+1) $sel $autoCacheTSSceneList;
+				$newIdxStr += (" -sii " + ($selIdx+1));
+			}
+		}
+	}
+	eval("textScrollList -e " + $newIdxStr + " " + $autoCacheTSSceneList);
+}
+
+
+
+global proc autoCacheGatherData (string $simMode)  {
+	global float $autoCacheData[];	// for each scene: startFrame endFrame nearClip farClip locatorScale per-frame:[tx ty tz rx ry rz focal]
+	global string $autoCacheSceneNames[];
+	global string $autoCacheWarnings[];
+
+
+
+	// remove any duplicates from scene list
+	global string $autoCacheTSSceneList;
+	string $origSceneList[] = `textScrollList -q -allItems $autoCacheTSSceneList`;
+	string $sceneList[] = stringArrayRemoveDuplicates($origSceneList);
+	if (size($origSceneList) != size($sceneList))
+		warning("Duplicate scene entries were detected in the list.  Only the first occurrance will be processed.");
+
+	if (size($sceneList) == 0)  {
+		warning("No scenes chosen to generate autoCache from");
+		return;
+	}
+
+	if (`file -q -mf`)  {
+		string $result = `confirmDialog -title "Scene Needs Saving" -message "The scene appears to need saving.  You can cancel autoCache and save it, or continue with autoCache and not save scene" -button "Cancel and Save" -button "Continue Without Saving" -defaultButton "Cancel and Save" -cancelButton "Cancel and Save" -dismissString "Cancel and Save"`;
+		if ($result == "Cancel and Save")  {
+			print("autoCache: Cancelled.\n");
+			return;
+		}
+	}
+
+	// this also disables reading the right frame ranges and frame rates so it has been commented out
+	/*
+	// set Maya so that it doesn't open extra windows on scene open
+	global int $gUseScenePanelConfig;
+	int $save_gUseScenePanelConfig = $gUseScenePanelConfig;
+	$gUseScenePanelConfig = false;
+	*/
+
+	clear($autoCacheData);
+	clear($autoCacheSceneNames);
+	clear($autoCacheWarnings);
+
+	string $camAttrsNoFL[] = {"tx", "ty", "tz", "rx", "ry", "rz"};
+
+	int $idx = 0;
+	string $scene;
+	for ($scene in $sceneList)  {
+		print("autoCache: Opening scene file " + $scene + "\n");
+		string $shortScene = basenameEx($scene); //basename($scene, ".m.");
+		$autoCacheSceneNames[size($autoCacheSceneNames)] = $shortScene;
+
+
+		file -mf false;
+		if (`exists ppDoNewSceneQuiet`) ppDoNewSceneQuiet "empty";
+		//file -f -options "v=0" -prompt 0 -uc 0 -o $scene;
+
+		float $startT = `playbackOptions -q -min`;
+		float $endT = `playbackOptions -q -max`;
+
+		if ($startT != int($startT) || $endT != int($endT))  {
+			$autoCacheWarnings[size($autoCacheWarnings)] = ("Scene: " + $shortScene + "  Start and/or end frames are not integers");
+			$startT = int($startT);
+			$endT = int($endT);
+		}
+
+		if ($endT - $startT < 3)
+			$autoCacheWarnings[size($autoCacheWarnings)] = ("Scene: " + $shortScene + "  Scene length is less than 3 frames");
+
+		$autoCacheData[$idx++] = $startT;
+		$autoCacheData[$idx++] = $endT;
+
+		int $imgWidth = 1920;
+		int $imgHeight = 1080;
+		float $postScale = 0.91;
+		float $hA;
+		float $hV;
+		// check for project defaults file and get settings from there
+		if (`exists abxProjectGetShotDetails`){
+			string $prjDetails[] = abxProjectGetShotDetails(`workspace -q -rd`);
+			if (size($prjDetails)>7){
+				//print ("// startDetails\n");
+				//print $prjDetails;
+				$lock = $prjDetails[0];
+				$fps = $prjDetails[1];
+				$imgWidth = $prjDetails[2];
+				$imgHeight = $prjDetails[3];
+				$hA = $prjDetails[5];
+				$hV =  $prjDetails[6];
+				$aspect = $prjDetails[4];
+				$sceneScale = $prjDetails[7];
+				$renderer = $prjDetails[8];
+			}	
+			else{
+				warning("Project Defaults File Not Found. Reverting to 1920 X 1080");
+			}
+		}
+		else {
+			warning("abxProject.mel not sourced. Skipping project defaults check.");
+		}
+
+		string $takeName = $simMode;
+		string $dept = "fx";
+
+		string $renderPath = (`workspace -q -rd`+"../../RENDER/_ALL_SHOTS/");
+		string $sceneName = $scene;//`file -q -shn -sn`;
+		$sceneName = basenameEx ($sceneName);
+		/* DONT DO THE GREEN SCREEN STUFFS /////////////////////////////////////
+		$fileName = ($sceneName+"_green");
+		*/
+		$fileName = ($sceneName);
+		string $tokenBuffer[];
+		tokenize $sceneName "_" $tokenBuffer;
+
+		//string $camLog = (`workspace -q -rd`+"/data/log/"+$sceneName+"_CAMDATA.txt");
+
+		//writeCameraLogFile $camLog;
+			
+		string $shotName = ($tokenBuffer[0]+"_"+$tokenBuffer[1]);
+
+		// just assuming this for now (i know its bad but i got no time)
+		string $shotFolder = "_ALL_SHOTS";
+
+		string $seqName = ($tokenBuffer[0]);
+		string $pbPath = "";
+		$pbPath = ($renderPath+$seqName+"/"+$shotName+"/playblasts/"+$sceneName);
+
+		//string $shotDetails[] = abxShotsGetShotDetails(($seqName+"/"+$shotName), $shotFolder);
+		int $frRange[] = abxShotsGetFrameRange(($seqName+"/"+$shotName),$shotFolder);
+
+
+
+		// get the latest FX scene version, if it doesn't exist start at zero
+
+		string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+
+		string $shotFileName = `abxShotsGetShortName $shotName`;
+		// get the latest work scene
+		string $latestWorkVersion = abxShotsGetLatestWorkVersion($shotFolder, $shotName, "fx", "", "work",0);
+		string $takeSceneName = ($shotFileName+"_"+$dept+"_"+$takeName+"_"+$latestWorkVersion+".ma");
+		string $takeFullPath = ($shotsPath+$seqName+"/"+$shotName+"/"+toupper($dept)+"/work/"+$takeSceneName);
+		print ("Latest FX Work Scene"+$takeFullPath+"\n");
+
+		//string $latestAnmMasterVersion = abxShotsGetLatestWorkVersion($shotFolder, $shotName, "anm", "", "master",0);
+		//string $latestAnmSceneName = ($shotFileName+"_anm_"+$takeName+"_master_"+$latestWorkVersion+".mb");
+		string $latestAnmFullPath = $scene; //($shotsPath+$seqName+"/"+$shotName+"/"+toupper("anm")+"/master/"+$latestAnmSceneName);
+		print ("Latest Master:"+$latestAnmFullPath+"\n");
+		int $ver = int(`match "[0-9]+" $latestWorkVersion`);
+		// increment the version to next available if it already exists
+		print ("// CHECKING FOR FILE: "+$takeFullPath+"\n");
+		while (`filetest -r $takeFullPath`){
+			print ("// File exists, incrementing save version\n");
+			
+			$ver++;
+			string $newVersion;
+			if ($ver<10)
+				$newVersion = ("v00"+$ver);
+			else if ($ver<100)
+				$newVersion = ("v0"+$ver);
+			else if ($ver<1000)
+				$newVersion = ("v"+$ver);
+			print ($newVersion+"\n");
+			$takeSceneName = ($shotFileName+"_"+$dept+"_"+$takeName+"_"+$newVersion+".ma");
+			$takeFullPath = ($shotsPath+$seqName+"/"+$shotName+"/"+toupper($dept)+"/work/"+$takeSceneName);
+			//if ($ver > 10) break;
+		}
+		// rename the empty scene file so referencing locks work correctly
+		file -rn $takeFullPath;
+
+
+		// reference the latest animation master
+		$takeNameUpper = toupper(`substring $takeName 1 1`);
+		int $takeNameLen = size($takeName);
+		$takeNameUpper = ($takeNameUpper + `substring $takeName 2 $takeNameLen`);
+
+		// create an unlocked reference
+		abxShotsCreateReference($latestAnmFullPath,("anm"),"namespace",0);
+
+		// set the start and end frame ranges
+		// add a preroll of -24 frames
+
+		playbackOptions -e -min ($frRange[0]-24) -max $frRange[1];
+		playbackOptions -e -ast ($frRange[0]-24) -aet $frRange[1]; 
+			
+
+		file -save;
+
+		
+		string $command = ("autoCacheDoCaching \\\""+$simMode+"\\\"");
+		string $sourceScript = (`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Misc/autoCache.mel");
+
+		print ("callMayaBGFarm (1, 1,\""+$takeFullPath+"\", \""+`workspace -q -rd`+"\", \""+$sourceScript+"\", \""+$command+"\");\n");
+		callMayaBGFarm (1, 1,$takeFullPath, `workspace -q -rd`, $sourceScript, $command);
+
+		///////////////
+		//// PLAYBLAST STUFF
+		//////////////////
+		/*
+		// blank out the maya screen so that stepping through the animation goes faster
+		setNamedPanelLayout "Single Perspective View";
+		//outlinerPanel -rp `getPanel -withFocus`;
+
+		// make the render cam have the focus 
+		string $activePanel = `getPanel -withFocus`; 
+		evalEcho("lookThroughModelPanel "+$camera+" "+$activePanel);
+		// make sure textures are on
+		modelEditor -e -displayAppearance "smoothShaded" -dtx true $activePanel;
+		/* DONT DO THE GREEN SCREEN STUFFS /////////////////////////////////////
+		displayPref -displayGradient false;
+		displayRGBColor background 0 1 0;
+		*/
+
+		//print (`playblast -ae`+"\n");
+		//int $doCommit = 1;
+		//evalEcho("ppPlayblastDoBlast "+$camera+" \""+$pbPath+"\" \""+$fileName+"\" \"png\" "+`playbackOptions -q -min`+" "+`playbackOptions -q -max`+" "+$imgWidth+" "+$imgHeight+" "+$doCommit+"\n");
+
+		/* DONT NEED THIS
+
+		$autoCacheData[$idx++] = `getAttr ($camera + ".nearClipPlane")`;
+		$autoCacheData[$idx++] = `getAttr ($camera + ".farClipPlane")`;
+		float $locScl = `getAttr ($camera + ".locatorScale")`;
+		if ($locScl < .001)  {
+			$autoCacheWarnings[size($autoCacheWarnings)] = ("Scene: " + $shortScene + "  Camera locator scale is ~0");
+			$locScl = .001;
+		}
+		$autoCacheData[$idx++] = $locScl;
+
+		// set up a locator parent-constrained to the camera - this will give cam data in world space
+		string $locs[] = `spaceLocator -a -p 0 0 0`;
+		string $loc = $locs[0];
+		select -r $camera;
+		select -add $loc;
+		parentConstraint -weight 1;
+
+		//for ($t in {$startT, ($startT + $endT)*.5, $endT})  {
+		for ($t = $startT; $t <= $endT; ++$t)  {
+			currentTime $t;
+			for ($at in $camAttrsNoFL)
+				$autoCacheData[$idx++] = `getAttr ($loc + "." + $at)`;
+			$autoCacheData[$idx++] = `getAttr ($camera + ".fl")`;
+		}
+		*/
+
+	}
+
+	// set Maya setting back to original value
+	//$gUseScenePanelConfig = $save_gUseScenePanelConfig;
+}
+
+
+
+global proc autoCacheRun (string $simMode)  {
+	print("autoCache: Begin.\n");
+
+	autoCacheGatherData($simMode);
+
+	// if any warnings were generated, display them in a pop-up window at the end
+	global string $autoCacheWarnings[];
+	if (size($autoCacheWarnings) > 0)  {
+		confirmDialog -title "Scene Warning" -button "OK"
+			-message ("The following scene files reported problems:\n\n" + stringArrayToString($autoCacheWarnings, "\n"));
+		clear($autoCacheWarnings);
+	}
+
+	print("autoCache: Done.\n");
+}
+
+// this is run by the farm to actually run the caching
+global proc autoCacheDoCaching (string $simMode){
+
+
+	// if its a cloth cache mode
+	if ($simMode == "clothSim"){
+
+		// assets to cache
+		string $assetsToClothCache[] = {"RyanFinal","YutoFinal"};
+		string $assetsAttrCmdClothCache[] = {"setAttr \"anm:RyanFinal:coat_ncloth_to_bnd.cloth_coat\" 1; setAttr \"anm:RyanFinal:coat_cloth_CTHShape.isDynamic\" 1;setAttr \"anm:RyanFinal:nucleus1.enable\" 1;setAttr \"anm:RyanFinal:nucleus1.startFrame\" `playbackOptions -q -min`;",
+			    	"setAttr \"anm:YutoFinal:cloth_to_bnd.cloth_abby_skirt\" 1; setAttr \"anm:YutoFinal:nCloth_abbyShape.isDynamic\" 1;setAttr \"anm:YutoFinal:ncloth_abby_nucleus.enable\" 1;setAttr \"anm:YutoFinal:ncloth_abby_nucleus.startFrame\" `playbackOptions -q -min`;"};
+		string $assetsSelGeoClothCache[] = {"select -add \"anm:RyanFinal:coat_cloth_CTHShape\";"};
+
+		$sceneName = `file -q -sn`;
+		$sceneNameNoExt = `basenameEx $sceneName`;
+		$cacheFilePath = (`workspace -q -rd`+"data/nClothSims/"+$sceneNameNoExt);
+
+		// turn on cloth bind geo blendshape
+    	// turn on evaluate in nCloth globals and shape
+    	// set cloth cache path (data/nClothSims/<scene_name>) 
+   		// turn off anim hair shape display RyanFinal:BODY.anim_display" 0;
+   		select -clear;
+		for ($i=0;$i<size($assetsToClothCache);$i++){
+			// turn off anim hair geo
+			if (`objExists ("anm:"+$assetsToClothCache[$i]+":ROOT")`){
+				catch(evalEcho($assetsAttrCmdClothCache[$i]));
+				catch(evalEcho($assetsSelGeoClothCache[$i]));
+			}
+		}
+		print ("// "+$assetsToClothCache[0]+"\n");
+		evalEcho("objExists \"anm:"+$assetsToClothCache[0]+":ROOT\"");
+		print ("// SELECTED OBJECTS\n");
+		print (`ls -sl`);
+
+		doCreateNclothCache 4 { "2", "1", "10", "OneFilePerFrame", "1", $cacheFilePath,"0","","0", "add", "0", "1", "1","0","1" } ;
+
+		file -save;
+	}
+	// else if its a shave hair sim
+	else if ($simMode == "hairSim"){
+
+		string $assetsToHairCache[] = {"RyanFinal","YutoFinal", "booferBully", "Abby"};
+		string $assetAttrCmdHairCache[] = {"setAttr \"anm:RyanFinal:BODY.anim_display\" 0;","setAttr \"anm:YutoFinal:BODY.animation_display\" 0;","anm:Boofer:BODY.shader_switch\" 1;"};
+
+    	// set shave globals stat file directory (data/haircutCache/<scene_name>/simNumber)
+		$sceneName = `file -q -sn`;
+		$sceneNameNoExt = `basenameEx $sceneName`;
+		$statFilePath = (`workspace -q -rd`+"data/haircutCache/"+$sceneNameNoExt+"/V1");
+		// loop ve
+		if (!`filetest -r $statFilePath`){
+			sysFile -makeDir $statFilePath;
+		}
+		else{
+			// delete the folder and contents? or make new folder
+		}
+
+		catch(eval("setAttr -type \"string\" shaveGlobals.tmpDir \""+$statFilePath+"\""));
+
+		// turn off anim hair shape display RyanFinal:BODY.anim_display" 0;
+		for ($i=0;$i<size($assetsToHairCache);$i++){
+			// turn off anim hair geo
+			if (`objExists ("anm:"+$assetsToHairCache[$i]+":ROOT")`){
+				catch(evalEcho($assetAttrCmdHairCache[$i]));
+			}
+		}
+
+		// run the dynamic sim
+		shaveRunDynamicsAll;
+
+    	// select all the shave nodes
+    	// set runDynamics attr to 2		
+
+		file -save;
+	}
+
+}
+
+// finds the latest hair or cloths sims for the shot and sets them up
+// cloth cache is per asset, but hair sims are global
+global proc autoCacheFindLatest (string $simMode){
+
+	string $assetsToCheck[] = {"RyanFinal","YutoFinal","booferBully","Abby", "RyanFinal1"};
+
+	string $sceneName = `file -q -sn`;
+	string $sceneNameNoExt = `basenameEx $sceneName`;
+	string $fileNameParts[] = stringToStringArray($sceneNameNoExt,"_");
+	string $seqName = $fileNameParts[0];
+	string $shotName = $fileNameParts[1];
+	string $deptName = $fileNameParts[2];
+
+	$updateStat = false;
+	$updateStatPath = "";
+	print ($assetsToCheck);
+	for ($each in $assetsToCheck){
+
+		string $foundMatch[] = `ls -dag -r 1 ("*"+$each+"*:ROOT")`;
+		// if the asset has been found get its prefix so you can setAttr properly
+		if (size($foundMatch)>0){
+			print ("Found Asset ROOT: \""+$foundMatch[0]+"\"\n");
+			string $tokenBuffer[];
+			tokenize $foundMatch[0] "|" $tokenBuffer;
+			string $matchNoDagPath = $tokenBuffer[size($tokenBuffer)-1];
+			int $nameLen = size($matchNoDagPath);
+			// subtract ":ROOT" characters from name to get the asset prefix
+			int $endStr = size($matchNoDagPath) - 5;
+			string $assetPrefix = `substring $matchNoDagPath 1 $endStr `;
+			print ("Found asset Prefx of \""+$assetPrefix+"\"\n");
+
+			// if its a cloth cache mode
+			if ($simMode == "clothSim" || $simMode == "both" ){
+
+				// find the cache //////////////////////////
+
+				$cacheRoot = (`workspace -q -rd`+"data/nClothSims/");
+				$cachePrefix = ($seqName+"_"+$shotName+"_fx_"+$simMode);
+
+				print ("Cache Filter: \""+$cacheRoot+$cachePrefix+"*\"\n");
+				string $cacheFolders[] = `getFileList -fs ($cachePrefix+"*") -folder $cacheRoot`;
+				//string $sorted[] = sort($cacheFolders);
+				print ("// Possible Caches: \n");
+				print $cacheFolders;
+				print ("// END Possible Caches\n");
+
+				// find which file has latest (must end with _v### )
+				int $ver = 1;
+				string $latestCacheFolder = "";
+				string $every = "";
+				for ($every in $cacheFolders){
+				    int $len = size($every);
+				    int $start = $len - 5;
+				    string $verSuffix = `substring $every $start $len`;
+				    int $foundVer = `match "[0-9]+" $verSuffix`;
+				    if ($foundVer >= $ver){
+				        $ver = $foundVer;
+				        $latestCacheFolder = $every;
+				    }
+				}
+				// latest cache folder found, now check for xml files
+
+				if ($latestCacheFolder != ""){
+
+
+
+					// assets to cache
+					string $assetsToClothCache[] = {"RyanFinal","YutoFinal","Abby","RyanFinal1"};
+					string $assetsAttrCmdClothCache[] = {
+						":coat_ncloth_to_bnd.cloth_coat\" 1", 
+						":coat_cloth_CTHShape.isDynamic\" 1",
+						":nucleus1.enable\" 0",
+						":nucleus1.startFrame\" `playbackOptions -q -min`;",
+						":cloth_to_bnd.cloth_abby_skirt\" 1",
+						":nCloth_abbyShape.isDynamic\" 1",
+						":ncloth_abby_nucleus.enable\" 1",
+						":ncloth_abby_nucleus.startFrame\" `playbackOptions -q -min`;"
+					};
+					string $assetsSelGeoClothCache[] = {":coat_cloth_CTHShape"};
+
+					// if the asset is in the cachable list
+					if (stringArrayContains($each,$assetsToClothCache)){
+
+	
+
+
+						// turn on cloth bind geo blendshape
+				    	// turn on evaluate in nCloth globals and shape
+				    	// set cloth cache path (data/nClothSims/<scene_name>) 
+				   		// turn off anim hair shape display RyanFinal:BODY.anim_display" 0;
+				   		select -clear;
+
+
+						for ($i=0;$i<size($assetsSelGeoClothCache);$i++){
+
+
+							string $geoName = ($assetPrefix+$assetsSelGeoClothCache[$i]);
+							// convert colon to underscore
+							string $cacheFileName = substituteAllString($geoName, ":", "_");
+							string $cacheFilePath = ($cacheRoot+$latestCacheFolder+"/"+$cacheFileName+".xml");
+							print ("testing for cache xml at "+$cacheFilePath+"\n");
+							// xml file check, only do this if a cache.xml that matches the geo name has been found
+							if (`filetest -r $cacheFilePath`){
+
+								// if assumed cache object is already attached
+								string $existingClothCacheNode = substituteAllString(($assetPrefix+$assetsSelGeoClothCache[$i]+"Cache1"),":","_");
+
+								// rename old cache nodes names to conform (golf's naming convention fixes)
+								/*
+								if (`objExists Cache1` && !`objExists $existingClothCacheNode`){
+									if (`nodeType "Cache1"` == "cacheFile")
+										catch(evalEcho("rename Cache1 "+$existingClothCacheNode));
+								}
+								else if (`objExists Cache2`){
+									if (`nodeType "Cache2"` == "cacheFile")
+										catch(evalEcho("rename Cache2 "+$existingClothCacheNode));
+								}
+								*/
+
+								// check for existing cache node
+								if (evalEcho("objExists \""+$existingClothCacheNode+"\"")){
+									// get the dirname for comparison to latest found
+									string $existingCachePath = evalEcho("getAttr \""+$existingClothCacheNode+".cachePath\"");
+									$cacheDir = (`dirname $cacheFilePath`+"/");
+
+									// if the existing cache path does not match cacheDir then prompt user
+									if ($existingCachePath != $cacheDir){
+										$result = `confirmDialog -title "AutoCache LGT Cache Update" -message ("A New Cloth Sim Was Detected for:\""+$each+"\" Would you like to update to this Cache?") -button "Yes" -button "Not Right Now" -defaultButton "Yes" -cancelButton "Not Right Now" -dismissString "Not Right Now"`;
+										if ($result=="Yes"){
+											// set the cloth blendshapes to on
+											for ($i=0;$i<size($assetsAttrCmdClothCache);$i++){
+												// turn off anim hair geo
+												catchQuiet(evalEcho("setAttr \""+$assetPrefix+$assetsAttrCmdClothCache[$i]));
+												
+											}
+											catchQuiet(evalEcho("setAttr -type \"string\" \""+$existingClothCacheNode+".cachePath\" \""+$cacheDir+"\""));
+											catchQuiet(evalEcho("setAttr -type \"string\" \""+$existingClothCacheNode+".cacheName\" \""+$existingClothCacheNode+"\""));
+											//setAttr -type "string" anm_RyanFinal_coat_cloth_CTHShapeCache1.cacheName "anm_RyanFinal_coat_cloth_CTHShape";
+										}
+									}
+								}
+								// if no cache node was found already, then prompt the user to update and call attach cache
+								else {
+									$result = `confirmDialog -title "AutoCache LGT Cache Update" -message ("A New Cloth Sim Was Detected for:\""+$each+"\" Would you like to update to this Cache?") -button "Yes" -button "Not Right Now" -defaultButton "Yes" -cancelButton "Not Right Now" -dismissString "Not Right Now"`;
+									if ($result=="Yes"){
+										for ($j=0;$j<size($assetsAttrCmdClothCache);$j++){
+											// turn off anim hair geo
+											catchQuiet(evalEcho("setAttr \""+$assetPrefix+$assetsAttrCmdClothCache[$j]));
+											
+										}
+										catchQuiet(evalEcho("doImportCacheFile(\""+$cacheFilePath+"\",\"\",{\""+($assetPrefix+$assetsSelGeoClothCache[$i])+"\"},{})"));
+									}
+								}
+							}
+							else {
+								print ("No New Cloth Sim Was Detected for:\""+$each+"\"\n");
+							}
+						}
+
+						//doImportCacheFile($fileName, $fileType,$geometries,{})
+						print ("// "+$assetsToClothCache[0]+"\n");
+						//evalEcho("objExists \"anm:"+$assetsToClothCache[0]+":ROOT\"");
+						print ("// SELECTED OBJECTS\n");
+						print (`ls -sl`);
+					}
+				}
+			}
+			// else if its a shave hair sim
+			else if ($simMode == "hairSim" || $simMode == "both" ){
+
+				// find the cache //////////////////////////
+
+				$cacheRoot = (`workspace -q -rd`+"data/haircutCache/");
+				$cachePrefix = ($seqName+"_"+$shotName+"_fx_"+$simMode);
+
+				print ("Cache Filter: \""+$cacheRoot+$cachePrefix+"*\"\n");
+				string $cacheFolders[] = `getFileList -fs ($cachePrefix+"*") -folder $cacheRoot`;
+				//string $sorted[] = sort($cacheFolders);
+				print ("// Possible Caches: \n");
+				print $cacheFolders;
+				print ("// END Possible Caches\n");
+
+				// find which file has latest (must end with _v### )
+				int $ver = 1;
+				string $latestCacheFolder = "";
+				string $every = "";
+				for ($every in $cacheFolders){
+					print("checking "+$every+"\n");
+				    int $len = size($every);
+				    int $start = $len - 5;
+				    if ($start < 1 )$start = 1;
+				    string $verSuffix = `substring $every $start $len`;
+
+				    int $foundVer = `match "[0-9]+" $verSuffix`;
+				    print("$foundVer "+$foundVer+"\n");
+				    if ($foundVer >= $ver){
+				        $ver = $foundVer;
+				        $latestCacheFolder = $every;
+				    }
+				}
+
+				if ($latestCacheFolder != ""){
+
+					print ("Checking SubFolders of: \""+$cacheRoot+$latestCacheFolder+"/"+"\"\n");
+
+					string $cacheSubFolders[] = `getFileList -fs "*.*" -folder ($cacheRoot+$latestCacheFolder+"/")`;
+					//string $sorted[] = sort($cacheFolders);
+					print ("// Possible Cache Versions: \n");
+					print $cacheSubFolders;
+					print ("// END Possible Cache Versions\n");
+
+					// assuming latest cache versoin subfolder is latest returned from getFilelist (its sorted by creation date reverse order)
+					string $latestCacheVersion = "";
+					$ver = 1;
+					for ($every in $cacheSubFolders){
+						int $foundVer = `match "[0-9]+" $every`;
+						if ($foundVer >= $ver){
+							$ver = $foundVer;
+							$latestCacheVersion = $every;
+						}
+					}
+
+					print ("Checking SubFolders of: \""+$cacheRoot+$latestCacheFolder+"/"+$latestCacheVersion+"/"+"\"\n");
+
+					if ($latestCacheVersion != ""){
+
+						// scene config///////////////////////////////		
+						string $assetAttrCmdHairCache[] = {":BODY.anim_display\" 0;",":BODY.animation_display\" 0;",":BODY.shader_switch\" 1;"};
+
+				    	// set shave globals stat file directory (data/haircutCache/<scene_name>/simNumber)
+						$statFilePath = ($cacheRoot+$latestCacheFolder+"/"+$latestCacheVersion+"/");
+							
+						if (!`filetest -r $statFilePath`){
+							sysFile -makeDir $statFilePath;
+						}
+						else{
+							// delete the folder and contents? or make new folder
+						}
+						if (`objExists shaveGlobals`){
+							string $oldStat = `getAttr "shaveGlobals.tmpDir"`;
+							if ($oldStat != $statFilePath){
+								$updateStat =  true;
+								$updateStatPath = $statFilePath;
+								//catchQuiet(evalEcho("setAttr -type \"string\" shaveGlobals.tmpDir \""+$statFilePath+"\""));
+							// turn off anim hair shape display RyanFinal:BODY.anim_display" 0;
+
+							}
+						}
+						for ($i=0;$i<size($assetAttrCmdHairCache);$i++){
+
+							// combines with string in attr in list (just quietly fails if attr doesnt exist);
+							catchQuiet(evalEcho("setAttr \""+$assetPrefix+$assetAttrCmdHairCache[$i]));
+						}
+
+						// find all the shave nodes under the asset
+						$shaveHairNodes = `ls -type "shaveHair" -r 1 ("*"+$each+"*:*")`;
+						for ($every in $shaveHairNodes){
+							//catchQuiet(evalEcho("setAttr \""+$every+".runDynamics\" 2"));
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if ($updateStat){
+		$result = `confirmDialog -title "AutoCache LGT Cache Update" -message ("A New Global Hair Sim Was Detected:\""+$updateStatPath+"\" Would you like to update to this Cache?") -button "Yes" -button "Not Right Now" -defaultButton "Yes" -cancelButton "Not Right Now" -dismissString "Not Right Now"`;
+		if ($result=="Yes"){
+
+			catchQuiet(evalEcho("setAttr -type \"string\" shaveGlobals.tmpDir \""+$updateStatPath+"\""));
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// NOT IN USE BELOW
+
+
+
+
+
+
+
+
+
+// retuns a path to the folder containing the latest cache
+global proc string autoCacheGetLatestCache(string $filePath, string $simMode){
+
+	string $sceneName = `file -q -sn`;
+	string $sceneNameNoExt = `basenameEx $sceneName`;
+	string $fileNameParts[] = stringToStringArray($sceneNameNoExt,"_");
+	string $seqName = $fileNameParts[0];
+	string $shotName = $fileNameParts[1];
+	string $deptName = $fileNameParts[2];
+
+
+	// if its a cloth cache mode
+	if ($simMode == "clothSim"){
+
+		// find the cache //////////////////////////
+
+		$cacheRoot = (`workspace -q -rd`+"data/nClothSims/");
+		$cachePrefix = ($seqName+"_"+$shotName+"_fx_"+$simMode);
+
+		print ("Cache Filter: \""+$cacheRoot+$cachePrefix+"*\"\n");
+		string $cacheFolders[] = `getFileList -fs ($cachePrefix+"*") -folder $cacheRoot`;
+		//string $sorted[] = sort($cacheFolders);
+		print ("// Possible Caches: \n");
+		print $cacheFolders;
+		print ("// END Possible Caches\n");
+
+		// find which file has latest (must end with _v### )
+		int $ver = 1;
+		string $latestCacheFolder = "";
+		string $every = "";
+		for ($every in $cacheFolders){
+		    int $len = size($every);
+		    int $start = $len - 5;
+		    string $verSuffix = `substring $every $start $len`;
+		    int $foundVer = `match "[0-9]+" $verSuffix`;
+		    if ($foundVer > $ver){
+		        $ver = $foundVer;
+		        $latestCacheFolder = $every;
+		    }
+		}
+		// latest cache folder found, now check for xml files
+
+		if ($latestCacheFolder != ""){
+			return ($cacheRoot+$latestCacheFolder);
+		}
+		else {
+			print ("// autoCacheGetLatestCache: No Cloth Cache Found\n");
+			return "";
+		}
+	}
+	else if ($simMode == "hairSim"){
+		// find the cache //////////////////////////
+
+		$cacheRoot = (`workspace -q -rd`+"data/haircutCache/");
+		$cachePrefix = ($seqName+"_"+$shotName+"_fx_"+$simMode);
+
+		print ("Cache Filter: \""+$cacheRoot+$cachePrefix+"*\"\n");
+		string $cacheFolders[] = `getFileList -fs ($cachePrefix+"*") -folder $cacheRoot`;
+		//string $sorted[] = sort($cacheFolders);
+		print ("// Possible Caches: \n");
+		print $cacheFolders;
+		print ("// END Possible Caches\n");
+
+		// find which file has latest (must end with _v### )
+		int $ver = 1;
+		string $latestCacheFolder = "";
+		string $every = "";
+		for ($every in $cacheFolders){
+		    int $len = size($every);
+		    int $start = $len - 5;
+		    string $verSuffix = `substring $every $start $len`;
+		    int $foundVer = `match "[0-9]+" $verSuffix`;
+		    if ($foundVer > $ver){
+		        $ver = $foundVer;
+		        $latestCacheFolder = $every;
+		    }
+		}
+
+		if ($latestCacheFolder != ""){
+
+			print ("Checking SubFolders of: \""+$cacheRoot+$latestCacheFolder+"/"+"\"\n");
+
+			string $cacheSubFolders[] = `getFileList -fs "*.*" -folder ($cacheRoot+$latestCacheFolder+"/")`;
+			//string $sorted[] = sort($cacheFolders);
+			print ("// Possible Cache Versions: \n");
+			print $cacheSubFolders;
+			print ("// END Possible Cache Versions\n");
+
+			// assuming latest cache versoin subfolder is latest returned from getFilelist (its sorted by creation date reverse order)
+			string $latestCacheVersion = "";
+			$ver = 1;
+			for ($every in $cacheSubFolders){
+				int $foundVer = `match "[0-9]+" $every`;
+				if ($foundVer > $ver){
+					$ver = $foundVer;
+					$latestCacheVersion = $every;
+				}
+			}
+
+			print ("Checking SubFolders of: \""+$cacheRoot+$latestCacheFolder+"/"+$latestCacheVersion+"/"+"\"\n");
+
+			return ($cacheRoot+$latestCacheFolder+"/"+$latestCacheVersion+"/");
+		}
+		else {
+			print ("// autoCacheGetLatestCache: No Hair Cache Found\n");
+			return "";
+		}
+	}
+	else{
+		print ("// autoCacheGetLatestCache: No Cache Found\n");
+		return  "";
+	}
+}
+
+
+
+
+// shitty way to just run the latest fx instead
+global proc autoCacheReCacheFX (string $simMode)  {
+	global float $autoCacheData[];	// for each scene: startFrame endFrame nearClip farClip locatorScale per-frame:[tx ty tz rx ry rz focal]
+	global string $autoCacheSceneNames[];
+	global string $autoCacheWarnings[];
+
+
+
+	// remove any duplicates from scene list
+	global string $autoCacheTSSceneList;
+	string $origSceneList[] = `textScrollList -q -allItems $autoCacheTSSceneList`;
+	string $sceneList[] = stringArrayRemoveDuplicates($origSceneList);
+	if (size($origSceneList) != size($sceneList))
+		warning("Duplicate scene entries were detected in the list.  Only the first occurrance will be processed.");
+
+	if (size($sceneList) == 0)  {
+		warning("No scenes chosen to generate autoCache from");
+		return;
+	}
+
+	if (`file -q -mf`)  {
+		string $result = `confirmDialog -title "Scene Needs Saving" -message "The scene appears to need saving.  You can cancel autoCache and save it, or continue with autoCache and not save scene" -button "Cancel and Save" -button "Continue Without Saving" -defaultButton "Cancel and Save" -cancelButton "Cancel and Save" -dismissString "Cancel and Save"`;
+		if ($result == "Cancel and Save")  {
+			print("autoCache: Cancelled.\n");
+			return;
+		}
+	}
+
+
+
+	clear($autoCacheData);
+	clear($autoCacheSceneNames);
+	clear($autoCacheWarnings);
+
+	string $camAttrsNoFL[] = {"tx", "ty", "tz", "rx", "ry", "rz"};
+
+	int $idx = 0;
+	string $scene;
+	for ($scene in $sceneList)  {
+		print("autoCache: Opening scene file " + $scene + "\n");
+		string $shortScene = basenameEx($scene); //basename($scene, ".m.");
+		$autoCacheSceneNames[size($autoCacheSceneNames)] = $shortScene;
+
+
+		file -mf false;
+		if (`exists ppDoNewSceneQuiet`) ppDoNewSceneQuiet "empty";
+		//file -f -options "v=0" -prompt 0 -uc 0 -o $scene;
+
+		float $startT = `playbackOptions -q -min`;
+		float $endT = `playbackOptions -q -max`;
+
+		if ($startT != int($startT) || $endT != int($endT))  {
+			$autoCacheWarnings[size($autoCacheWarnings)] = ("Scene: " + $shortScene + "  Start and/or end frames are not integers");
+			$startT = int($startT);
+			$endT = int($endT);
+		}
+
+		if ($endT - $startT < 3)
+			$autoCacheWarnings[size($autoCacheWarnings)] = ("Scene: " + $shortScene + "  Scene length is less than 3 frames");
+
+		$autoCacheData[$idx++] = $startT;
+		$autoCacheData[$idx++] = $endT;
+
+		int $imgWidth = 1920;
+		int $imgHeight = 1080;
+		float $postScale = 0.91;
+		float $hA;
+		float $hV;
+		// check for project defaults file and get settings from there
+		if (`exists abxProjectGetShotDetails`){
+			string $prjDetails[] = abxProjectGetShotDetails(`workspace -q -rd`);
+			if (size($prjDetails)>7){
+				//print ("// startDetails\n");
+				//print $prjDetails;
+				$lock = $prjDetails[0];
+				$fps = $prjDetails[1];
+				$imgWidth = $prjDetails[2];
+				$imgHeight = $prjDetails[3];
+				$hA = $prjDetails[5];
+				$hV =  $prjDetails[6];
+				$aspect = $prjDetails[4];
+				$sceneScale = $prjDetails[7];
+				$renderer = $prjDetails[8];
+			}	
+			else{
+				warning("Project Defaults File Not Found. Reverting to 1920 X 1080");
+			}
+		}
+		else {
+			warning("abxProject.mel not sourced. Skipping project defaults check.");
+		}
+
+		string $takeName = $simMode;
+		string $dept = "fx";
+
+		string $renderPath = (`workspace -q -rd`+"../../RENDER/_ALL_SHOTS/");
+		string $sceneName = $scene;//`file -q -shn -sn`;
+		$sceneName = basenameEx ($sceneName);
+		/* DONT DO THE GREEN SCREEN STUFFS /////////////////////////////////////
+		$fileName = ($sceneName+"_green");
+		*/
+		$fileName = ($sceneName);
+		string $tokenBuffer[];
+		tokenize $sceneName "_" $tokenBuffer;
+
+		//string $camLog = (`workspace -q -rd`+"/data/log/"+$sceneName+"_CAMDATA.txt");
+
+		//writeCameraLogFile $camLog;
+			
+		string $shotName = ($tokenBuffer[0]+"_"+$tokenBuffer[1]);
+
+		// just assuming this for now (i know its bad but i got no time)
+		string $shotFolder = "_ALL_SHOTS";
+
+		string $seqName = ($tokenBuffer[0]);
+		string $pbPath = "";
+		$pbPath = ($renderPath+$seqName+"/"+$shotName+"/playblasts/"+$sceneName);
+
+		//string $shotDetails[] = abxShotsGetShotDetails(($seqName+"/"+$shotName), $shotFolder);
+		int $frRange[] = abxShotsGetFrameRange(($seqName+"/"+$shotName),$shotFolder);
+
+
+
+		// get the latest FX scene version, if it doesn't exist start at zero
+
+		string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+
+		string $shotFileName = `abxShotsGetShortName $shotName`;
+		// get the latest work scene
+		string $takeFullPath = abxShotsGetLatestWorkVersion($shotFolder, ($seqName+"/"+$shotName), "fx", $simMode, "work",1);
+		print ("Latest FX Work Scene"+$takeFullPath+"\n");
+
+		// open the latest fx work scene instead
+		if (`filetest -r $takeFullPath`){
+			file -f -o $takeFullPath;
+
+
+			delete `ls -type "cacheFile"`;
+
+			
+			string $command = ("autoCacheDoCaching \\\""+$simMode+"\\\"");
+			string $sourceScript = (`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Misc/autoCache.mel");
+
+			print ("callMayaBGFarm (1, 1,\""+$takeFullPath+"\", \""+`workspace -q -rd`+"\", \""+$sourceScript+"\", \""+$command+"\");\n");
+			callMayaBGFarm (1, 1,$takeFullPath, `workspace -q -rd`, $sourceScript, $command);
+
+		}
+		else{
+			error ("Could Not Open File:"+$takeFullPath);
+		}
+
+	}
+
+	// set Maya setting back to original value
+	//$gUseScenePanelConfig = $save_gUseScenePanelConfig;
+}

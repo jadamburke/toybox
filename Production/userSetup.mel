@@ -1,0 +1,24 @@
+global string $gPPScripts = "//MONKEY/Resources/Maya/2012-x64/scripts";
+
+pandapantherMenu;
+eval ("source \""+$gPPScripts+"/production/ppNewScene.mel\"");
+eval ("source \""+$gPPScripts+"/production/ppFileBrowse.mel\"");
+eval ("source \""+$gPPScripts+"/production/ppForcePrefs.mel\"");
+
+// these override original maya scripts with vray modified versions to prevent render global UI bugs
+source "//MONKEY/resources/vray/vray22001/maya_vray/scripts/others/createMayaSoftwareCommonGlobalsTab.mel";
+source "//MONKEY/resources/vray/vray22001/maya_vray/scripts/others/shouldAppearInNodeCreateUI.mel";
+source "//MONKEY/resources/vray/vray22001/maya_vray/scripts/others/unifiedRenderGlobalsWindow.mel";
+
+// enable the playblast HUD for now
+
+evalDeferred("if (`exists playblastHUD`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/playblastHUD.mel\";if (`exists playblastHUD`) playblastHUD;");
+evalDeferred("if (`exists timewarpHUD`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/timewarpHUD.mel\";if (`exists timewarpHUD`) timewarpHUD;");
+
+evalDeferred("ppForcePrefs;");
+//evalDeferred("loadPlugin stereoCamera;");
+//evalDeferred("loadPlugin Mayatomr;");
+//evalDeferred("headsUpMessage (\"Current Project:   \"+`workspace -q -rd`) -time 3;");
+evalDeferred("if (`exists abxAssets`==0) source \""+`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Pipeline/abxProject.mel\";if (`exists abxProject`) abxProject");
+
+//evalDeferred("int $state = `undoInfo -q -state`; if (!$state){undoInfo -state 1; print (\"undoQueue turned on\\n\");}");

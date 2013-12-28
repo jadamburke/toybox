@@ -1,0 +1,17 @@
+// insertGammaCorrectNode.mel
+// Created by: raphe
+// Date: 2012/09/07 17:18:25
+
+global proc insertGammaCorrectNode(){
+
+	string $mySel[] = `ls -sl`;
+	string $myMaterial[] = `ls -mat $mySel`;
+	string $myTex[] = `ls -tex $mySel`;
+	string $myGamma = `shadingNode -asUtility gammaCorrect`;
+	setAttr ($myGamma + ".gammaX") 0.455;
+	setAttr ($myGamma + ".gammaY") 0.455;
+	setAttr ($myGamma + ".gammaZ") 0.455;
+	connectAttr -force ($myTex[0] + ".outColor") ($myGamma + ".value");
+	connectAttr -force ($myGamma + ".outValue") ($myMaterial[0] + ".color");
+
+}

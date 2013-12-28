@@ -1,0 +1,14 @@
+//
+//
+ global proc showHIRES ()
+ {
+ source "smResSwitch.mel";
+ string $sel[] =`ls -sl`;
+ for ($each in $sel)
+        {
+        select -r $each;
+        smResSwitch "" "HIRES";
+       }
+ if (`size $sel` <= 0)
+smResSwitch "" "HIRES";
+ }

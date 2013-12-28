@@ -1,0 +1,11 @@
+
+$selectedNodes = `ls -sl`;
+for ($curNode in $selectedNodes){
+	string $tokenBuffer[];
+	tokenize $curNode "|" $tokenBuffer;
+	select ($tokenBuffer[0]+"|Anemone_MOVER|Anemone_L1_CNSTR|Anemone_L1_CTRL");
+	select -add ($tokenBuffer[0]+"|Anemone_MOVER|Anemone_L2_CNSTR|Anemone_L2_CTRL");
+	select -add ($tokenBuffer[0]+"|Anemone_MOVER|Anemone_L3_CNSTR|Anemone_L3_CTRL");
+
+
+}

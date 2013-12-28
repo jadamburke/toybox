@@ -1,0 +1,55 @@
+// usage: texRezSwitchButt("HI");
+// usage: texRezSwitchButt("LOW");
+// if (`exists texRezSwitchButt`==0) eval ("source \""+`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Lighting/vrayLOW.mel\"");if (`exists texRezSwitchButt`) texRezSwitchButt("HI");
+
+global proc texRezSwitchButt(string $rez){
+
+    string $fileNodes[] = `ls -type file`;
+    for($tmp in $fileNodes){
+        string $filePath = `getAttr ($tmp+".fileTextureName")`;
+        string $ext = fileExtension($filePath);
+        string $baseFileName = `basenameEx($filePath)`;
+        string $pathParts[];
+        tokenize($filePath,"/",$pathParts);
+        int $ppLOW = `size $pathParts`-1;
+        int $ppHI = `size $pathParts`;
+
+        if($rez == "HI"){
+            $outputPath = substitute($pathParts[$ppLOW],$filePath,($baseFileName+"."+$ext));
+            $outputPath = substitute("/LOW",$outputPath,"");
+            $outputPath = substitute("_LOW.",$outputPath,".");
+            $outputPath = substitute("/MED",$outputPath,"");
+            $outputPath = substitute("_MED.",$outputPath,".");
+            print ("setAttr -type \"string\" " + $tmp + ".fileTextureName " + $outputPath + "\n");
+            setAttr -type "string" ($tmp+".fileTextureName") $outputPath;
+
+        }else if ($rez == "LOW"){
+            if(!`gmatch $baseFileName "*_LOW"`){
+                $filePath = substitute("/MED",$filePath,"");
+                $filePath = substitute("_MED.",$filePath,".");
+                $baseFileName = substitute("_MED",$baseFileName,"");
+                $pathParts[$ppLOW] = substitute("_MED.",$pathParts[$ppLOW],".");
+                $outputPath = substitute($pathParts[$ppLOW],$filePath,("LOW/"+$baseFileName+"_LOW."+$ext));
+                int $exists = `filetest -r $outputPath`;
+                if($exists){
+                    print ("setAttr -type \"string\" " + $tmp + ".fileTextureName " + $outputPath + "\n");
+                    setAttr -type "string" ($tmp+".fileTextureName") $outputPath;
+                }
+            }
+
+        }else if ($rez == "MED"){
+            if(!`gmatch $baseFileName "*_MED"`){
+                $filePath = substitute("/LOW",$filePath,"");
+                $filePath = substitute("_LOW.",$filePath,".");
+                $baseFileName = substitute("_LOW",$baseFileName,"");
+                $pathParts[$ppLOW] = substitute("_LOW.",$pathParts[$ppLOW],".");
+                $outputPath = substitute($pathParts[$ppLOW],$filePath,("MED/"+$baseFileName+"_MED."+$ext));
+                int $exists = `filetest -r $outputPath`;
+                if($exists){
+                    print ("setAttr -type \"string\" " + $tmp + ".fileTextureName " + $outputPath + "\n");
+                    setAttr -type "string" ($tmp+".fileTextureName") $outputPath;
+                }
+            }
+        }
+    }
+}

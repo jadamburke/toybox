@@ -1,0 +1,7 @@
+// tmdTrails
+// Created by: adambu
+// Date: 2011/12/06 10:50:43
+
+global proc tmdTrails(){
+source "/Volumes/logan_homes/trentity/maya/2009-x64/scripts/trails/tmd_trails_TESTER.mel"
+}

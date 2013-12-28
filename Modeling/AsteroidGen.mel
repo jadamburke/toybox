@@ -1,0 +1,562 @@
+/*  This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: Asteroid Generator v0.5
+''    Author: Sunil S Pant
+''    Last Updated: July 29, 2004
+''    Update/Change this file at:
+''    http://www.highend3d.com/maya/mel/?section=modeling#3044
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+
+
+
+//AsteroidGen 0.5
+
+//==========================================================================================================
+
+//		| written by:		 |
+
+//		| Sunil S Pant		 |
+
+//		| e-mail comments to:    |
+
+//		| forsunil_p@yahoo.com	 |		
+
+//		---------------------
+
+//		| Date of release:	|
+
+//		|08/02/2004		|
+
+//		---------------------
+
+//based on source Code of Turbulence Generator by Adrian Herbez
+
+//Website of Adrian Herbez: http://www.purplestatic.com
+
+//ref. for the shader script : Mike Hovland on www.highend3D.com
+
+//USE THIS SCRIPT ON YOUR OWN RISK
+
+//The programmer is not responsible for any problems that result from the use of this script
+
+//==============================================================================================================================
+
+//	PURPOSE:
+
+//	Generation of turbulence in a sphere like in 3D Studio max for easy generation of Asteroids and rocks.
+ 
+//	To create surfaces Non-Uniform and Bumpy.
+
+//==============================================================================================================================
+
+//	This is the first script I ever wrote so don´t blame me for inefficient code.
+
+//	This script calculates the turbulence on a spehre and creates bumps by moving the vertices in a random fashion.
+
+//==============================================================================================================================
+
+//	USAGE:
+
+//	1. 	Save the AsteroidGen.mel to your scripts directory.
+
+//	2.	Source the script i.e. : AsteroidGen.mel
+
+//	3. 	Start Maya. In the command line type AsteroidGen and middlemouse drag to a shelf you like.
+
+//	4.	Start by pressing the newly created button
+
+//	5.	drop me a note about what you think about it..	
+
+//==============================================================================================================================
+
+//	KNOWN ISSUES:
+//	1. 	You can modify and work on only Poly Spheres.
+
+//	2.	U can put the color shaders to your spheres and i'll hopefully include actual rock and Asteroid shaders in my updated version.
+
+//	3.	You cannot select a group of spheres and use the Generate Turbulence button.I will try and fix that
+//              in the upcomming version.
+
+//==============================================================================================================================
+
+//	FUTURE IMPROVEMENTS:
+
+//	Creating GeoSpheres instead of polySpheres so it does not look edgy at the poles.
+
+//	Including actual textures of rocks and solid surfaces.
+
+//	Putting a Seed Value option for more realistic results.
+
+
+//==============================================================================================================================
+
+
+
+//Writing a procedure to create the Shader swatches to apply to objects.
+
+
+global proc Selection( string $name, float $r, float $g, float $b)
+{
+// get the current selection
+string $sel[] = `ls -sl -fl`;
+
+//if the shader already exists
+if(`objExists $name`)
+    {
+    //just some info printed to the script editor
+    print ($name +" exists. Assigning Existing Shader to selection\n");   
+    
+    //apply the existing shader to the selection
+    sets -e -forceElement ($name+"SG") $sel;
+    }
+//if the shader doesn't exist
+else
+    {
+    //create the shader with the name passed in the $name variable
+    string $newShader = `shadingNode -asShader lambert -n $name`;   
+    
+    //set the color of the new shader to the values passed in $r $g $b
+    setAttr ($newShader +".color") -type double3 $r $g $b;
+    
+    //create the shadingGroup for the new shader
+    sets -renderable true -noSurfaceShader true -empty -name ($name+"SG");
+    
+    //connect the outColor of the new shader to the shadingGroups surfaceShader input
+    connectAttr -f ($name+".outColor") ($name+"SG.surfaceShader");    
+    
+    //apply the shader to the selection
+    sets -e -forceElement ($name+"SG") $sel;    
+    }    
+}
+
+
+global proc makeBelt()
+{
+	string $selected[] = ` ls -sl `;
+	float $startX = `getAttr ($selected[0] + ".translateX") `;
+	float $startY = `getAttr ($selected[0] + ".translateY") `;
+	float $startZ = `getAttr ($selected[0] + ".translateZ") `;
+
+	float $startA = `getAttr ($selected[0] + ".translateX") `;
+	float $startB = `getAttr ($selected[0] + ".translateY") `;
+	float $startC = `getAttr ($selected[0] + ".translateZ") `;
+
+
+	int $howMany = `intField -query -value numSpheres1 `;
+	float $radius = ` floatField -query -value sphereRadius1 `;
+
+	float $tempA;
+	float $tempB;
+	float $tempX;
+	float $tempZ;
+	float $degree = (2*3.1459)/$howMany;
+	float $degree1 = (4*3.1459)/$howMany;
+
+	for ($i=0; $i<$howMany; $i++)
+	{
+		polySphere;
+		
+		
+		$tempA = ($radius * cos($degree*$i))+ $startA ;
+		$tempB = ($radius * sin($degree*$i))+ $startC ;
+		$tempX = ($radius * cos($degree1*$i))+ $startX ;
+		$tempZ = ($radius * sin($degree1*$i))+ $startZ ;
+
+		
+		
+		
+		move -r $tempX $startY $tempZ;
+		
+		move -r $tempA $tempB $startB;
+		
+
+	}
+
+}
+
+
+global proc polySmooth()
+
+{
+
+	string $selected[] = `ls -sl `;
+	select -r ($selected[0]);
+	polySmooth  -mth 0 -dv 1 -c 1 -kb 1 -ksb 1 -khe 0 -kt 1 -kmb 1 -suv 1 -sl 1 -dpe 1 -ps 0.1 -ro 1 -ch 1;
+}
+
+
+global proc makePolySphere()
+
+
+{
+
+	print ("Starting makePolySphere \n");
+
+//Declareing my variables.
+
+	string $theSphere1[] ;
+
+	int $howMany = ` intField -query -value numSpheres `;
+	float $radius = ` floatField -query -value sphereRadius `;
+	
+	for ($i=0; $i<$howMany; $i++)
+ 	{
+		$theSphere1 = ` polySphere -r $radius `;
+	}
+			
+	//Selects the sphere Created and connects its control of X,Y,Z axes to Translate X,Y,Z.
+	
+	connectControl pos1X ($theSphere1[0]+".translateX") ;
+	connectControl pos1Y ($theSphere1[0]+".translateY") ;
+	connectControl pos1Z ($theSphere1[0]+".translateZ") ;
+	
+	//Selects the sphere Created and connects its control of X,Y,Z axes to Rotate X,Y,Z.
+
+	connectControl rot1X ($theSphere1[0]+".rotateX") ;
+	connectControl rot1Y ($theSphere1[0]+".rotateY") ;
+	connectControl rot1Z ($theSphere1[0]+".rotateZ") ;
+
+	//Selects the sphere Created and connects its control of X,Y,Z axes to Scale X,Y,Z.
+
+	connectControl scl1X ($theSphere1[0]+".scaleX") ;
+	connectControl scl1Y ($theSphere1[0]+".scaleY") ;
+	connectControl scl1Z ($theSphere1[0]+".scaleZ") ;
+	
+	//select -r ($theSphere1[0]);
+	
+  }
+
+
+//Create a procedure to control movement of the Polysphere in X Y Z co-ordinates.
+
+
+global proc movePolySpheres()
+
+{
+	
+	float $x = `floatFieldGrp -query -value1 pos1 `; 
+	float $y = `floatFieldGrp -query -value2 pos1 `; 
+	float $z = `floatFieldGrp -query -value3 pos1 `;
+	
+	move $x $y $z;
+}
+
+//Create a procedure to control Rotation of the Polysphere in X Y Z co-ordinates.
+
+global proc rotatePolySpheres()
+
+{
+
+//to create rotation angle for object positions in 3D space.
+
+	float $x = `floatFieldGrp -query -value1 rot1 `; 
+	float $y = `floatFieldGrp -query -value2 rot1 `; 
+	float $z = `floatFieldGrp -query -value3 rot1 `;
+	
+	rotate $x $y $z;
+}
+
+
+//Create a procedure to control Size of the Polysphere in X Y Z co-ordinates.
+
+global proc sizePolySpheres()
+
+{
+
+//to create rotation angle for object positions in 3D space.
+
+	float $x = `floatFieldGrp -query -value1 scl1 `; 
+	float $y = `floatFieldGrp -query -value2 scl1 `; 
+	float $z = `floatFieldGrp -query -value3 scl1 `;
+	
+	scale $x $y $z;
+}
+
+
+global proc makeTurbulence()
+
+{
+
+	string $selected[] = `ls -sl `;
+
+
+	
+	int $howMany[] = ` polyEvaluate -vertex `;
+
+	float $howMuch2 = ` floatField -query -value amount `;
+	
+	int $ifX = ` checkBoxGrp -query -v1 axises `;
+	
+	int $ifY = ` checkBoxGrp -query -v2 axises `;
+	
+	int $ifZ = ` checkBoxGrp -query -v3 axises `;
+
+	float $moveBy;
+
+	select -cl;
+
+	for ($i=0; $i<$howMany[0]; $i++)
+	{
+
+		select -r ($selected[0]+".vtx["+ $i +"]") ;
+
+		if ($ifX) 
+		{
+
+			$moveBy = rand($howMuch2);
+	
+			move -r $moveBy 0 0;
+			
+		}
+
+
+			
+
+		if ($ifY) 
+		{
+
+			$moveBy = rand($howMuch2);
+			move -r  0 $moveBy 0;
+			
+		}
+
+		if ($ifZ) 
+		{
+
+			$moveBy = rand($howMuch2);
+			move -r  0 0 $moveBy;
+			
+		}
+	}
+
+}
+
+global proc AsteroidGen()
+{
+
+	string $winName = ` window  -w 350 -h 700 -title "Asteroid Generator v0.5" `;
+	columnLayout -adjustableColumn true;
+	
+	
+
+	frameLayout -label "Create Primitives" -borderStyle "etchedIn" -font "boldLabelFont" -collapsable true;  //collapsable is a boolein value.
+	columnLayout;
+	separator -style "in" -w 500 -h 12;
+	
+
+	
+	
+	rowColumnLayout -numberOfColumns 2 -cw 1 100 -cw 2 100;
+	text -label "Number of Spheres:" ;
+	intField -min 1 -v 1 numSpheres ;
+
+	setParent..;
+
+
+	rowColumnLayout -numberOfColumns 2 -cw 1 100 -cw 2 100;
+	text -label "Desired radius:";
+	floatField -min 0.1 -v 1 -ec "makePolySphere()" sphereRadius;
+	
+
+	setParent..;
+		
+
+	separator -style "none" -w 350 -h 12;
+
+	button -label "Make Spheres" -width 500 -command "makePolySphere()" ;
+
+	separator -style "in" -w 500 -h 12;
+
+	setParent..;
+	setParent..;
+
+	frameLayout -label "Object Attributes" -collapsable true;  //collapsable is a boolein value.
+	rowColumnLayout -numberOfColumns 2;
+	//separator -style "in" -w 500 -h 12;
+
+	//creating a button to move the polySphere
+	
+	//separator -style "none" -w 350 -h 12;
+	
+	text -label "X Position";
+	floatSlider -min -10 -max 10 -v 0 pos1X ;
+
+	text -label "Y Position";
+	floatSlider -min -10 -max 10 -v 0 pos1Y ;
+
+	text -label "Z Position";
+	floatSlider -min -10 -max 10 -v 0 pos1Z ;
+	
+	//separator -style "in" -w 500 -h 12;
+
+		
+	//creating a button to rotate a poly sphere
+
+	//separator -style "none" -w 350 -h 12; //specifying height and width of the seperator from the button.
+
+	
+	text -label "X Rotate";
+	floatSlider -min 0 -max 360 -v 0 rot1X ;
+
+	text -label "Y Rotate";
+	floatSlider -min 0 -max 360 -v 0 rot1Y ;
+
+	text -label "Z Rotate";
+	floatSlider -min 0 -max 360 -v 0 rot1Z ;
+
+	//separator -style "in" -w 500 -h 12;
+	
+	
+	//creating sliders to scale poly Sphere
+	//separator -style "none" -w 350 -h 12;	
+
+	text -label "X Scale";
+	floatSlider -min -10 -max 10 scl1X ;
+
+	text -label "Y Scale";
+	floatSlider -min -10 -max 10 scl1Y ;
+
+	text -label "Z Scale";
+	floatSlider -min -10 -max 10 scl1Z ;
+
+	separator -style "in" -w 500 -h 12;
+
+
+		setParent ..;
+	setParent ..;
+	
+	frameLayout -label "Create Asteroid Belt" -collapsable true;  //collapsable is a boolein value.
+	columnLayout;
+	separator -style "in" -w 500 -h 12;
+	
+	
+	rowColumnLayout -numberOfColumns 2 -cw 1 100 -cw 2 100;
+	text -label "Number of Asteroids: ";
+	intField -min 0 numSpheres1;
+	
+	setParent..;
+	
+	rowColumnLayout -numberOfColumns 2 -cw 1 100 -cw 2 100;
+	text -label "Desired radius:";
+	floatField -min 0 -ec "makeBelt()" sphereRadius1;
+
+	setParent..;
+	
+	separator -style "in" -w 500 -h 12;
+	button -label "Make Belt" -w 500 -command "makeBelt()";
+	separator -style "in" -w 500 -h 12;
+
+	setParent..;
+		setParent..;
+	setParent..;
+	
+
+	frameLayout -label "Asteroid Genetator" -collapsable true;  //collapsable is a boolein value.
+	columnLayout;
+	separator -style "in" -w 500 -h 12;
+	
+	checkBoxGrp 
+		-numberOfCheckBoxes 3
+		-labelArray3 "X-Axis" "Y-Axis" "Z-Axis"
+	       axises;
+
+	rowColumnLayout -numberOfColumns 2 -cw 1 100 -cw 2 100;
+	text -label "Enter Jitter Value:";
+	floatField amount ;
+	separator -style "none" -w 350 -h 12;
+
+	setParent..;
+	separator -style "none" -w 350 -h 12;
+
+	button -label "Generate Turbulence" -w 500 -command "makeTurbulence()";
+
+	button -label "Smooth Selected Object" -w 500 -command "polySmooth()";
+
+	separator -style "none" -w 350 -h 12;
+	separator -style "in" -w 500 -h 12;
+
+	
+	setParent..;
+	setParent..;
+	
+	frameLayout -label "Select Shaders" -collapsable true;  //collapsable is a boolein value.
+	columnLayout;
+	separator -style "in" -w 500 -h 12;
+	
+	
+	
+	
+	string $form = `formLayout mhShaderPaletteLayout`;
+string $can1 = `canvas -w 25 -h 25 -rgb 1 0 0 -pc "Selection RedShader 1 0 0" redCanvas`;
+string $can2 = `canvas -w 25 -h 25 -rgb 0 1 0 -pc "Selection GreenShader 0 1 0" greenCanvas`;
+string $can3 = `canvas -w 25 -h 25 -rgb 0 0 1 -pc "Selection BlueShader 0 0 1" blueCanvas`;
+string $can4 = `canvas -w 25 -h 25 -rgb 1 0 1 -pc "Selection PurpleShader 1 0 1" purpleCanvas`;
+string $can5 = `canvas -w 25 -h 25 -rgb 0 1 1 -pc "Selection AquaShader 0 1 1" aquaCanvas`;
+string $can6 = `canvas -w 25 -h 25 -rgb 1 1 0 -pc "Selection YellowShader 1 1 0" yellowCanvas`;
+string $can7 = `canvas -w 25 -h 25 -rgb 1 0.5 0 -pc "Selection OrangeShader 1 0.5 0" orangeCanvas`;
+string $can8 = `canvas -w 25 -h 25 -rgb 1 0 0.5 -pc "Selection HotPinkShader 1 0 0.5" hotPinkCanvas`;
+string $can9 = `canvas -w 25 -h 25 -rgb 0.7 1 0.7 -pc "Selection MintShader 0.7 1 0.7" mintCanvas`;
+string $can10 = `canvas -w 25 -h 25 -rgb 0 0 0.5 -pc "Selection DarkBlueShader 0 0 .5" DarkBlueCanvas`;
+string $can11 = `canvas -w 25 -h 25 -rgb 0.5 0 0 -pc "Selection DarkRedShader 0.5 0 0" DarkRedCanvas`;
+string $can12 = `canvas -w 25 -h 25 -rgb 0 0.5 0 -pc "Selection DarkGreenShader 0 0.5 0" DarkGreenCanvas`;
+string $can13 = `canvas -w 25 -h 25 -rgb 0.75 0.5 0.75 -pc "Selection MediumPurpleShader 0.75 0.5 .75" MediumPurpleCanvas`;
+string $can14 = `canvas -w 25 -h 25 -rgb 0.35 0.5 0.35 -pc "Selection DarkMintShader 0.35 0.5 0.35" DarkMintCanvas`;
+string $can15 = `canvas -w 25 -h 25 -rgb 0.5 0 0.25 -pc "Selection DarkPinkShader 0.5 0 0.25" DarkPinkCanvas`;
+
+formLayout -edit
+    -af $can1 "left" 8
+    -af $can1 "top" 8
+    -af $can2 "top" 8
+    -ac $can2 "left" 2 $can1
+    -af $can3 "top" 8
+    -ac $can3 "left" 2 $can2
+    -af $can4 "top" 8
+    -ac $can4 "left" 2 $can3
+    -af $can5 "top" 8
+    -ac $can5 "left" 2 $can4
+    -af $can6 "left" 8
+    -ac $can6 "top" 2 $can1
+    -ac $can7 "top" 2 $can1
+    -ac $can7 "left" 2 $can6
+    -ac $can8 "top" 2 $can1
+    -ac $can8 "left" 2 $can7
+    -ac $can9 "top" 2 $can1
+    -ac $can9 "left" 2 $can8
+    -ac $can10 "top" 2 $can1
+    -ac $can10 "left" 2 $can9
+    -af $can11 "left" 8
+    -ac $can11 "top" 2 $can6
+    -ac $can12 "top" 2 $can6
+    -ac $can12 "left" 2 $can11
+    -ac $can13 "top" 2 $can6
+    -ac $can13 "left" 2 $can12
+    -ac $can14 "top" 2 $can6
+    -ac $can14 "left" 2 $can13
+    -ac $can15 "top" 2 $can6
+
+$form;
+
+separator -style "none" -w 350 -h 12;
+
+	
+
+setParent..;
+
+setParent..;
+setParent..;
+setParent..;
+
+//Shows the Gui.	
+	
+
+	showWindow $winName;
+
+}
+
+

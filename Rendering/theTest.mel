@@ -1,0 +1,5 @@
+// theTes
+global proc theTest(){
+	print "Test Complete\n";
+
+}

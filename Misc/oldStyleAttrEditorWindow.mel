@@ -1,0 +1,27 @@
+// oldStyleAttrEditorWindow
+
+global proc oldStyleAttrEditorWindow () {
+
+	if (!`window -q -ex origAttrEditWindow`){
+		window -retain origAttrEditWindow;
+
+		if (!`layout -q -exists MayaWindow|MainAttributeEditorLayout`){
+			editSelected;
+		}
+
+		layout -e -parent origAttrEditWindow MayaWindow|MainAttributeEditorLayout;
+
+		if( !`exists getUIComponentDockControl` ) {
+			eval("source \"UIComponents.mel\"");
+		}
+		string $component = getUIComponentDockControl("Attribute Editor", false);
+
+		showWindow origAttrEditWindow;
+		dockControl -e -visible 0 $component;
+
+	}
+	else{
+		showWindow origAttrEditWindow;
+	}
+
+}

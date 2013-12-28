@@ -1,0 +1,33 @@
+// addShaderNamesToShapes
+
+global proc addShaderNamesToShapes () {
+
+	string $meshes[] = `ls -long -type mesh -noIntermediate`;
+	for ($each in $meshes){
+		$setMembers = `listConnections -d 1 ($each+".instObjGroups")`;
+
+		if (size($setMembers) == 0)
+			$setMembers = `listConnections -d 1 ($each+".instObjGroups.objectGroups")`;
+		
+		print ($each+":"+$setMembers[0]+"\n");
+		string $shadingGroupName = "";
+		for ($every in $setMembers){
+			if (`objectType $every` == "shadingEngine"){
+				$shadingGroupName = $every;
+				
+			}
+
+		}
+		if ($shadingGroupName != ""){
+			if (!`attributeExists "shadingGroupName" $each`){
+				addAttr -dt "string" -ln "shadingGroupName" $each;
+			
+			}
+			setAttr -type "string" ($each+".shadingGroupName") $shadingGroupName;
+		}
+		else {
+			print ("No shading group found for shape "+$each+".\n");
+		}
+	}
+
+}

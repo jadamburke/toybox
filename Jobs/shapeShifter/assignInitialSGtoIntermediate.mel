@@ -1,0 +1,13 @@
+// assignInitialSGtoIntermediate
+
+global proc assignInitialSGtoIntermediate() {
+
+	$sceneShapeNodes = `ls -io -s`;
+	for ($each in $sceneShapeNodes){
+		setAttr ($each+".intermediateObject") 0;
+		sets -e -forceElement initialShadingGroup $each;
+		setAttr ($each+".intermediateObject") 1;
+		print ("Assigned "+$each+" to lambert1\n");
+	}
+
+}

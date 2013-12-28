@@ -1,0 +1,19 @@
+// mirrorGeo.mel
+// Created by: raphe
+// Date: 2013/03/11 14:04:05
+
+global proc mirrorGeo(){
+
+	duplicate -rr;
+	group; xform -os -piv 0 0 0;
+	$myGroup = `ls -sl`;
+	setAttr ($myGroup[0] + ".scaleX") -1;
+	makeIdentity -apply true -t 1 -r 1 -s 1 -n 0;
+	ungroup;
+	$myGeo = `ls -sl`;
+	setAttr ($myGeo[0] + ".doubleSided") 0;
+	setAttr ($myGeo[0] + ".opposite") 0;
+	setAttr ($myGeo[0] + ".doubleSided") 1;
+	polyNormal -normalMode 0 -userNormalMode 1 -ch 1 $myGeo[0];
+
+}

@@ -1,0 +1,1296 @@
+// ppStereoCam
+
+
+// creates commands used in working with stereo cameras
+
+//eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/ppPlayblast.mel\"");
+
+global proc ppStereoCam () {
+
+	
+
+	if (`window -ex ppStereoWindow` != true)
+	{
+		window -w 150 -h 200 -t "ppStereoCamTools" -in "ppStereoCamTool" -s true -tb true ppStereoWindow;
+			
+		columnLayout -rs 1 -cal "center" -cat "both" 0 -adj true ppStereoColLyt;
+
+		//button -label "Conform Current Scene" -h 20 -w 60 -c "ppStereoCamConformScene";
+		button -label "Attach Stereo Rig" -h 20 -w 60 -c "ppStereoCamAddLeftEye";
+		button -en 0 -label "Rebuild Stereo Rig" -h 20 -w 60 -c "ppStereoCamRebuildStereoRig";
+		button -label "Prep AE Cameras" -h 20 -w 60 -c "ppStereoCamPrepAEExport";
+		button -label "Playblast L Textured" -h 20 -w 60 -c "ppStereoCamPlayblast \"left\"  \"parallel\" 1";
+		button -label "Playblast R Textured" -h 20 -w 60 -c "ppStereoCamPlayblast \"right\"  \"parallel\"1";
+ 		
+		button -label "Playblast L" -h 20 -w 60 -c "ppStereoCamPlayblast \"left\"  \"parallel\"0";
+		button -label "Playblast R" -h 20 -w 60 -c "ppStereoCamPlayblast \"right\"  \"parallel\"0"; 
+
+		//button -label "Anim Playblast L" -h 20 -w 60 -c "ppStereoCamAnmPlayblast \"left\"  \"parallel\"0"; 
+
+		button -label "Playblast Anaglyph" -h 20 -w 60 -c "ppStereoCamPlayblast \"anaglyph\"  \"off-axis\" 0";
+
+		button -label "Bake for Mastering" -h 20 -w 60 -c "ppStereoCamMaster";
+
+		// button -en 0 -label "Add Depth Fix" -h 20 -w 60 -c "ppStereoCamAddFix;";
+
+		button -en 0 -label "Revise Stereo Camera" -h 20 -w 60 -c "ppStereoCamTweakRightEye";
+
+		button -en 1 -label "Four Blasts" -h 40 -w 60 -c "ppPlayblastDoCurrentScene; ppStereoCamPlayblast \"left\"  \"parallel\" 0; ppStereoCamPlayblast \"right\"  \"parallel\" 0; ppStereoCamPlayblast \"anaglyph\"  \"off-axis\" 0";
+
+		window -e -w 150 -h 200 ppStereoWindow;
+		showWindow ppStereoWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 150 -h 200 ppStereoWindow;
+		showWindow ppStereoWindow;
+    	}
+
+
+}
+
+
+// this looks at the scene and tries to conform all cameras to standardized  naming conventions
+// user selects the non-stereo render camera
+// it confirms a stereo camera exists and checks that it is constrained to this camera
+// it compares camera settings such as film gate and film gate fit
+// it connects the focal length of the cameras
+global proc ppStereoCamConformScene ()  {
+
+	namespace -set ":";
+
+	setAttr "defaultResolution.width" 1920;
+	setAttr "defaultResolution.height" 1080;
+
+	string $renderCam[] = `ls -sl`;
+
+	if (size($renderCam) == 1){
+		string $camShapes[] = `listRelatives -shapes $renderCam[0]`;
+		if (`objectType $camShapes[0]` == "camera"){
+
+			// if the selected camera is not already named renderCam then we want to rename it
+			if ($renderCam[0] != "renderCam"){
+				// if there is already another object named renderCam, confirm with user the discrepency
+				if (`objExists renderCam`){
+					// prompt the user if they want to replace the current renderCam with this camera
+					string $result = `confirmDialog -title "Confirm" -message "Another renderCam Already Exists. Would you like to swap them?" -button "OK" -button "Cancel Conform" -defaultButton "OK" -cancelButton "Cancel Conform" -dismissString "Cancel"`;
+					
+					if ($result == "OK"){
+						rename "renderCam" "renderCamOld1";
+						rename $renderCam "renderCam";
+					}
+					else {
+						return;
+					}
+				}
+				else {
+					// must rename camera to renderCam;
+					string $result = `confirmDialog -title "Confirm" -message "Must rename camera to renderCam to continue." -button "OK" -button "Cancel Conform" -defaultButton "OK" -cancelButton "Cancel Conform" -dismissString "Cancel"`;
+					if ($result == "OK"){
+						rename $renderCam "renderCam";
+					}
+					else {
+						return;
+					}
+				}
+			}
+			// check for a stereo camera rig in the scene and make sure it is named stereoCam
+			if (`objExists "stereoCamera"`){
+				
+				// check that the stereo camera is constrained to the render camera
+				string $children[] = `listRelatives "stereoCamera"`;
+				int $foundConstraint = 0;
+				for ($each in $children){
+					if (`objectType $each` == "parentConstraint"){
+						string $connected = `connectionInfo -sfd ($each+".target[0].targetTranslate")`;
+						if ($connected != ""){
+							string $tokenBuffer[];
+							tokenize $connected "." $tokenBuffer;
+							// if its constrained to render cam then keep it, else delete the constraint
+							if ($tokenBuffer[0] == "renderCam"){
+								$foundConstraint = 1;
+							}
+							else {
+								delete $each;
+							}
+						}
+					}
+				}
+				
+
+				if ($foundConstraint == 0) {
+					string $result = `confirmDialog -title "Confirm" -message "StereoCamera is not constrained to this camera. Constrain it now?" -button "OK" -button "Cancel Conform" -defaultButton "OK" -cancelButton "Cancel Conform" -dismissString "Cancel"`;
+					if ($result == "OK"){
+						parentConstraint -weight 1 renderCam stereoCamera;
+					}
+					else {
+						return;
+					}
+
+				}
+
+
+				// check that the film gate and film gate fit are matching
+
+				setAttr stereoCameraCenterCamShape.stereo 2;
+				setAttr "stereoCameraCenterCamShape.horizontalFilmAperture" `getAttr "renderCam.horizontalFilmAperture"`;
+				setAttr "stereoCameraCenterCamShape.verticalFilmAperture" `getAttr "renderCam.verticalFilmAperture"`;
+				setAttr "stereoCameraCenterCamShape.lensSqueezeRatio" `getAttr "renderCam.lensSqueezeRatio"`;
+				setAttr stereoCameraCenterCamShape.filmFit `getAttr "renderCam.filmFit"`;
+
+				setAttr "stereoCameraCenterCamShape.postScale" 1;
+				setAttr "stereoCameraLeftShape.postScale" 1;
+				setAttr "stereoCameraRightShape.postScale" 1;
+
+				// check that the stereo camera focal length is connected to the render camera
+				if (!`isConnected "renderCamShape.focalLength" "stereoCameraCenterCamShape.focalLength"`){
+					connectAttr -f renderCamShape.focalLength stereoCameraCenterCamShape.focalLength;
+				}
+			}
+				else {
+				string $result = `confirmDialog -title "Confirm" -message "Stereo Camera does not Exist. Please create a stereoCamera and try again" -button "OK" -defaultButton "OK"`;
+				return;
+			}
+
+			
+			
+		}
+		else {
+			error("Please select a Renderable Camera");
+		}
+	}
+
+	// get a list of all cameras in the scene
+	string $cameraShapes[] = `ls -type camera`;
+
+	
+
+}
+
+// specifies which camera in the stereo rig to render a playblast from in addition to which stereo type and which display mode;
+
+global proc ppStereoCamPlayblast (string $stereoEye, string $stereoType, int $textureMode) {
+
+
+	int $imgWidth = 1920;
+	int $imgHeight = 1080;
+	float $postScale = 0.91;
+		float $hA;
+	float $hV;
+
+	// check for project defaults file and get settings from there
+	if (`exists abxProjectGetShotDetails`){
+		string $prjDetails[] = abxProjectGetShotDetails(`workspace -q -rd`);
+		if (size($prjDetails)>7){
+			//print ("// startDetails\n");
+			//print $prjDetails;
+			$lock = $prjDetails[0];
+			$fps = $prjDetails[1];
+			$imgWidth = $prjDetails[2];
+			$imgHeight = $prjDetails[3];
+			$hA = $prjDetails[5];
+			$hV =  $prjDetails[6];
+			$aspect = $prjDetails[4];
+			$sceneScale = $prjDetails[7];
+			$renderer = $prjDetails[8];
+		}	
+		else{
+			warning("Project Defaults File Not Found. Reverting to 1920 X 1080");
+		}
+	}
+	else {
+		warning("abxProject.mel not sourced. Skipping project defaults check.");
+	}
+
+
+	string $stereoCam;
+	if (`objExists "master:stereoCam"`)
+		$stereoCam = "master:stereoCam";
+	else if (`objExists "stereoCam"`)
+		$stereoCam = "stereoCam";
+	else {
+		error ("No master:stereoCam or stereoCam exists in the scene.");
+	}
+
+	string $stereoCamCenterShape = ($stereoCam+"CenterCamShape");
+	string $stereoCamLeft = ($stereoCam+"Left");
+	string $stereoCamLeftShape = ($stereoCam+"LeftShape");
+	string $stereoCamRight = ($stereoCam+"Right");
+	string $stereoCamRightShape = ($stereoCam+"RightShape");
+	
+	if (`objExists stereoCamRevised`){
+
+		$stereoCam = "stereoCamRevised";
+		$stereoCamCenterShape = "stereoCamRevisedCenterCamShape";
+		$stereoCamLeft = "stereoCamRevisedLeft";
+		$stereoCamLeftShape = "stereoCamRevisedLeftShape";
+
+		$stereoCamRight = "stereoCamRevisedRight";
+		$stereoCamRightShape = "stereoCamRevisedRightShape";
+
+	}
+
+	string $renderPath = (`workspace -q -rd`+"../../RENDER/_ALL_SHOTS/");
+	//string $renderPath = (`workspace -q -rd`+"images/_ALL_SHOTS/");
+	//M:/Skylanders_PP10069/3D/skylanders_maya/
+
+	string $sceneName = `file -q -shn -sn`;
+	$sceneName = basenameEx ($sceneName);
+	$fileName = $sceneName;
+
+	string $tokenBuffer[];
+	tokenize $sceneName "_" $tokenBuffer;
+
+	string $camLog = (`workspace -q -rd`+"/data/log/"+$sceneName+"_CAMDATA.txt");
+
+	writeCameraLogFile $camLog;
+		
+	string $shotName = ($tokenBuffer[0]+"_"+$tokenBuffer[1]);
+	string $seqName = ($tokenBuffer[0]);
+	string $pbPath = "";
+	if ($textureMode == 0)
+		$pbPath = ($renderPath+$seqName+"/"+$shotName+"/playblasts/"+$sceneName);
+		//$pbPath = ($renderPath+$seqName+"/"+$shotName+"/playblasts/"+$sceneName+"/"+$sceneName+"_"+$stereoEye);
+	else 
+		$pbPath = ($renderPath+$seqName+"/"+$shotName+"/playblasts/"+$sceneName);
+		//$pbPath = ($renderPath+$seqName+"/"+$shotName+"/playblasts/"+$sceneName+"Tex/"+$sceneName+"Tex_"+$stereoEye);
+
+	// get the active viewport and set it to the correct camera
+	string $activePanel = `getPanel -withFocus`;  
+	if (`modelPanel -q -exists $activePanel` || $activePanel == "StereoPanel"){
+
+		if ($stereoType == "off-axis")
+			setAttr ($stereoCamCenterShape+".stereo") 2;
+		else if ($stereoType == "converged")
+			setAttr ($stereoCamCenterShape+".stereo") 1;
+		else if ($stereoType == "parallel")
+			setAttr ($stereoCamCenterShape+".stereo") 3;
+		else if ($stereoType == "off")
+			setAttr ($stereoCamCenterShape+".stereo") 0;
+
+		select -clear;
+
+		//int $filmFit = `getAttr ($stereoCamCenterShape+".filmFit")`;
+
+		// compensates the overscan for horizontal or fill fit settings, overscan and vertical are not compensated.
+		//!if ($filmFit == 0 || $filmFit == 1){
+			//!setAttr ($stereoCamLeftShape+".postScale") $postScale;
+			//!setAttr ($stereoCamRightShape+".postScale") $postScale;
+		//!}
+
+		if ($stereoEye == "left"){
+			$fileName += "_L";
+			//!$imgWidth = int($imgWidth*1.1);
+			lookThroughModelPanel $stereoCamLeft $activePanel;
+
+			$activePanel = `getPanel -withFocus`; 
+			modelEditor -e -dtx false -allObjects false -ignorePanZoom true $activePanel;
+			modelEditor -e -nurbsSurfaces true -polymeshes true -dynamics true -fluids true -locators false -nParticles true -grid false $activePanel;
+			if ($textureMode == 1)
+				modelEditor -e -dtx true $activePanel;
+			modelEditor -e -displayAppearance "smoothShaded" $activePanel;
+			if ($textureMode == 0)
+				modelEditor -e -udm true $activePanel;
+			else 
+				modelEditor -e -udm false $activePanel;
+		}
+		else if ($stereoEye == "right"){
+			$fileName += "_R";
+			//!$imgWidth = int($imgWidth*1.1);
+			lookThroughModelPanel $stereoCamRight $activePanel;
+
+			$activePanel = `getPanel -withFocus`; 
+			modelEditor -e -dtx false -allObjects false -ignorePanZoom true $activePanel;
+			modelEditor -e -nurbsSurfaces true -polymeshes true -dynamics true -fluids true -locators false -nParticles true -grid false $activePanel;
+			if ($textureMode == 1)
+				modelEditor -e -dtx true $activePanel;
+			modelEditor -e -displayAppearance "smoothShaded" $activePanel;
+			if ($textureMode == 0)
+				modelEditor -e -udm true $activePanel;
+			else 
+				modelEditor -e -udm false $activePanel;
+		}
+		else if ($stereoEye == "anaglyph"){
+			$fileName += "_ANAGLYPH";
+			//$imgWidth = 1920;
+			stereoCameraSwitchToCamera $stereoCam $activePanel;
+
+			$activePanel = `getPanel -withFocus`; 
+			stereoCameraView -e -displayMode "anaglyphLum" StereoPanelEditor;
+			stereoCameraView -e -dtx false -allObjects false -ignorePanZoom true StereoPanelEditor;
+			stereoCameraView -e -nurbsSurfaces true -polymeshes true -dynamics true -fluids true -locators false -nParticles true -grid false StereoPanelEditor;
+			stereoCameraView -e -displayAppearance "smoothShaded" StereoPanelEditor;
+			modelEditor -e -dtx true StereoPanelEditor;
+			stereoCameraView -e -udm true StereoPanelEditor;	
+
+			setAttr ($stereoCamLeftShape+".postScale") 1;
+			setAttr ($stereoCamRightShape+".postScale") 1;	
+		}
+		print (`playblast -ae`+"\n");
+		print ("ppPlayblastDoBlast "+$stereoCam+" \""+$pbPath+"\" \""+$fileName+"\" \"png\" "+`playbackOptions -q -min`+" "+`playbackOptions -q -max`+" "+$imgWidth+" "+$imgHeight+"\n");
+		ppPlayblastDoBlast $stereoCam $pbPath $fileName "png" `playbackOptions -q -min` `playbackOptions -q -max` $imgWidth $imgHeight;
+
+
+
+		// set render globals
+		//setAttr "defaultRenderGlobals.animation" 1;
+		//setAttr defaultRenderGlobals.outFormatControl 0;
+		//setAttr "defaultRenderGlobals.extensionPadding" 4;
+
+
+		// SGI image format
+		//setAttr defaultRenderGlobals.imageFormat 5;
+
+		// JPEG image format 
+		//setAttr defaultRenderGlobals.imageFormat 8;
+
+		// MAYA IFF
+		//setAttr defaultRenderGlobals.imageFormat 7;
+
+		// PNG image format
+		//setAttr defaultRenderGlobals.imageFormat 32;
+
+		//int $percent = 50;
+
+		//if ($imgHeight < 720 || $imgWidth < 640){
+		//	$percent = 100;
+		//}
+		//if ($imgHeight > 2048 || $imgWidth > 2048){
+		//	$percent = 25;
+		//}
+		
+		//print (`playblast -ae`+"\n");
+		//string $cmd = "playblastHUDResize \"small\";";
+		// setup the playblast as a command string for deferred evaluation
+		//$cmd += ("playblast  -format iff -filename \""+$pbPath+"\" -forceOverwrite -sequenceTime 0 -clearCache 1 -viewer 1 -showOrnaments 0 -offScreen -fp 4 -percent "+$percent+" -widthHeight "+$imgWidth+" "+$imgHeight);
+
+		// add to the deferred command to return the render global image format to sgi
+		//$cmd += ";setAttr defaultRenderGlobals.imageFormat 5;";
+		//$cmd += "playblastHUDResize \"large\";";
+
+		// run the playblast command as deferred evaluation
+		//evalDeferred ($cmd);
+	}
+	else {
+			error ("Please select a 3d viewport to playblast\n");
+	}
+}
+
+
+// bakes the stereo camera rig into two regular cameras. 
+// turns off all other cameras renderable flag. 
+// deletes the renderCamShape to prevent accidental use. 
+// exports cameras to CAM folder
+global proc ppStereoCamMaster () {
+
+	int $imgWidth = 1920;
+	int $imgHeight = 1080;
+	float $postScale = 0.91;
+	float $hA;
+	float $hV;
+
+	// check for project defaults file and get settings from there
+	if (`exists abxProjectGetShotDetails`){
+		string $prjDetails[] = abxProjectGetShotDetails(`workspace -q -rd`);
+		if (size($prjDetails)>7){
+			//print ("// startDetails\n");
+			//print $prjDetails;
+			$lock = $prjDetails[0];
+			$fps = $prjDetails[1];
+			$imgWidth = $prjDetails[2];
+			$imgHeight = $prjDetails[3];
+			$hA = $prjDetails[5];
+			$hV =  $prjDetails[6];
+			$aspect = $prjDetails[4];
+			$sceneScale = $prjDetails[7];
+			$renderer = $prjDetails[8];
+		}	
+		else{
+			warning("Project Defaults File Not Found. Reverting to 1920 X 1080");
+		}
+	}
+	else {
+		warning("abxProject.mel not sourced. Skipping project defaults check.");
+	}
+
+	string $stereoCam;
+	if (`objExists "master:stereoCam"`)
+		$stereoCam = "master:stereoCam";
+	else if (`objExists "stereoCam"`)
+		$stereoCam = "stereoCam";
+	else if (`objExists "anm:stereoCam"`)
+		$stereoCam = "anm:stereoCam";
+	else if (`objExists "anm:master:stereoCam"`)
+		$stereoCam = "anm:master:stereoCam";
+	else {
+		error ("No master:stereoCam or stereoCam exists in the scene.");
+	}
+
+	string $stereoCamCenterShape = ($stereoCam+"CenterCamShape");
+	string $stereoCamLeft = ($stereoCam+"Left");
+	string $stereoCamLeftShape = ($stereoCam+"LeftShape");
+	string $stereoCamRight = ($stereoCam+"Right");
+	string $stereoCamRightShape = ($stereoCam+"RightShape");
+
+	if (`objExists $stereoCam`){
+
+
+	namespace -set ":";
+
+	// set the stereo cam to parallel
+	setAttr ($stereoCamCenterShape+".stereo") 3;
+
+	setAttr ($stereoCamLeftShape+".postScale") 1;
+	setAttr ($stereoCamRightShape+".postScale") 1;
+
+	
+
+	//if (`objExists stereoCamRevised`){
+
+	//	setAttr stereoCamRevisedCenterCamShape.stereo 3;
+
+	//	setAttr "stereoCamRevisedLeftShape.postScale" 1;
+	//	setAttr "stereoCamRevisedRightShape.postScale" 1;
+	//}
+
+
+ 	// create a new persp camera left
+	string $newCam[] = `camera 
+		-centerOfInterest 5 
+		-focalLength 35 
+		-lensSqueezeRatio 1 
+		-cameraScale 1 
+		-horizontalFilmAperture $hA 
+		-horizontalFilmOffset 0 
+		-verticalFilmAperture $hV
+		-verticalFilmOffset 0 
+		-filmFit 2
+		-overscan 1 
+		-motionBlur 0 
+		-shutterAngle 144 
+		-nearClipPlane 0.1 
+		-farClipPlane 10000 
+		-orthographic 0 
+		-orthographicWidth 30 
+		-panZoomEnabled 0 
+		-horizontalPan 0 
+		-verticalPan 0 
+		-zoom 1`;
+	
+	string $result = `rename $newCam[0] "renderCam_L"`;
+	string $camLeft = $result;
+	print ($result+"\n");
+	string $camLeftShape = ($result+"Shape");
+
+	// constrain the camera to the stereo rig left camera
+	evalEcho("parentConstraint -weight 1 "+$stereoCamLeft+" "+$camLeft);
+
+	// connect the focal length to the stereo rig left camera
+	connectAttr -f ($stereoCamLeftShape+".focalLength") ($camLeft+".focalLength");
+
+	// match the film gate settings and gate fit
+	setAttr ($camLeftShape+".horizontalFilmAperture") `getAttr ($stereoCamCenterShape+".horizontalFilmAperture")`;
+	setAttr ($camLeftShape+".verticalFilmAperture") `getAttr ($stereoCamCenterShape+".verticalFilmAperture")`;
+	setAttr ($camLeftShape+".lensSqueezeRatio") `getAttr ($stereoCamCenterShape+".lensSqueezeRatio")`;
+	setAttr ($camLeftShape+".filmFit") `getAttr ($stereoCamCenterShape+".filmFit")`;
+
+	setAttr ($camLeftShape+".postScale") `getAttr ($stereoCamLeftShape+".postScale")`;
+
+ 
+
+ 	// create a new persp camera right
+	$newCam = `camera 
+		-centerOfInterest 5 
+		-focalLength 35 
+		-lensSqueezeRatio 1 
+		-cameraScale 1 
+		-horizontalFilmAperture $hA 
+		-horizontalFilmOffset 0 
+		-verticalFilmAperture $hV 
+		-verticalFilmOffset 0 
+		-filmFit 2 
+		-overscan 1 
+		-motionBlur 0 
+		-shutterAngle 144 
+		-nearClipPlane 0.1 
+		-farClipPlane 10000 
+		-orthographic 0 
+		-orthographicWidth 30 
+		-panZoomEnabled 0 
+		-horizontalPan 0 
+		-verticalPan 0 
+		-zoom 1`;
+
+	string $result = "";
+	string $bakedStereoCamRight = "";
+
+	if (`objExists stereoCamRevised`){
+		
+		$result = `rename $newCam[0] "renderCam_RRevised"`;
+		$bakedStereoCamRight = "stereoCamRevisedRight";
+	}
+	else{
+
+		$result = `rename $newCam[0] "renderCam_R"`;
+		$bakedStereoCamRight = $stereoCamRight;
+	}
+	
+	
+	string $camRight = $result;
+	string $camRightShape = ($result+"Shape");
+
+	// constrain the camera to the stereo rig left camera
+	evalEcho("parentConstraint -weight 1 "+$bakedStereoCamRight+" "+$camRight);
+
+	// connect the focal length to the stereo rig left camera
+	connectAttr -f ($bakedStereoCamRight+"Shape.focalLength") ($camRight+".focalLength");
+
+
+
+	// match the film gate settings and gate fit
+	setAttr ($camRightShape+".horizontalFilmAperture") `getAttr ($stereoCamCenterShape+".horizontalFilmAperture")`;
+	setAttr ($camRightShape+".verticalFilmAperture") `getAttr ($stereoCamCenterShape+".verticalFilmAperture")`;
+	setAttr ($camRightShape+".lensSqueezeRatio") `getAttr ($stereoCamCenterShape+".lensSqueezeRatio")`;
+	setAttr ($camRightShape+".filmFit") `getAttr ($stereoCamCenterShape+".filmFit")`;
+
+	setAttr ($camRightShape+".postScale") `getAttr ($stereoCamRight+"Shape.postScale")`;
+
+
+
+
+	// bake both cameras including shapes
+
+	bakeResults -simulation true -t (`playbackOptions -q -min`+":"+`playbackOptions -q -max`) -sampleBy 1 -disableImplicitControl true -preserveOutsideKeys false -sparseAnimCurveBake false -removeBakedAttributeFromLayer false -bakeOnOverrideLayer false -controlPoints false -shape true {$camLeft, $camRight};
+
+
+	// delete constraint nodes
+	string $camRelatives[] = `listRelatives $camLeft`;
+	for ($each in $camRelatives){
+		if (`objectType $each` == "parentConstraint")
+			delete $each;
+	}
+
+	$camRelatives = `listRelatives $camRight`;
+	for ($each in $camRelatives){
+		if (`objectType $each` == "parentConstraint")
+			delete $each;
+	}
+
+	// delete stereoCam
+	//delete `ls stereoCam`;
+
+	// delete renderCam
+	//delete `ls renderCam`;
+
+	// set the render globals to 2112 by 1080
+
+
+	//setAttr "defaultResolution.width" 2112;
+	//setAttr "defaultResolution.height" 1080;
+
+	//!if (`getAttr ($stereoCamCenterShape+".filmFit")` != 2 && `getAttr ($stereoCamCenterShape+".filmFit")` != 3){
+		// multiply the focal length animation curves by .91 to correct for overscan
+	//!	scaleKey -scaleSpecifiedKeys 0 -timeScale 1 -timePivot 0 -floatScale 1 -floatPivot 0 -valueScale 0.91 -valuePivot 0 ($camLeftShape+".focalLength");
+	//!	scaleKey -scaleSpecifiedKeys 0 -timeScale 1 -timePivot 0 -floatScale 1 -floatPivot 0 -valueScale 0.91 -valuePivot 0 ($camRightShape+".focalLength");
+	//!}
+	reorder -front $camRight;
+	reorder -front renderCam_L;
+	
+	reorder -front side;
+	reorder -front front;
+	reorder -front top;
+	reorder -front persp;
+
+	}
+
+}
+
+global proc ppStereoCamPrepAEExport () {
+
+		int $imgWidth = 1920;
+	int $imgHeight = 1080;
+	float $postScale = 0.91;
+		float $hA;
+	float $hV;
+
+	// check for project defaults file and get settings from there
+	if (`exists abxProjectGetShotDetails`){
+		string $prjDetails[] = abxProjectGetShotDetails(`workspace -q -rd`);
+		if (size($prjDetails)>7){
+			//print ("// startDetails\n");
+			//print $prjDetails;
+			$lock = $prjDetails[0];
+			$fps = $prjDetails[1];
+			$imgWidth = $prjDetails[2];
+			$imgHeight = $prjDetails[3];
+			$hA = $prjDetails[5];
+			$hV =  $prjDetails[6];
+			$aspect = $prjDetails[4];
+			$sceneScale = $prjDetails[7];
+			$renderer = $prjDetails[8];
+		}	
+		else{
+			warning("Project Defaults File Not Found. Reverting to 1920 X 1080");
+		}
+	}
+	else {
+		warning("abxProject.mel not sourced. Skipping project defaults check.");
+	}
+
+
+	namespace -set ":";
+
+	//if (!`objExists "_AE_EXPORT_"`){
+	//	createNode transform -name "_AE_EXPORT_";
+	//}
+
+	// set the stereo cam to parallel
+	setAttr stereoCamCenterCamShape.stereo 3;
+
+	setAttr "stereoCamLeftShape.postScale" 1;
+	setAttr "stereoCamRightShape.postScale" 1;
+
+
+ 	// create a new persp camera left
+	string $newCam[] = `camera 
+		-centerOfInterest 5 
+		-focalLength 35 
+		-lensSqueezeRatio 1 
+		-cameraScale 1 
+		-horizontalFilmAperture $hA
+		-horizontalFilmOffset 0 
+		-verticalFilmAperture $hV
+		-verticalFilmOffset 0 
+		-filmFit Horizontal 
+		-overscan 1 
+		-motionBlur 0 
+		-shutterAngle 144 
+		-nearClipPlane 0.1 
+		-farClipPlane 10000 
+		-orthographic 0 
+		-orthographicWidth 30 
+		-panZoomEnabled 0 
+		-horizontalPan 0 
+		-verticalPan 0 
+		-zoom 1`;
+	
+	string $result = `rename $newCam[0] "aeStereoCamLeft"`;
+	string $camLeft = $result;
+	print ($result+"\n");
+	string $camLeftShape = ($result+"Shape");
+
+	// constrain the camera to the stereo rig left camera
+	evalEcho("parentConstraint -weight 1 stereoCamLeft "+$camLeft);
+
+	// connect the focal length to the stereo rig left camera
+	connectAttr -f stereoCamLeftShape.focalLength ($camLeft+".focalLength");
+
+	// match the film gate settings and gate fit
+	setAttr ($camLeftShape+".horizontalFilmAperture") `getAttr "stereoCamCenterCamShape.horizontalFilmAperture"`;
+	setAttr ($camLeftShape+".verticalFilmAperture") `getAttr "stereoCamCenterCamShape.verticalFilmAperture"`;
+	setAttr ($camLeftShape+".lensSqueezeRatio") `getAttr "stereoCamCenterCamShape.lensSqueezeRatio"`;
+	setAttr ($camLeftShape+".filmFit") `getAttr "stereoCamCenterCamShape.filmFit"`;
+
+	setAttr ($camLeftShape+".postScale") `getAttr "stereoCamLeftShape.postScale"`;
+
+ 
+
+ 	// create a new persp camera left
+	$newCam = `camera 
+		-centerOfInterest 5 
+		-focalLength 35 
+		-lensSqueezeRatio 1 
+		-cameraScale 1 
+		-horizontalFilmAperture $hA 
+		-horizontalFilmOffset 0 
+		-verticalFilmAperture $hV 
+		-verticalFilmOffset 0 
+		-filmFit Horizontal 
+		-overscan 1 
+		-motionBlur 0 
+		-shutterAngle 144 
+		-nearClipPlane 0.1 
+		-farClipPlane 10000 
+		-orthographic 0 
+		-orthographicWidth 30 
+		-panZoomEnabled 0 
+		-horizontalPan 0 
+		-verticalPan 0 
+		-zoom 1`;
+	
+	$result = `rename $newCam[0] "aeStereoCamRight"`;
+	string $camRight = $result;
+	string $camRightShape = ($result+"Shape");
+
+	if (`objExists stereoCamRevised`){
+		// constrain the camera to the stereo rig left camera
+		evalEcho("parentConstraint -weight 1 stereoCamRevisedRight "+$camRight);
+	}
+	else {
+		// constrain the camera to the stereo rig left camera
+		evalEcho("parentConstraint -weight 1 stereoCamRight "+$camRight);
+	}
+
+	// connect the focal length to the stereo rig left camera
+	connectAttr -f stereoCamRightShape.focalLength ($camRight+".focalLength");
+
+	// match the film gate settings and gate fit
+	setAttr ($camRightShape+".horizontalFilmAperture") `getAttr "stereoCamCenterCamShape.horizontalFilmAperture"`;
+	setAttr ($camRightShape+".verticalFilmAperture") `getAttr "stereoCamCenterCamShape.verticalFilmAperture"`;
+	setAttr ($camRightShape+".lensSqueezeRatio") `getAttr "stereoCamCenterCamShape.lensSqueezeRatio"`;
+	setAttr ($camRightShape+".filmFit") `getAttr "stereoCamCenterCamShape.filmFit"`;
+
+	setAttr ($camRightShape+".postScale") `getAttr "stereoCamRightShape.postScale"`;
+
+
+
+
+	// set the render globals to 2112 by 1080
+	//setAttr "defaultResolution.width" 2112;
+	//setAttr "defaultResolution.height" 1080;
+
+	// multiply the focal length animation curves by .91 to correct for overscan
+	//scaleKey -scaleSpecifiedKeys 0 -timeScale 1 -timePivot 0 -floatScale 1 -floatPivot 0 -valueScale 0.91 -valuePivot 0 ($camLeftShape+".focalLength");
+	//scaleKey -scaleSpecifiedKeys 0 -timeScale 1 -timePivot 0 -floatScale 1 -floatPivot 0 -valueScale 0.91 -valuePivot 0 ($camRightShape+".focalLength");
+
+	//parent $camLeft "_AE_EXPORT_";
+	//parent $camRight "_AE_EXPORT_";
+
+
+}
+
+global proc writeCameraLogFile (string $filePath){
+	
+ 		float $cfl =  `getAttr "renderCamShape.focalLength"`;
+		int $cfitGate = `getAttr "renderCamShape.filmFit"`;
+		float $cHAp = `getAttr "renderCamShape.horizontalFilmAperture"`;
+		float $cVAp = `getAttr "renderCamShape.verticalFilmAperture"`;
+		float $cPostScl = `getAttr "renderCamShape.postScale"`;	
+		float $cHFO = `getAttr "renderCamShape.horizontalFilmOffset"`;
+		float $cVFO = `getAttr "renderCamShape.verticalFilmOffset"`;
+
+		float $stereoAxial = `getAttr "stereoCamCenterCamShape.interaxialSeparation"`;
+		float $stereoZero = `getAttr "stereoCamCenterCamShape.zeroParallax"`;
+ 	
+ 		$fileId=`fopen $filePath "w"`;
+ 		fprint $fileId ("setAttr \"renderCamShape.focalLength\" "+$cfl+";\n");
+		fprint $fileId ("setAttr \"renderCamShape.filmFit\" "+$cfitGate+";\n");
+		fprint $fileId ("setAttr \"renderCamShape.horizontalFilmAperture\" "+$cHAp+";\n");
+		fprint $fileId ("setAttr \"renderCamShape.verticalFilmAperture\" "+$cVAp+";\n");
+		fprint $fileId ("setAttr \"renderCamShape.postScale\" "+$cPostScl+";\n");
+		fprint $fileId ("setAttr \"renderCamShape.horizontalFilmOffset\" "+$cHFO+";\n");
+		fprint $fileId ("setAttr \"renderCamShape.verticalFilmOffset\" "+$cVFO+";\n\n");
+
+		fprint $fileId ("setAttr \"stereoCamCenterCamShape.interaxialSeparation\" "+$stereoAxial+";\n");
+		fprint $fileId ("setAttr \"stereoCamCenterCamShape.zeroParallax\" "+$stereoZero+";\n");
+ 		fclose $fileId;
+ 		
+ 	
+
+}
+
+
+global proc  ppStereoCamAnmPlayblast (string $stereoEye, string $stereoType, int $textureMode) {
+
+	//setAttr "defaultResolution.width" 1920;
+	//setAttr "defaultResolution.height" 1080;
+	//setAttr "defaultResolution.pixelAspect" 1;
+
+	int $imgWidth = 1920;
+	int $imgHeight = 1080;
+	float $postScale = 0.91;
+		float $hA;
+	float $hV;
+
+	// check for project defaults file and get settings from there
+	if (`exists abxProjectGetShotDetails`){
+		string $prjDetails[] = abxProjectGetShotDetails(`workspace -q -rd`);
+		if (size($prjDetails)>7){
+			//print ("// startDetails\n");
+			//print $prjDetails;
+			$lock = $prjDetails[0];
+			$fps = $prjDetails[1];
+			$imgWidth = $prjDetails[2];
+			$imgHeight = $prjDetails[3];
+			$hA = $prjDetails[5];
+			$hV =  $prjDetails[6];
+			$aspect = $prjDetails[4];
+			$sceneScale = $prjDetails[7];
+			$renderer = $prjDetails[8];
+		}	
+		else{
+			warning("Project Defaults File Not Found. Reverting to 1920 X 1080");
+		}
+	}
+	else {
+		warning("abxProject.mel not sourced. Skipping project defaults check.");
+	}
+	
+
+	string $renderPath = (`workspace -q -rd`+"../../RENDER/_ALL_SHOTS/");
+	//string $renderPath = (`workspace -q -rd`+"images/_ALL_SHOTS/");
+	//M:/Skylanders_PP10069/3D/skylanders_maya/
+
+	string $sceneName = `file -q -shn -sn`;
+	$sceneName = basenameEx ($sceneName);
+
+	string $tokenBuffer[];
+	tokenize $sceneName "_" $tokenBuffer;
+
+	string $camLog = (`workspace -q -rd`+"log/"+$sceneName+"_CAMDATA.txt");
+
+	writeCameraLogFile $camLog;
+		
+	string $shotName = ($tokenBuffer[0]+"_"+$tokenBuffer[1]);
+	string $seqName = $tokenBuffer[0];
+	string $pbPath = "";
+	if ($textureMode == 0)
+		$pbPath = ($renderPath+$seqName+"/"+$shotName+"/playblasts/"+$sceneName+"/"+$stereoEye+"/"+$sceneName+"_"+$stereoEye);
+	else 
+		$pbPath = ($renderPath+$seqName+"/"+$shotName+"/playblasts/"+$sceneName+"Tex/"+$stereoEye+"/"+$sceneName+"Tex_"+$stereoEye);
+
+	// get the active viewport and set it to the correct camera
+	string $activePanel = `getPanel -withFocus`;  
+
+	if ($stereoType == "off-axis")
+		setAttr stereoCamCenterCamShape.stereo 2;
+	else if ($stereoType == "converged")
+		setAttr stereoCamCenterCamShape.stereo 1;
+	else if ($stereoType == "parallel")
+		setAttr stereoCamCenterCamShape.stereo 3;
+	else if ($stereoType == "off")
+		setAttr stereoCamCenterCamShape.stereo 0;
+
+	select -clear;
+
+	int $filmFit = `getAttr stereoCamCenterCamShape.filmFit`;
+
+	// compensates the overscan for horizontal or fill fit settings, overscan and vertical are not compensated.
+	if ($filmFit == 0 || $filmFit == 1){
+		//setAttr "stereoCamLeftShape.postScale" $postScale;
+		//setAttr "stereoCamRightShape.postScale" $postScale;
+	}
+
+	if ($stereoEye == "left"){
+		if (!`objExists stereoCam`)
+			error ("StereoCam does not exist. Please create a stereo cam and match to the the mayaProject/log/shot##CAMDATA.txt for settings");
+		$imgWidth = 2112;
+
+		setAttr "stereoCamCenterCamShape.overscan" 1;
+		
+		lookThroughModelPanel stereoCamLeft $activePanel;
+		$activePanel = `getPanel -withFocus`; 
+		//modelEditor -e -dtx false -allObjects false -ignorePanZoom true $activePanel;
+		//modelEditor -e -nurbsSurfaces true -polymeshes true -dynamics true -fluids false -locators true -nParticles true -grid false $activePanel;
+		//if ($textureMode == 1)
+		//	modelEditor -e -dtx true $activePanel;
+		//modelEditor -e -displayAppearance "smoothShaded" $activePanel;
+		//if ($textureMode == 0)
+		//	modelEditor -e -udm true $activePanel;
+		//else 
+		//	modelEditor -e -udm false $activePanel;
+	}
+	else if ($stereoEye == "right"){
+
+		
+		if (!`objExists stereoCam`)
+			error ("StereoCam does not exist. Please create a stereo cam and match to the the mayaProject/log/shot##CAMDATA.txt for settings");
+
+		setAttr "stereoCamCenterCamShape.overscan" 1;
+
+		//$imgWidth = 2112;
+		lookThroughModelPanel stereoCamRight $activePanel;
+		$activePanel = `getPanel -withFocus`; 
+		//modelEditor -e -dtx false -allObjects false -ignorePanZoom true $activePanel;
+		//modelEditor -e -nurbsSurfaces true -polymeshes true -dynamics true -fluids false -locators true -nParticles true -grid false $activePanel;
+		//if ($textureMode == 1)
+		//	modelEditor -e -dtx true $activePanel;
+		//modelEditor -e -displayAppearance "smoothShaded" $activePanel;
+		//if ($textureMode == 0)
+		//	modelEditor -e -udm true $activePanel;
+		//else 
+		//	modelEditor -e -udm false $activePanel;
+	}
+	else if ($stereoEye == "anaglyph"){
+		if (!`objExists stereoCam`)
+			error ("StereoCam does not exist. Please create a stereo cam and match to the the mayaProject/log/shot##CAMDATA.txt for settings");
+
+		setAttr "stereoCamCenterCamShape.overscan" 1;
+
+		//$imgWidth = 1920;
+		stereoCameraSwitchToCamera stereoCam $activePanel;
+		$activePanel = `getPanel -withFocus`; 
+		stereoCameraView -e -displayMode "anaglyphLum" StereoPanelEditor;
+		//stereoCameraView -e -dtx false -allObjects false -ignorePanZoom true StereoPanelEditor;
+		//stereoCameraView -e -nurbsSurfaces true -polymeshes true -dynamics true -fluids false -locators true -nParticles true -grid false StereoPanelEditor;
+		stereoCameraView -e -displayAppearance "smoothShaded" StereoPanelEditor;
+		//stereoCameraView -e -udm true StereoPanelEditor;	
+
+		setAttr "stereoCamLeftShape.postScale" 1;
+		setAttr "stereoCamRightShape.postScale" 1;	
+	}
+	else if ($stereoEye == "center"){
+		//$imgWidth =1920;
+
+		
+		if (!`objExists renderCam`)
+			error ("RenderCam does not exist. Please conform your scene or make your main camera named renderCam");
+
+		setAttr "renderCamShape.overscan" 1;
+
+		lookThroughModelPanel renderCam $activePanel;
+		$activePanel = `getPanel -withFocus`; 
+		
+	}
+
+
+
+
+	// set render globals
+	//setAttr "defaultRenderGlobals.animation" 1;
+	//setAttr defaultRenderGlobals.outFormatControl 0;
+	//setAttr "defaultRenderGlobals.extensionPadding" 4;
+
+
+	// SGI image format
+	//setAttr defaultRenderGlobals.imageFormat 5;
+
+	// JPEG image format 
+	//setAttr defaultRenderGlobals.imageFormat 8;
+
+	// MAYA IFF
+	//setAttr defaultRenderGlobals.imageFormat 7;
+
+	// PNG image format
+	setAttr defaultRenderGlobals.imageFormat 32;
+	
+	print (`playblast -ae`+"\n");
+	string $cmd = "playblastHUDResize \"small\";";
+	// setup the playblast as a command string for deferred evaluation
+	$cmd += ("playblast  -format avi -sequenceTime 0 -clearCache 1 -viewer 1 -showOrnaments 0 -compression \"MS-CRAM\" -quality 100 -offScreen -fp 4 -percent 50 -widthHeight "+$imgWidth+" "+$imgHeight);
+	
+
+
+	// add to the deferred command to return the render global image format to sgi
+	$cmd += ";setAttr defaultRenderGlobals.imageFormat 5;";
+	$cmd += "playblastHUDResize \"large\";";
+	// run the playblast command as deferred evaluation
+	evalDeferred ($cmd);
+}
+
+global proc ppStereoCamAddFix () {
+	if (`objExists stereoCam`){
+		addAttr -at "double" -ln "depthFix";
+		setAttr -keyable 1 stereoCam.depthFix;
+		setAttr -lock 0 stereoCamRight.translate;
+		disconnectAttr stereoCam.stereoRightOffset stereoCamRight.translateX;
+		$dlNode = `createNode -skipSelect addDoubleLinear`;
+		connectAttr stereoCam.stereoRightOffset ($dlNode+".input1");
+		connectAttr stereoCam.depthFix ($dlNode+".input2");
+		connectAttr ($dlNode+".output") stereoCamRight.translateX;
+
+	}
+	else {
+		print ("stereoCam not found. aborting\n");
+
+	}
+
+
+}
+
+global proc ppStereoCamRebuildStereoRig () {
+
+	if (`objExists stereoCamera`){
+
+		// get stereo camera settings
+
+		float $currentIA = `getAttr stereoCameraCenterCamShape.interaxialSeparation`;
+		float $currentZP = `getAttr stereoCameraCenterCamShape.zeroParallax`;
+
+		// delete stereo camera
+		delete stereoCamera;
+
+		// create new stereo camera
+		python("import maya.app.stereo.stereoCameraRig");
+		string $results[] = python("maya.app.stereo.stereoCameraRig.createStereoCameraRig()");
+
+
+		// restore stereo settings
+		setAttr "stereoCameraCenterCamShape.interaxialSeparation"$currentIA;
+		setAttr "stereoCameraCenterCamShape.zeroParallax" $currentZP;
+
+
+
+		// constrain to renderCam
+		// constrain camera to the original stereo camera
+		string $constraint[] = `parentConstraint -weight 1 renderCam stereoCamera`;
+
+		// lock the stereo cam transforms
+		setAttr -l 1 "stereoCamera.tx";
+		setAttr -l 1 "stereoCamera.ty";
+		setAttr -l 1 "stereoCamera.tz";
+		setAttr -l 1 "stereoCamera.rx";
+		setAttr -l 1 "stereoCamera.ry";
+		setAttr -l 1 "stereoCamera.rz";
+
+		// color the cameras for easier viewing
+		setAttr "stereoCameraCenterCamShape.visibility" 0;
+        
+		setAttr "stereoCameraLeftShape.overrideEnabled" 1;
+		setAttr "stereoCameraRightShape.overrideEnabled" 1;
+        
+		setAttr "stereoCameraLeftShape.overrideColor" 12;
+		setAttr "stereoCameraRightShape.overrideColor" 18;
+
+		setAttr stereoCameraCenterCamShape.stereo 2;
+		setAttr "stereoCameraCenterCamShape.horizontalFilmAperture" `getAttr "renderCam.horizontalFilmAperture"`;
+		setAttr "stereoCameraCenterCamShape.verticalFilmAperture" `getAttr "renderCam.verticalFilmAperture"`;
+		setAttr "stereoCameraCenterCamShape.lensSqueezeRatio" `getAttr "renderCam.lensSqueezeRatio"`;
+		setAttr stereoCameraCenterCamShape.filmFit `getAttr "renderCam.filmFit"`;
+
+		setAttr "stereoCameraCenterCamShape.postScale" 1;
+		setAttr "stereoCameraLeftShape.postScale" 1;
+		setAttr "stereoCameraRightShape.postScale" 1;
+
+		// check that the stereo camera focal length is connected to the render camera
+		if (!`isConnected "renderCamShape.focalLength" "stereoCameraCenterCamShape.focalLength"`){
+			connectAttr -f renderCamShape.focalLength stereoCameraCenterCamShape.focalLength;
+		}
+		
+
+		// if a stereoCamTweak exists 
+		if (`objExists "stereoCameraRevised"`){
+
+			// get the camera settings from the tweak eye
+			float $revisedIA = `getAttr stereoCameraRevisedCenterCamShape.interaxialSeparation`;
+			float $revisedZP = `getAttr stereoCameraRevisedCenterCamShape.zeroParallax`;
+
+			// delete the stereCamTweak
+			delete stereoCameraRevised;
+
+			// run ppStereoCamTweakRight Eye
+			ppStereoCamTweakRightEye;
+
+			// set the stereo settings for the tweak eye
+			setAttr "stereoCameraRevisedCenterCamShape.interaxialSeparation"$revisedIA;
+			setAttr "stereoCameraRevisedCenterCamShape.zeroParallax" $revisedZP;
+		}
+	}
+
+}
+
+global proc ppStereoCamTweakRightEye () {
+
+	if (`objExists stereoCamera`){
+
+		float $currentIA = `getAttr stereoCameraCenterCamShape.interaxialSeparation`;
+		float $currentZP = `getAttr stereoCameraCenterCamShape.zeroParallax`;
+
+		// create a new stereo camera
+
+		python("import maya.app.stereo.stereoCameraRig");
+		string $results[] = python("maya.app.stereo.stereoCameraRig.createStereoCameraRig()");
+	
+		rename $results[0] "stereoCameraRevised";
+		rename $results[1] "stereoCameraRevisedLeft";
+		rename $results[2] "stereoCameraRevisedRight";
+		
+		// constrain camera to the original stereo camera
+		string $constraint[] = `parentConstraint -weight 1 stereoCamera stereoCameraRevised`;
+
+		// create 2 multiply divide nodes and a addDoubleLinear
+		createNode -n "stereoCameraRevised_MD1" multiplyDivide;
+		createNode -n "stereoCameraRevised_MD2" multiplyDivide;
+		createNode -n "stereoCameraRevised_ADL1" addDoubleLinear;
+
+		// connect network
+		connectAttr "stereoCameraCenterCamShape.interaxialSeparation" "stereoCameraRevised_MD1.input1X";
+		setAttr "stereoCameraRevised_MD1.input2X" -2;
+		setAttr "stereoCameraRevised_MD1.operation" 2;
+		connectAttr  "stereoCameraRevised_MD1.outputX" "stereoCameraRevised_ADL1.input1";
+
+		connectAttr "stereoCameraRevisedCenterCamShape.interaxialSeparation" "stereoCameraRevised_MD2.input1X";
+		setAttr "stereoCameraRevised_MD2.input2X" 2;
+		setAttr "stereoCameraRevised_MD2.operation" 2;
+		connectAttr  "stereoCameraRevised_MD2.outputX" "stereoCameraRevised_ADL1.input2";
+
+		connectAttr "stereoCameraRevised_ADL1.output" ($constraint[0]+".target[0].targetOffsetTranslateX"); 
+
+		setAttr stereoCameraRevisedCenterCamShape.stereo 2;
+		setAttr "stereoCameraRevisedCenterCamShape.horizontalFilmAperture" `getAttr "renderCam.horizontalFilmAperture"`;
+		setAttr "stereoCameraRevisedCenterCamShape.verticalFilmAperture" `getAttr "renderCam.verticalFilmAperture"`;
+		setAttr "stereoCameraRevisedCenterCamShape.lensSqueezeRatio" `getAttr "renderCam.lensSqueezeRatio"`;
+		setAttr stereoCameraRevisedCenterCamShape.filmFit `getAttr "renderCam.filmFit"`;
+
+		setAttr "stereoCameraRevisedCenterCamShape.postScale" 1;
+		setAttr "stereoCameraRevisedLeftShape.postScale" 1;
+		setAttr "stereoCameraRevisedRightShape.postScale" 1;
+
+
+		connectAttr "stereoCameraCenterCamShape.focalLength"  "stereoCameraRevisedCenterCamShape.focalLength";
+				
+        	setAttr  "stereoCameraCenterCamShape.visibility" 0;
+		setAttr "stereoCameraRevisedCenterCamShape.visibility" 0;
+        
+		setAttr "stereoCameraRevisedLeftShape.overrideEnabled" 1;
+		setAttr "stereoCameraRevisedRightShape.overrideEnabled" 1;
+        
+		setAttr "stereoCameraRevisedLeftShape.overrideColor" 12;
+		setAttr "stereoCameraRevisedRightShape.overrideColor" 18;
+		// lock the original stereo camera settings
+
+		setAttr -l 1 "stereoCameraCenterCamShape.interaxialSeparation";
+		setAttr -l 1 "stereoCameraCenterCamShape.zeroParallax";
+
+		setAttr "stereoCameraRevisedCenterCamShape.interaxialSeparation" $currentIA;
+		setAttr "stereoCameraRevisedCenterCamShape.zeroParallax" $currentZP;
+
+		setAttr -l 1 "stereoCamera.tx";
+		setAttr -l 1 "stereoCamera.ty";
+		setAttr -l 1 "stereoCamera.tz";
+		setAttr -l 1 "stereoCamera.rx";
+		setAttr -l 1 "stereoCamera.ry";
+		setAttr -l 1 "stereoCamera.rz";
+
+		setAttr -l 1 "stereoCameraRevised.tx";
+		setAttr -l 1 "stereoCameraRevised.ty";
+		setAttr -l 1 "stereoCameraRevised.tz";
+		setAttr -l 1 "stereoCameraRevised.rx";
+		setAttr -l 1 "stereoCameraRevised.ry";
+		setAttr -l 1 "stereoCameraRevised.rz";
+
+		setAttr stereoCamera.visibility 0;
+		
+	}
+
+}
+
+
+// attaches a stereoCameraRig where the selected camera becomres the right eye
+global proc ppStereoCamAddLeftEye () {
+
+	string $rc = "renderCam";
+
+	if (`objExists "master:renderCam"`){
+		$rc = "master:renderCam";
+	}
+
+	if (`objExists $rc`){
+
+		// add attributes to camerashape
+		if (!`attributeExists "stereoInterAxial" ($rc+"Shape")`){
+			addAttr -ln "stereoInterAxial"  -at double  -min 0 -dv 6.35 ($rc+"Shape");
+			setAttr -e -keyable true ($rc+"Shape.stereoInterAxial");
+		}
+		
+		if (!`attributeExists "stereoZeroParallax" ($rc+"Shape")`){
+			addAttr -ln "stereoZeroParallax"  -at double  -min .001 -dv 200 ($rc+"Shape");
+			setAttr -e -keyable true ($rc+"Shape.stereoZeroParallax");
+		}
+
+		float $currentIA = `getAttr ($rc+"Shape.stereoInterAxial")`;
+		float $currentZP = `getAttr ($rc+"Shape.stereoZeroParallax")`;
+
+		// create a new stereo camera
+		if (!`objExists "stereoCam"`){
+			python("import maya.app.stereo.stereoCameraRig");
+			string $results[] = python("maya.app.stereo.stereoCameraRig.createStereoCameraRig()");
+			rename $results[0] "stereoCam";
+			rename $results[1] "stereoCamLeft";
+			rename $results[2] "stereoCamRight";
+		}
+		else {
+			error("StereoCam Already exists. Please delete your current \"stereoCam\" and try again.");
+			return;
+		}
+		
+		// constrain camera to the render cam
+		string $constraint[] = `parentConstraint -weight 1 $rc stereoCam`;
+
+		// create 2 multiply divide nodes and a addDoubleLinear
+		createNode -n "stereoCam_MD1" multiplyDivide;
+		//createNode -n "stereoCam_MD2" multiplyDivide;
+		//createNode -n "stereoCam_ADL1" addDoubleLinear;
+
+		connectAttr ($rc+"Shape.stereoInterAxial") "stereoCamCenterCamShape.interaxialSeparation";
+		connectAttr ($rc+"Shape.stereoZeroParallax") "stereoCamCenterCamShape.zeroParallax";
+		connectAttr ($rc+"Shape.nearClipPlane") "stereoCamCenterCamShape.nearClipPlane";
+		connectAttr ($rc+"Shape.farClipPlane") "stereoCamCenterCamShape.farClipPlane";
+		connectAttr ($rc+"Shape.lensSqueezeRatio") "stereoCamCenterCamShape.lensSqueezeRatio";
+
+		connectAttr ($rc+"Shape.horizontalFilmAperture") "stereoCamCenterCamShape.horizontalFilmAperture";
+		connectAttr ($rc+"Shape.verticalFilmAperture") "stereoCamCenterCamShape.verticalFilmAperture";
+
+		connectAttr ($rc+"Shape.locatorScale") "stereoCamCenterCamShape.locatorScale";
+		connectAttr ($rc+"Shape.locatorScale") "stereoCamRightShape.locatorScale";
+		connectAttr ($rc+"Shape.locatorScale") "stereoCamLeftShape.locatorScale";
+
+		// connect network
+		connectAttr "stereoCamCenterCamShape.interaxialSeparation" "stereoCam_MD1.input1X";
+		setAttr "stereoCam_MD1.input2X" -2;
+		setAttr "stereoCam_MD1.operation" 2;
+		connectAttr  "stereoCam_MD1.outputX" ($constraint[0]+".target[0].targetOffsetTranslateX");
+
+		//connectAttr "stereoCamCenterCamShape.interaxialSeparation" "stereoCam_MD2.input1X";
+		//setAttr "stereoCam_MD2.input2X" 2;
+		//setAttr "stereoCam_MD2.operation" 2;
+		//connectAttr  "stereoCam_MD2.outputX" "stereoCam_ADL1.input2";
+
+		//connectAttr "stereoCam_ADL1.output" ($constraint[0]+".target[0].targetOffsetTranslateX"); 
+
+		setAttr stereoCamCenterCamShape.stereo 2;
+		//setAttr "stereoCamCenterCamShape.horizontalFilmAperture" `getAttr "renderCam.horizontalFilmAperture"`;
+		//setAttr "stereoCamCenterCamShape.verticalFilmAperture" `getAttr "renderCam.verticalFilmAperture"`;
+		//setAttr "stereoCamCenterCamShape.lensSqueezeRatio" `getAttr "renderCam.lensSqueezeRatio"`;
+		setAttr stereoCamCenterCamShape.filmFit `getAttr ($rc+".filmFit")`;
+
+		setAttr "stereoCamCenterCamShape.postScale" 1;
+		setAttr "stereoCamLeftShape.postScale" 1;
+		setAttr "stereoCamRightShape.postScale" 1;
+
+
+		connectAttr ($rc+"Shape.focalLength")  "stereoCamCenterCamShape.focalLength";
+				
+        //setAttr  "renderCamShape.visibility" 0;
+		setAttr "stereoCamCenterCamShape.visibility" 0;
+        
+		setAttr "stereoCamLeftShape.overrideEnabled" 1;
+		setAttr "stereoCamRightShape.overrideEnabled" 1;
+        
+		setAttr "stereoCamLeftShape.overrideColor" 12;
+		setAttr "stereoCamRightShape.overrideColor" 18;
+
+		// hide the right cam since render cam will be in its place
+		setAttr "stereoCamRight.visibility" 0;
+
+		// lock the original stereo camera settings
+
+		//setAttr -l 1 "renderCamShape.stereoInterAxial";
+		//setAttr -l 1 "renderCamShape.stereoZeroParallax";
+
+		//setAttr "stereoCamCenterCamShape.interaxialSeparation" $currentIA;
+		//setAttr "stereoCamCenterCamShape.zeroParallax" $currentZP;
+
+		//setAttr -l 1 "renderCam.tx";
+		//setAttr -l 1 "renderCam.ty";
+		//setAttr -l 1 "renderCam.tz";
+		//setAttr -l 1 "renderCam.rx";
+		//setAttr -l 1 "renderCam.ry";
+		//setAttr -l 1 "renderCam.rz";
+
+		setAttr -l 1 "stereoCam.tx";
+		setAttr -l 1 "stereoCam.ty";
+		setAttr -l 1 "stereoCam.tz";
+		setAttr -l 1 "stereoCam.rx";
+		setAttr -l 1 "stereoCam.ry";
+		setAttr -l 1 "stereoCam.rz";
+
+		//setAttr renderCam.visibility 0;
+		
+	}
+	else {
+		error("Cannot Find a \"master:renderCam\" or a \"renderCam\" to attach StereoCam To. Please Create or rename your scene camera to \"renderCam\"");
+	}
+
+}
+

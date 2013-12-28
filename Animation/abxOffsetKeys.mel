@@ -1,0 +1,38 @@
+// abxOffsetKeys
+
+global proc abxOffsetKeys () {
+
+if (`window -ex abxOffsetKeysWindow` != true)
+	{
+		window -w 150 -h 200 -t "abxOffsetKeys" -in "abxOffsetKeys" -s true -tb true abxOffsetKeysWindow;
+
+		columnLayout -rs 1 -w 400 -cal "center" -cat "both" 0 -adj true abxTimeOffsetColLyt;
+
+
+		button -label "Enable Selected" -h 20 -w 60 -c "timeOffsetAdd";
+		button -label "Enable As Group" -h 20 -w 60 -c "timeOffsetGroupAdd";
+		button -label "Disable Selected" -h 20 -w 60 -c "timeOffsetRemoveKeepAttr";
+		button -label "Remove Completely" -h 20 -w 60 -c "timeOffsetRemove";
+		button -label "Bake Offset" -h 20 -w 60 -c "timeOffsetBake";
+		button -label "UnBake Offset" -h 20 -w 60 -c "timeOffsetUnbake";
+		button -label "KeyWithOffset" -h 20 -w 60 -c "keyWithTimeOffset";
+
+		button -label "Sequence Offset Attr" -h 20 -w 60 -c "timeOffsetSequence";
+		button -label "Randomize Offset Attr" -h 20 -w 60 -c "timeOffsetRandom";
+
+		window -e -w 150 -h 200 abxOffsetKeysWindow;
+		showWindow abxOffsetKeysWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 150 -h 200 abxOffsetKeysWindow;
+		showWindow abxOffsetKeysWindow;
+    	}
+
+
+}
+
+global proc abxOffsetKeysRand(){
+
+
+}

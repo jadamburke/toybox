@@ -1,0 +1,627 @@
+/* To Do
+
+Fix Double Translations
+Clean and fix up the messy MEL
+deselect the taffy spheres
+reset button?
+
+Fix it when they use feet instead of centimeters. Can't use the floatslider as source.
+
+
+Half this script is mine.
+The other half belongs to about a dozen or so people. I don't remember who they are.
+
+
+Keith Osborn
+
+
+*/
+
+
+
+global proc taffy()
+{
+
+
+
+if (`window -q -ex taffyWin`)
+   {
+   showWindow taffyWin ;
+   return ;
+   }
+
+
+// Load Prefs
+//   float $taffyInfluence = 1 ;
+
+// Make Window
+   window -s 0 -t "" taffyWin;
+
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+			text -label "" -height 2;
+			frameLayout -borderStyle "out" -labelVisible 0 -marginWidth 2 -marginHeight 4 -bgc 1 0.5 1;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1 -bgc 1 0.5 1;
+			text -label "Face Taffy 1.0" -align "center" -bgc 1 0.7 1 -font "tinyBoldLabelFont" -height 20;
+			setParent ..;
+			setParent ..; 
+			text -label "" -height 5;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+			frameLayout -borderStyle "out" -labelVisible 0 -marginWidth 2 -marginHeight 2;
+			columnLayout -columnAttach "both" 2 -adjustableColumn 1;
+			text -label "" -height 8;
+			frameLayout -borderStyle "etchedOut" -labelVisible 0 -marginWidth 4 -marginHeight 2;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+			text -label "" -height 10 -align "center";
+			text -label "  1. Select some verts on the BLEND head. " -height 20 -align "left";
+			text -label "" -height 10 -align "center";
+			setParent ..;
+			setParent ..;
+			text -label "" -height 10;
+			frameLayout -borderStyle "etchedIn" -labelVisible 0 -marginWidth 0 -marginHeight 2;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+			button -label "CREATE TAFFY INFLUENCE" -command taffyInfluence -height 30;
+			setParent ..;
+			setParent ..;
+			text -label "" -height 8;
+				
+			setParent ..;
+			setParent ..; 
+			setParent ..;
+			text -label "" -height 5;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+			frameLayout -borderStyle "out" -labelVisible 0 -marginWidth 2 -marginHeight 2;
+			columnLayout -columnAttach "both" 2 -adjustableColumn 1;
+			text -label "" -height 8;
+			frameLayout -borderStyle "etchedOut" -labelVisible 0 -marginWidth 4 -marginHeight 2;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+			text -label "" -height 10 -align "center";
+			text -label "  2. Adjust the influence then make some taffy. " -height 20 -align "left";
+			text -label "" -height 10 -align "center";
+			setParent ..;
+			setParent ..;
+			text -label "" -height 10;
+//			frameLayout -borderStyle "etchedIn" -labelVisible 0 -marginWidth 0 -marginHeight 2;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+    	floatSliderGrp -field true -min 0.05 -max 5.00 -v 1 -pre 2 -adj 2 -cw2 40 270 -cc ("influenceSize();") fsgInfluence;
+//			setParent ..;
+			setParent ..;
+			text -label "" -height 10;
+			frameLayout -borderStyle "etchedIn" -labelVisible 0 -marginWidth 0 -marginHeight 2;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+			button -label "MAKE TAFFY!" -command makeTaffy -height 30;
+			setParent ..;
+			setParent ..;
+			text -label "" -height 8;
+				
+			setParent ..;
+			setParent ..; 
+			setParent ..;
+   
+   			text -label "" -height 5;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+			frameLayout -borderStyle "out" -labelVisible 0 -marginWidth 2 -marginHeight 2;
+			columnLayout -columnAttach "both" 2 -adjustableColumn 1;
+			text -label "" -height 8;
+			frameLayout -borderStyle "etchedOut" -labelVisible 0 -marginWidth 4 -marginHeight 2;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+			text -label "" -height 10 -align "center";
+			text -label "  3. Select the control then paints weights. " -height 20 -align "left";
+			text -label "" -height 10 -align "center";
+			setParent ..;
+			setParent ..;
+			text -label "" -height 10;
+			frameLayout -borderStyle "etchedIn" -labelVisible 0 -marginWidth 0 -marginHeight 2;
+			columnLayout -columnAttach "both" 1 -adjustableColumn 1;
+			button -label "PAINT WEIGHTS" -command paintTaffyWeights -height 30;
+			setParent ..;
+			setParent ..;
+			text -label "" -height 8;
+				
+			setParent ..;
+			setParent ..; 
+			setParent ..;
+   
+   
+    showWindow;
+    window -e -w 265 -h 475 taffyWin;
+}
+
+global proc taffyInfluence()
+{
+float $xyz[3];
+global string $myVerts[];
+string $myVerts[] = `ls -sl`;
+global string $myArray[];
+string $myArray[] = stringToStringArray($myVerts[0], ".");
+
+int $count = 0;
+
+global string $selVtx[];
+string $selVtx[] = `filterExpand -ex 1 -fp 1 -sm 31`;
+// string $selectionUV[] = `polyListComponentConversion -tuv`;
+if (!size($selVtx)) error "No vertices selected.";
+// if ((size ($selectionUV) > 1) || (size ($selectionUV) == 0))
+//		{
+//		error "Vertices cannot be on a texture border edge";
+//		}
+	
+	
+			// Chreate the shader
+			shadingNode -as lambert -n "taffy_MAT";
+			setAttr "taffy_MAT.color" -type double3 0 0 0 ;
+			setAttr "taffy_MAT.incandescence" -type double3 1 0.7 1;
+			setAttr "taffy_MAT.transparency" -type double3 0.6 0.6 0.6;
+
+
+for ($vtx in $selVtx)
+{	
+	$xyz = `pointPosition -w $vtx`;
+	sphere -r 1 -ax 0 1 0 -ch 0 -n ("taffy_Influence_"+$count);
+	move -a $xyz[0] $xyz[1] $xyz[2];
+	makeIdentity -apply true -t 1 -r 1 -s 0 -n 0;
+	setAttr -keyable false -channelBox false -lock true ("taffy_Influence_"+$count + ".tx");
+	setAttr -keyable false -channelBox false -lock true ("taffy_Influence_"+$count + ".ty");
+	setAttr -keyable false -channelBox false -lock true ("taffy_Influence_"+$count + ".tz");
+	setAttr -keyable false -channelBox false -lock true ("taffy_Influence_"+$count + ".rx");
+	setAttr -keyable false -channelBox false -lock true ("taffy_Influence_"+$count + ".ry");
+	setAttr -keyable false -channelBox false -lock true ("taffy_Influence_"+$count + ".rz");
+	setAttr -keyable false -channelBox false ("taffy_Influence_"+$count + ".sx");
+	setAttr -keyable false -channelBox false ("taffy_Influence_"+$count + ".sy");
+	setAttr -keyable false -channelBox false ("taffy_Influence_"+$count + ".sz");
+	setAttr -keyable false -channelBox false ("taffy_Influence_"+$count + ".v");
+
+// assign the shader
+hyperShade -assign taffy_MAT; 
+
+	$count++;
+}
+ 	
+}
+
+
+
+global proc influenceSize()
+{
+global float $taffyInfluence;
+float $taffyInfluence = `floatSliderGrp -q -v fsgInfluence`;
+global string $sel[];
+string $obj;
+
+$sel = `ls -tr "taffy_Influence*"`;
+
+for ($obj in $sel)
+{
+setAttr ($obj + ".sx") ($taffyInfluence);
+setAttr ($obj + ".sy") ($taffyInfluence);
+setAttr ($obj + ".sz") ($taffyInfluence);
+};
+
+} 
+
+
+////////////////////////////////////////////////////
+
+global proc makeTaffy()
+{
+
+
+//float $xyz[3];
+//string $myVerts[] = `ls -sl`;
+//string $myArray[] = stringToStringArray($myVerts[0], ".");
+float $xyz[3];
+global string $myVerts[];
+global string $myArray[];
+string $targetHead = $myArray[0];
+
+global int $count;
+int $count = 0;
+
+int $mySize;
+string $stupidArrays[], $taffy_CTLs[];
+
+global string $selVtx[];	
+// string $selVtx[] = `filterExpand -ex 1 -fp 1 -sm 31`;
+if (!size($selVtx)) error "No vertices selected.";
+	
+	
+for ($vtx in $selVtx)
+{
+	if( `objExists GRP_taffy_CTLs` ) {
+		string $currentHighestCTL = `getAttr GRP_taffy_CTLs.highest`;
+		string $newCount = `substitute "taffy_CTL_" $currentHighestCTL ""`;
+		int $convertNewCount = $newCount;
+		print ("newCount is "+$newCount+"\n");
+		print ("print converted count is : "+$convertNewCount+"\n");
+		$count = ($convertNewCount+1) ;
+		print ("count is now "+$count+"\n");
+	} else {
+		$count = $count;
+	}
+
+	$xyz = `pointPosition -w $vtx`;
+		circle -c 0 0 1 -nr 0 0 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 0 -n "theControl";
+//	curve -d 1 -p 0 0 1 -p 0 0.5 0.866025 -p 0 0.866025 0.5 -p 0 1 0 -p 0 0.866025 -0.5 -p 0 0.5 -0.866025 -p 0 0 -1 -p 0 -0.5 -0.866025 -p 0 -0.866025 -0.5 -p 0 -1 0 -p 0 -0.866025 0.5 -p 0 -0.5 0.866025 -p 0 0 1 -p 0.707107 0 0.707107 -p 1 0 0 -p 0.707107 0 -0.707107 -p 0 0 -1 -p -0.707107 0 -0.707107 -p -1 0 0 -p -0.866025 0.5 0 -p -0.5 0.866025 0 -p 0 1 0 -p 0.5 0.866025 0 -p 0.866025 0.5 0 -p 1 0 0 -p 0.866025 -0.5 0 -p 0.5 -0.866025 0 -p 0 -1 0 -p -0.5 -0.866025 0 -p -0.866025 -0.5 0 -p -1 0 0 -p -0.707107 0 0.707107 -p 0 0 1 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -k 17 -k 18 -k 19 -k 20 -k 21 -k 22 -k 23 -k 24 -k 25 -k 26 -k 27 -k 28 -k 29 -k 30 -k 31 -k 32 -n "MyControl";
+//	setAttr MyRadiusCTL.rx 90;
+//	setAttr MyRadiusCTL.sx 2;
+//	setAttr MyRadiusCTL.sy 2;
+//	setAttr MyRadiusCTL.sz 2;
+
+//	parent MyRadiusCTL MyControl;
+
+	$stupidArrays[0] = "theControl";
+	string $stupidName = ("taffy_CTL_"+$count);
+	$taffy_CTLs[$count] = `rename $stupidArrays[0] $stupidName`;
+//	rename MyRadiusCTL ("taffy_Radius_"+$count);
+
+	string $currentCTL = $taffy_CTLs[$count];
+//	string $currentFallOff = (("taffy_Radius_"+$count)+".scale.scaleX");
+//	string $currentEnv = ($currentCTL+".Envelope");
+	
+//	addAttr -ln Envelope -at double  -min 0 -max 2 -dv .5 $currentCTL;
+//	setAttr -e -keyable true $currentEnv;
+	
+	scale -a 0.03 0.03 0.03 $taffy_CTLs[$count];
+	move -a $xyz[0] $xyz[1] $xyz[2] $taffy_CTLs[$count];
+		
+	normalConstraint  -n "MyConstraint" -aimVector 0 0 1 $targetHead $taffy_CTLs[$count];
+	delete MyConstraint;
+		
+	select -r $taffy_CTLs[$count];
+	makeIdentity -apply true -t 1 -r 1 -s 1 -n 0;
+	
+	
+
+	
+	
+	
+	select -cl;
+
+//////////////////////////////////////////
+
+	select $vtx;
+	createFollicle;
+		global string $follicleName;
+		
+	select $targetHead;
+	print ("count is now "+$count+"\n");
+	print ("The name of the CTL at $taffy_CTLs[$count] is "+$taffy_CTLs[$count]+"\n");
+	string $clusterName = ("taffy_Cluster_"+($count));
+	polySelectConstraint -m 3 -t 1 -d 1 -db 0 `floatSliderGrp -q -v fsgInfluence` -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+
+	cluster -relative -n $clusterName;
+//	move -a ($xyz[0]) ($xyz[1]) ($xyz[2]);
+//	need to move cluster to vert position.
+	move -a ($xyz[0]) ($xyz[1]) ($xyz[2]) ($clusterName + "Handle.scalePivot") ($clusterName + "Handle.rotatePivot") ;	
+//connectAttr -f ($follicleName+".translate") ("taffy_Cluster_"+$count+"Handle.rotatePivot");
+//connectAttr -f ($follicleName+".translate") ("taffy_Cluster_"+$count+"Handle.scalePivot");
+	connectAttr -f ($taffy_CTLs[$count]+".translate") ("taffy_Cluster_"+$count+"Handle.translate");
+	connectAttr -f ($taffy_CTLs[$count]+".rotate") ("taffy_Cluster_"+$count+"Handle.rotate");
+	connectAttr -f ($taffy_CTLs[$count]+".scale") ("taffy_Cluster_"+$count+"Handle.scale");
+
+
+
+
+			select $targetHead;
+			changeSelectMode -component;
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .95) (`floatSliderGrp -q -v fsgInfluence` *  1) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.000 `substitute "Handle" $clusterName ""`;
+				}
+				print (" falloff at .9 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .9) (`floatSliderGrp -q -v fsgInfluence` * .95) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.001 `substitute "Handle" $clusterName ""`;
+				}			
+				print (" falloff at .8 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .85) (`floatSliderGrp -q -v fsgInfluence` * .9) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.011 `substitute "Handle" $clusterName ""`;
+				}						
+				print (" falloff at .7 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .8) (`floatSliderGrp -q -v fsgInfluence` * .85) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.034 `substitute "Handle" $clusterName ""`;
+				}						
+				print (" falloff at .6 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .75) (`floatSliderGrp -q -v fsgInfluence` * .8) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.071 `substitute "Handle" $clusterName ""`;
+				}						
+				print (" falloff at .5 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .7) (`floatSliderGrp -q -v fsgInfluence` * .75) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.120 `substitute "Handle" $clusterName ""`;
+				}			
+				print (" falloff at .4 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .65) (`floatSliderGrp -q -v fsgInfluence` * .7) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.182 `substitute "Handle" $clusterName ""`;
+				}			
+				print (" falloff at .3 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .6) (`floatSliderGrp -q -v fsgInfluence` * .65) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.253 `substitute "Handle" $clusterName ""`;
+				}							
+				print (" falloff at .2 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .55) (`floatSliderGrp -q -v fsgInfluence` * .6) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.331 `substitute "Handle" $clusterName ""`;
+				}						
+				print (" falloff at .1 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .5) (`floatSliderGrp -q -v fsgInfluence` * .55) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.414 `substitute "Handle" $clusterName ""`;
+				}						
+				print (" falloff at 0 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .45) (`floatSliderGrp -q -v fsgInfluence` *  .5) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.5 `substitute "Handle" $clusterName ""`;
+				}
+				print (" falloff at .9 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .4) (`floatSliderGrp -q -v fsgInfluence` * .45) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.586 `substitute "Handle" $clusterName ""`;
+				}			
+				print (" falloff at .8 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .35) (`floatSliderGrp -q -v fsgInfluence` * .4) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.669 `substitute "Handle" $clusterName ""`;
+				}						
+				print (" falloff at .7 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .3) (`floatSliderGrp -q -v fsgInfluence` * .35) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.747 `substitute "Handle" $clusterName ""`;
+				}						
+				print (" falloff at .6 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .25) (`floatSliderGrp -q -v fsgInfluence` * .3) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.818 `substitute "Handle" $clusterName ""`;
+				}						
+				print (" falloff at .5 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .2) (`floatSliderGrp -q -v fsgInfluence` * .25) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.879 `substitute "Handle" $clusterName ""`;
+				}			
+				print (" falloff at .4 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .15) (`floatSliderGrp -q -v fsgInfluence` * .2) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.923 `substitute "Handle" $clusterName ""`;
+				}			
+				print (" falloff at .3 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .1) (`floatSliderGrp -q -v fsgInfluence` * .15) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.964 `substitute "Handle" $clusterName ""`;
+				}							
+				print (" falloff at .2 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db (`floatSliderGrp -q -v fsgInfluence` * .05) (`floatSliderGrp -q -v fsgInfluence` * .1) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 0.986 `substitute "Handle" $clusterName ""`;
+				}						
+				print (" falloff at .1 success" + "\n");
+			polySelectConstraint -m 3 -t 1 -d 1 -db 0 (`floatSliderGrp -q -v fsgInfluence` * .05) -dp ($xyz[0]) ($xyz[1]) ($xyz[2]);
+			string $howMany[] = `ls -sl`;	
+				if (`size($howMany)` > 0)
+				{
+				percent -v 1.000 `substitute "Handle" $clusterName ""`;
+				}						
+				print (" falloff at 0 success" + "\n");
+			print (" falloff a success" + "\n");
+			changeSelectMode -object;
+			artAttrToolScript 4 "cluster";
+			artAttrCtx -e -sao smooth `currentCtx`;
+			artAttrCtx -e -clear `currentCtx`;
+			artAttrCtx -e -clear `currentCtx`;
+			artAttrCtx -e -clear `currentCtx`;
+			//artAttrCtx -e -clear `currentCtx`;
+			//artAttrCtx -e -clear `currentCtx`;
+			//artAttrCtx -e -clear `currentCtx`;
+			//artAttrCtx -e -clear `currentCtx`;
+			//print ($geoArray[$nGeo] + " smooth a success" + "\n");
+//			$nGeo = $nGeo - 1;
+			
+
+polySelectConstraint -d 0;
+
+
+
+
+
+
+
+
+
+	string $groupName = ("GRP_taffy_CTL_"+$count);
+	string $clusterHandle = ($clusterName + "Handle");
+	group -n $groupName $taffy_CTLs[$count]; 
+	parent $groupName $follicleName;
+
+
+
+
+
+
+
+// setAttr ($follicleName +".v") 0;
+
+
+// Shape0.visibility" 0;
+
+// string $follicleShape = taffy_Follicle_Shape  ("taffy_Cluster_"+$count+"Handle.translate")
+
+
+	
+	
+	string $currentHighest = ("GRP_taffy_CTLs.highest");
+	if (`objExists GRP_taffy_CTLs`) {
+		parent $follicleName GRP_taffy_CTLs;
+		parent $clusterHandle GRP_taffy_CTLs;
+	} else {
+	group -n "GRP_taffy_CTLs" $follicleName;
+	parent $clusterHandle GRP_taffy_CTLs;
+	addAttr -ln highest -dt "string" GRP_taffy_CTLs;
+	setAttr -e -keyable true $currentHighest;
+	select -cl;
+	}
+	select -cl;
+	select -r $taffy_CTLs[$count];
+	string $currentHighestCTL = $taffy_CTLs[$count];
+	setAttr $currentHighest -type "string" $currentHighestCTL;
+
+
+// Lock & Hide Cluster Channels
+	setAttr ($clusterHandle + ".v") 0;
+	setAttr -keyable false -channelBox false -lock true ($clusterHandle + ".tx");
+	setAttr -keyable false -channelBox false -lock true ($clusterHandle + ".ty");
+	setAttr -keyable false -channelBox false -lock true ($clusterHandle + ".tz");
+	setAttr -keyable false -channelBox false -lock true ($clusterHandle + ".rx");
+	setAttr -keyable false -channelBox false -lock true ($clusterHandle + ".ry");
+	setAttr -keyable false -channelBox false -lock true ($clusterHandle + ".rz");
+	setAttr -keyable false -channelBox false -lock true ($clusterHandle + ".sx");
+	setAttr -keyable false -channelBox false -lock true ($clusterHandle + ".sy");
+	setAttr -keyable false -channelBox false -lock true ($clusterHandle + ".sz");
+	setAttr -keyable false -channelBox false -lock true ($clusterHandle + ".v");
+	
+	
+	// Lock & Hide Group Channels
+	setAttr -keyable false -channelBox false -lock true ($groupName + ".tx");
+	setAttr -keyable false -channelBox false -lock true ($groupName + ".ty");
+	setAttr -keyable false -channelBox false -lock true ($groupName + ".tz");
+	setAttr -keyable false -channelBox false -lock true ($groupName + ".rx");
+	setAttr -keyable false -channelBox false -lock true ($groupName + ".ry");
+	setAttr -keyable false -channelBox false -lock true ($groupName + ".rz");
+	setAttr -keyable false -channelBox false -lock true ($groupName + ".sx");
+	setAttr -keyable false -channelBox false -lock true ($groupName + ".sy");
+	setAttr -keyable false -channelBox false -lock true ($groupName + ".sz");
+	setAttr -keyable false -channelBox false -lock true ($groupName + ".v");
+
+	// Lock & Hide Follicle Channels
+	setAttr -keyable false -channelBox false -lock true ($follicleName + ".tx");
+	setAttr -keyable false -channelBox false -lock true ($follicleName + ".ty");
+	setAttr -keyable false -channelBox false -lock true ($follicleName + ".tz");
+	setAttr -keyable false -channelBox false -lock true ($follicleName + ".rx");
+	setAttr -keyable false -channelBox false -lock true ($follicleName + ".ry");
+	setAttr -keyable false -channelBox false -lock true ($follicleName + ".rz");
+	setAttr -keyable false -channelBox false -lock true ($follicleName + ".sx");
+	setAttr -keyable false -channelBox false -lock true ($follicleName + ".sy");
+	setAttr -keyable false -channelBox false -lock true ($follicleName + ".sz");
+	setAttr -keyable false -channelBox false -lock true ($follicleName + ".v");
+
+
+
+
+
+
+
+	$count++;
+}
+
+
+delete "taffy_Influence*";
+delete "taffy_MAT*";
+setToolTo moveSuperContext;
+ 	
+}
+
+
+
+global proc createFollicle()
+{
+	global int $count;
+	float $xCoord;
+	float $yCoord;
+	string $shape;
+	string $selectionUV[] = `polyListComponentConversion -tuv`;
+	global string $follicleName;
+	string $follicleName = ("taffy_Follicle_"+($count));
+
+
+// is the if else statement necessary?
+//	if ((size ($selectionUV) > 1) || (size ($selectionUV) == 0))
+//		{
+//		error "You must select 1 vertex - and it must have a \"one to one\" UV ratio";
+//		}
+//	else
+//		{
+			string $buffer[];
+			$numTokens = `tokenize $selectionUV[0] "." $buffer`;
+			string $shapesArray[] = `listRelatives -f -s $buffer[0]`;
+			$shape = $shapesArray[0];
+			$xyCoord = `polyEditUV -q -u -v $selectionUV`;
+			$xCoord = $xyCoord[0];
+			$yCoord = $xyCoord[1];	
+//		}	
+
+
+		$follicleCreation = `createNode "follicle"`;
+		
+		connectAttr ($shape + ".outMesh") ($follicleCreation + ".inputMesh");
+		connectAttr ($shape + ".worldMatrix[0]") ($follicleCreation + ".inputWorldMatrix");
+		setAttr ($follicleCreation + ".visibility") 0;
+		
+		string $follicleTransform[] = `pickWalk -d up`;
+		
+		
+		connectAttr ($follicleCreation + ".outTranslate") ($follicleTransform[0] + ".translate");
+//		connectAttr ($follicleCreation + ".outRotate") ($follicleTransform[0] + ".rotate");
+		
+		
+		
+		setAttr ($follicleCreation + ".parameterU") $xCoord;
+		setAttr ($follicleCreation + ".parameterV") $yCoord;
+		rename $follicleTransform $follicleName;
+		
+		
+}
+
+
+
+global proc paintTaffyWeights()
+{
+string $currentSelection[] = `ls -sl`;
+string $currentTaffy = $currentSelection[0];
+string $currentTaffyCluster = `substitute "CTL_" $currentTaffy "Cluster_"`;
+string $currentTaffyWeights = ("cluster."+$currentTaffyCluster+".weights");
+string $currentGeoList[] = `cluster -q -g $currentTaffyCluster`;
+string $targetHead = `substitute "Shape" $currentGeoList[0] ""`;
+select -cl;
+select $targetHead;
+artSetToolAndSelectAttr( "artAttrCtx", $currentTaffyWeights);
+}

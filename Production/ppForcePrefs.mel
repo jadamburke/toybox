@@ -1,0 +1,13 @@
+// ppForcePrefs
+global proc ppForcePrefs () {
+	string $gUseSaveScenePanelConfig;
+	string $gUseScenePanelConfig;
+
+	$gUseSaveScenePanelConfig = false;
+	$gUseScenePanelConfig = false;
+	// disable scene config saving/restoring
+	optionVar -iv "useNewScenePanelConfig" 1 -iv "useSaveScenePanelConfig" 0 -iv "useScenePanelConfig" 0;
+	
+	
+
+}

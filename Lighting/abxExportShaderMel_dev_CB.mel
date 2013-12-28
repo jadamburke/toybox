@@ -1,0 +1,1255 @@
+// exportShaderMel
+
+global proc abxExportShaderMel ()  {
+	string $abxExportShaderMelVersionString = "1.35b DEV CB";
+
+	if (`window -ex abxShadersWindow` != true)  {
+		window -w 250 -h 200 -t ("abxShaderTools v" + $abxExportShaderMelVersionString) -in ("abxShaderTools v" + $abxExportShaderMelVersionString) -s true -tb true abxShadersWindow;
+
+		columnLayout -rs 1 -w 400 -cal "center" -cat "both" 0 -adj true abxTimeOffsetColLyt;
+
+
+		//button -label "Export Sel ShadingGroups" -h 20 -w 60 -c ("exportShadingNetworkMEL `ls -sl -type shadingEngine` `fileDialog -title \"Save SG Network MEL\" -mode 1 -directoryMask \"*.mel\"`");
+		button -label "Export Sel ShadingGroups" -h 20 -w 60 -c ("exportShadingNetworkMEL `ls -sl -type shadingEngine` `fileDialog2 -dialogStyle 2 -fileMode 3 -okc \"Open\" -cap \"Choose Folder To Export To\"`");		
+
+		button -label "Import ShadingGroups MEL" -h 20 -w 60 -c "importShadingNetworkMEL `fileDialog2 -dialogStyle 2 -fileMode 4` 0";
+		button -label "Replace SG" -h 20 -w 60;
+		button -label "Conform SG Network Names" -h 20 -w 60 -c "conformShaderNetworkNames `ls -sl -type shadingEngine`";
+		button -label "Strip All Shaders" -h 20 -w 60 -c "stripAllShaders";
+		button -label "Get Shaders For Char" -h 20 -w 60 -c "getCharShaderFromSel";
+
+		abxExportShaderInitGlobals();
+	}
+
+	window -e -w 250 -h 200 abxShadersWindow;
+	showWindow abxShadersWindow;
+}
+
+global proc abxExportShaderInitGlobals ()  {
+	// set up global string arrays used by functions
+
+	// these will fail on read-in, so exclude them
+	global string $abxExportShaderAttrIgnoreList[];
+	if (size($abxExportShaderAttrIgnoreList) > 0) return;	// globals already initialized
+	print("abxExportShader: Initialize globals\n");
+	$abxExportShaderAttrIgnoreList = { "hyperLayout", "ignoredShadingConnections", "ghostFrames", "geometry", "keyTickDrawSpecial[0]", "keyTickDrawSpecial[1]", "outStippleRange",
+						"inStippleRange", "keyTimeValue[0].keyTime", "keyTimeValue[1].keyTime", "PS3TextureOptions", "WiiTextureOptions", "PS2BakeOptions",
+						"WiiBakeOptions", "TTMipMapMode", "TTMipMapAlphaMode", "TTAlphaCompression", "TTWiiAlphaCompression", "TTTexAnimModeU", "TTTexAnimModeV",
+						"PSPTextureOptions", "PS2TextureOptions", "attributeAliasList" };
+
+	global string $abxExportShaderIgnoreAttrTypes[];
+	$abxExportShaderIgnoreAttrTypes = { "TdataCompound", "Compound", "message", "matrix", "attributeAlias" };
+
+	global string $abxExportShaderArrayAttrTypes[];
+	$abxExportShaderArrayAttrTypes = { "double2", "double3", "double4", "float2", "float3", "float4", "short2", "short3", "long2", "long3", "stringArray", "doubleArray", "floatArray" };
+
+	//global string $atFlagTypes[] = {"bool","long","short","byte","char","enum","float","double","doubleAngle","doubleLinear","compound","message","time","fltMatrix","reflectance","spectrum","float2","float3","double2","double3","long2","long3","short2","short3"};
+	global string $abxExportShaderDtFlagTypes[];
+	$abxExportShaderDtFlagTypes = {"string","stringArray","matrix","reflectanceRGB","spectrumRGB","doubleArray","Int32Array","vectorArray","nurbsCurve","nurbsSurface","mesh","lattice","pointArray"};
+}
+
+
+global proc string[] abxExportShaderGetAddAttrCommands (string $node, string $attr)  {
+	global string $abxExportShaderAttrIgnoreList[];
+	if (stringArrayContains($attr, $abxExportShaderAttrIgnoreList))
+		return { "", "" };
+
+	global string $abxExportShaderDtFlagTypes[];
+
+	string $attrType = `getAttr -type ($node + "." + $attr)`;
+	string $attrParent[] = `attributeQuery -lp -node $node $attr`;
+
+	string $attrFlag = "-at";
+	if (stringArrayContains($attrType, $abxExportShaderDtFlagTypes)) $attrFlag = "-dt";
+
+	string $parentFlag = "";
+	if ($attrParent[0] != "") $parentFlag = (" -parent \"" + $attrParent[0] + "\"");
+
+	string $nodeNoNS = substituteAllString($node, ":", "_");
+
+	string $addAttrCmd = ("addAttr -longName \"" + $attr + "\" " + $attrFlag + " \"" + $attrType + "\"" + $parentFlag + " $" + $nodeNoNS);
+
+	// if attr is keyable, add command line for that
+	string $keyableCmd = "";
+	if (`getAttr -k ($node + "." + $attr)`)
+		$keyableCmd = ("setAttr -k 1 ($" + $nodeNoNS + " + \"." + $attr + "\")");
+
+	return { $addAttrCmd, $keyableCmd };
+}
+
+global proc string[] abxExportShaderGetSetConnectAttrCommands (string $node, string $attr)  {
+	global string $abxExportShaderAttrIgnoreList[];
+	if (stringArrayContains($attr, $abxExportShaderAttrIgnoreList))
+		return { "", "" };
+
+	// create a setAttr command with value for each settable attr
+	global string $abxExportShaderIgnoreAttrTypes[];
+	global string $abxExportShaderArrayAttrTypes[];
+
+	string $nodeNoNS = substituteAllString($node, ":", "_");
+
+	// if its has no incoming connection, just save its value
+	if (!`connectionInfo -isDestination ($node + "." + $attr)`)  {
+		string $attrType = `getAttr -type ($node + "." + $attr)`;		
+
+		string $setAttrCmd = "";
+		if (!stringArrayContains($attrType, $abxExportShaderIgnoreAttrTypes))  {
+			string $typeFlag = "";
+			string $attrValStr = "";
+			if ($attrType == "string" || $attrType == "stringArray")  {
+				//$attrType = ("\"" + $attrType + "\"");
+				if ($attrType == "stringArray")  {
+					string $attrStrs[] = `getAttr ($node + "." + $attr)`;
+					for ($attrStr in $attrStrs)
+						$attrValStr += (" \"" + $attrStr + "\"");
+					$typeFlag = " -type \"stringArray\"";
+				} else  {
+					string $attrStr = `getAttr ($node + "." + $attr)`;
+					$attrValStr = (" \"" + $attrStr + "\"");
+					$typeFlag = " -type \"string\"";
+				}
+			} else if (stringArrayContains($attrType, $abxExportShaderArrayAttrTypes))  {
+				float $attrVals[] = `getAttr ($node + "." + $attr)`;
+				for ($attrVal in $attrVals)
+					$attrValStr += (" " + $attrVal);
+				$typeFlag = (" -type " + $attrType);
+			} else  {
+				float $attrVal = `getAttr ($node + "." + $attr)`;
+				$attrValStr = (" " + $attrVal);
+				$typeFlag = "";
+			}
+
+			$setAttrCmd = ("setAttr ($" + $nodeNoNS + " + \"." + $attr + "\")" + $typeFlag + $attrValStr);
+		}
+
+		return { $setAttrCmd, "" };
+	}
+	else  {
+		string $connectAttrCmd = "";
+		string $sources[] = `listConnections -s 1 -p 1 ($node + "." + $attr)`;
+		if (size($sources) > 0)  {
+			string $sourceNode = match("^[^.]*", $sources[0]);
+			string $sourceTypes[] = `ls -st $sourceNode`;
+			// exclude non-material connections of SG node
+			if ($sourceTypes[0] != "shadingEngine" || size(`ls -mat $sourceNode`) > 0)  {
+				string $src = substituteAllString($sourceNode, ":", "_");
+				$connectAttrCmd = ("connectAttr ($" + $src + " + \"" + match("\\..*$", $sources[0]) + "\") ($" + $nodeNoNS + " + \"." + $attr + "\")");
+			}
+		}
+
+		return { "", $connectAttrCmd };
+	}
+}
+
+
+global proc exportShadingNetworkMEL (string $sgNodes[], string $filePath[])  {
+	abxExportShaderInitGlobals();
+
+	// filter out default SGs
+	$sgNodes = stringArrayRemove({ "initialShadingGroup", "initialParticleSE" }, $sgNodes);
+
+	// for each SG node
+	// check $sgNodes to ensure all are SG nodes?
+	for ($sgNode in $sgNodes)  {
+		string $shaderAssignCmds[];
+		string $createNodeCmds[];
+		string $addAttrCmds[];
+		string $keyableCmds[];
+		string $setAttrCmds[];
+		string $connectAttrCmds[];
+		string $containerAddCmds[];
+		string $parsedNodeList[];
+
+		string $sgNodeNoNS = substituteAllString($sgNode, ":", "_");
+		
+		// get the instObjGroups connections
+		// create assignment lines for objects which use this SG
+		string $sgMembers[] = `listConnections -p 0 -s 1 -sh 1 ($sgNode+".dagSetMembers")`;
+		for ($member in $sgMembers){
+			if (`objectType $member` == "mesh" || `objectType $member` == "nurbsSurface"){
+				//$shaderAssignCmds[size($shaderAssignCmds)] = ("sets -forceElement "+$sgNode+" "+$member);
+				//print ("sets -forceElement "+$sgNode+" "+$member+";\n");
+				$shaderAssignCmds[size($shaderAssignCmds)] = ("sets -forceElement $" + $sgNodeNoNS + " " + $member);
+			}
+		}
+
+		// add creation line for this SG node
+		//$createNodeCmds[size($createNodeCmds)] = ("sets -renderable true -noSurfaceShader true -empty -name "+$sgNodeNoNS);
+		$createNodeCmds[size($createNodeCmds)] = ("string $" + $sgNodeNoNS + " = `sets -renderable true -noSurfaceShader true -empty -name " + $sgNodeNoNS + "`");
+
+		// create addAttr command line for each user defined attr
+		string $userDefinedAttrs[] = `listAttr -userDefined $sgNode`;
+		for ($attr in $userDefinedAttrs)  {
+			string $cmds[] = abxExportShaderGetAddAttrCommands($sgNode, $attr);
+			if ($cmds[0] != "")
+				$addAttrCmds[size($addAttrCmds)] = $cmds[0];
+			if ($cmds[1] != "")
+				$keyableCmds[size($keyableCmds)] = $cmds[1];
+		}
+
+		// add setAttr or connectAttr command
+		string $settableAttrs[] = `listAttr -settable -multi $sgNode`;
+		for ($attr in $settableAttrs)  {
+			string $cmds[] = abxExportShaderGetSetConnectAttrCommands($sgNode, $attr);
+
+			if ($cmds[0] != "")
+				$setAttrCmds[size($setAttrCmds)] = $cmds[0];
+
+			if ($cmds[1] != "")
+				$connectAttrCmds[size($connectAttrCmds)] = $cmds[1];			
+		}
+
+		// get incoming connections
+		string $incoming[] = `listConnections -p 0 -s 1 $sgNode`;
+		string $sgShaders[] = `ls -mat $incoming`;
+		// for each incoming connections
+		for ($shader in $sgShaders)  {
+			// list history of incoming node
+			string $shaderHistory[] = `listHistory -ac $shader`;
+
+			// for each in history
+			for ($node in $shaderHistory)  {
+				string $nodeNoNS = substituteAllString($node, ":", "_");
+
+				// if node is not in parsedNodesList
+				if (!stringArrayContains($node, $parsedNodeList))  {
+					// add createNode Cmd
+					string $nodeType = `objectType $node`;
+					if ($nodeType != "mesh" && $nodeType != "nurbsSurface")  {
+						$createNodeCmds[size($createNodeCmds)] = ("string $" + $nodeNoNS + " = `shadingNode " + lookupShadingType($nodeType) + " " + $nodeType + " -name " + $nodeNoNS + "`");
+
+						// add user defined attrs
+						string $userDefinedAttrs[] = `listAttr -userDefined $node`;
+						for ($attr in $userDefinedAttrs)  {
+							string $cmds[] = abxExportShaderGetAddAttrCommands($node, $attr);
+							if ($cmds[0] != "")
+								$addAttrCmds[size($addAttrCmds)] = $cmds[0];
+							if ($cmds[1] != "")
+								$keyableCmds[size($keyableCmds)] = $cmds[1];
+						}
+
+						if (`gmatch $nodeType "animCurve*"`)  {
+							// get the keyframe times and values and use the setKeyframe command to fill the keyframes
+							int $keyCount = `keyframe -q -kc $node`;
+							int $i;
+							for ($i = 0; $i < $keyCount; $i++)  {
+								float $timeVal[] = `keyframe -index $i -q -tc $node`;
+								float $valValue[] = `keyframe -index $i -q -vc $node`;
+								$setAttrCmds[size($setAttrCmds)] = ("setKeyframe -t " + $timeVal[0] + " -v "+ $valValue[0] + " $" + $nodeNoNS);
+							}			
+						}
+
+						if (`gmatch $nodeType "container"`)  {
+							string $containerObjs[] = `container -q -nl $node`;
+							for ($member in $containerObjs)  {
+								$member = substituteAllString($member, ":", "_");
+								$containerAddCmds[size($containerAddCmds)] = ("container -e -addNode $" + $member + " $" + $nodeNoNS);
+							}
+
+							string $containerPubNodes[] = `container -q -pn $node`;
+							for ($pn in $containerPubNodes)  {
+								if (`connectionInfo -ied ($node + "." + $pn)`)  {
+									string $ged = `connectionInfo -ged ($node + "." + $pn)`;	// the attr the published node is bound to
+									string $n = match("^[^.]*", $ged);
+									string $a  = match("[^.]*$", $ged);
+									$n = substituteAllString($n, ":", "_");								
+									$containerAddCmds[size($containerAddCmds)] = ("container -e -pb ($" + $n + " + \"." + $a + "\") \"" + $pn + "\" $" + $nodeNoNS);
+
+									string $src = `connectionInfo -sfd ($node + "." + $pn)`;	// the node.attr that is connected to the pn
+									// src needs to be processed - either a $var, or geo (or ???)
+									//$src = substituteAllString($src, ":", "_");
+									$containerAddCmds[size($containerAddCmds)] = ("connectAttr -f " + $src + " ($" + $nodeNoNS + " + \"." + $pn + "\")");
+								} else
+									$containerAddCmds[size($containerAddCmds)] = ("container -e -pn \"" + $pn + "\" $" + $nodeNoNS);								
+							}
+						}
+
+						// handle settable attributes
+						string $settableAttrs[] = `listAttr -settable -multi $node`;
+						for ($attr in $settableAttrs)  {
+							string $cmds[] = abxExportShaderGetSetConnectAttrCommands($node, $attr);
+
+							if ($cmds[0] != "")
+								$setAttrCmds[size($setAttrCmds)] = $cmds[0];
+
+							if ($cmds[1] != "")
+								$connectAttrCmds[size($connectAttrCmds)] = $cmds[1];			
+						}
+					}
+
+					// add node to parsed list so its not recorded twice
+					$parsedNodeList[size($parsedNodeList)] = $node;					
+				}
+			}
+		}
+			
+
+		int $fileId = fopen(fromNativePath(($filePath[0] + "/" + $sgNodeNoNS + ".mel")), "w");
+
+		//write commands to file
+		fprint $fileId ("// abxShader Export File \n");
+		fprint $fileId ("// Generated by abxShaders.mel Version 0.5\n");
+		fprint $fileId  ("// Exported from File: "+`file -q -sn`+"\n\n");
+
+		// put all the stuff here into a namespace with the name of the file
+		string $namespace = basename($filePath[0], "");
+		$namespace = substitute("shd_master_", $namespace, "");
+		fprint $fileId ("// set up namespace\n");
+		fprint $fileId ("string $previousNamespace = `namespaceInfo -an -cur`;\n");
+		fprint $fileId ("namespace -set \":\"\n");
+		fprint $fileId ("if (!`namespace -ex \"" + $namespace + "\"`) namespace -add \"" + $namespace + "\";\n");
+		fprint $fileId ("namespace -set \"" + $namespace + "\";\n\n");
+
+		// print each array of mel commands to output file
+		fprint $fileId ("\n// create nodes\n");
+		for ($cmd in $createNodeCmds) fprint $fileId ($cmd + ";\n");
+		
+		fprint $fileId ("\n// addAttr Commands\n");
+		for ($cmd in $addAttrCmds) fprint $fileId ($cmd + ";\n");
+
+		fprint $fileId ("\n// keyableAttr Commands\n");
+		for ($cmd in $keyableCmds) fprint $fileId ($cmd + ";\n");
+
+		fprint $fileId ("\n// setAttr Commands\n");
+		for ($cmd in $setAttrCmds) fprint $fileId ($cmd + ";\n");
+
+		fprint $fileId ("\n// connectAttr Commands\n");
+		for ($cmd in $connectAttrCmds) fprint $fileId ($cmd + ";\n");
+
+		fprint $fileId ("\n// container Commands\n");
+		for ($cmd in $containerAddCmds) fprint $fileId ($cmd + ";\n");
+		
+		fprint $fileId ("\n// Shader Assignments\n");
+		for ($cmd in $shaderAssignCmds) fprint $fileId ($cmd + ";\n");
+
+		fprint $fileId ("\n// restore previous namespace\n");
+		fprint $fileId ("namespace -set $previousNamespace;\n\n");
+
+		fclose $fileId;
+
+		clear($createNodeCmds);
+		clear($containerAddCmds);
+		clear($addAttrCmds);
+		clear($keyableCmds);
+		clear($setAttrCmds);
+		clear($connectAttrCmds);
+		clear($shaderAssignCmds);
+		clear($parsedNodeList);
+	}
+}
+
+
+
+// $mode:
+//        0 - prompt user for each node update/copy
+//        1 - prompt user for each shading node update/copy
+//        2 - prompt user for each asset node update/copy
+//        3 - force update all
+//        4 - force copy all
+global proc importShadingNetworkMEL_OLD (string $filenames[], int $mode)  {
+
+	for ($filename in $filenames)  {
+		if ($filename == "")
+			return;
+		// if mode is 1, prompt user about each shading group
+		//if ($mode == 1)
+		//	;
+
+		print ($filename + "\n");
+
+		// open file
+		$fileId=`fopen $filename "r"`;
+
+		string $nextLine = `fgetline $fileId`;
+		string $nodeName = "";
+		string $nodeType = "";
+		string $nodeRename = "";
+		int $renameFlag = 0;
+		int $updateNode = 0;
+
+		// check to see if it is an abxRenderLayer file
+		if (!`gmatch $nextLine "// abxShader Export File*"`){
+			error ("Not a recognized abxShader Export File\n");
+			return;
+		}
+
+		// check to see if the renderLayer already exists
+		// if it exists prompt the user
+			// would you like to replace, merge, or rename
+
+		// run each line with error suppression
+
+		
+		while (size($nextLine) > 0)  {
+
+			$updateNode = 0;
+		
+			// if the line is a command that creates nodes
+			if (`gmatch $nextLine "sets -renderable*"` || `gmatch $nextLine "shadingNode -as*"`) {
+				// if its a typical create shading group or node command the layer name is fourth
+
+				// node name will always be the 58th character
+				if (`gmatch $nextLine "sets -renderable*"`){
+					$nodeName = substring($nextLine,58,(size($nextLine)-2));
+					$nodeType = "shadingEngine";
+				}
+
+				// node name will be the 5th space seperated token
+				else if (`gmatch $nextLine "shadingNode -as*"`){
+					string $tokenBuffer[];
+					tokenize $nextLine " " $tokenBuffer;
+					$nodeType = $tokenBuffer[2];
+					$nodeName = substring($tokenBuffer[4],1,(size($tokenBuffer[4])-2));
+				}
+				$nodeRename = $nodeName;
+				int $it = 1;
+				while (`objExists $nodeRename`){
+					$nodeRename = ($nodeName+"Copy"+$it);
+					$it++;
+				}
+				
+
+				// if the object already exists
+				if (`objExists $nodeName`){
+
+
+					// prompt user that layer already exists
+					string $result = `promptDialog 
+							-title "Node Already Exists" 
+							-message "Import Rename:"  
+							-button "Rename" -button "Update" -button "Cancel"
+	    						-defaultButton "Rename" -cancelButton "Cancel"
+	    						-dismissString "Cancel" -text $nodeRename`;
+					$updateNode = 1;
+					print ("object Exists\n");
+
+					if ($result == "Rename"){
+						string $text = `promptDialog -query -text`;
+						$nodeRename = `match "[A-Za-z0-9]+" $text`;
+						$it=0;
+						while (`objExists $nodeRename`){
+							$nodeRename = ($nodeRename+"Copy"+$it);
+							$it++;
+						}
+						$renameFlag = 1;
+						$updateNode = 0;
+					}
+					else if ($result == "Update"){
+						
+
+						if (`objectType $nodeName` != $nodeType){
+							rename $nodeName $nodeRename;
+							$nodeRename = $nodeName;
+							$updateNode = 0;
+						}
+						else {
+							$nodeRename = $nodeName;
+							// delete any incoming connections accept for renderLayer overrides
+							clearIncomingConnections $nodeName;	
+							$updateNode = 1;
+						}			
+
+						
+					}
+					else if ($result == "Cancel" || $result == "dismiss"){
+						return;
+					}
+				}
+			}
+
+			//if the line sets a shading group membership
+
+			else if (`gmatch $nextLine "sets -forceElement*"`) {
+				
+				string $tokenBuffer[];
+				tokenize $nextLine " " $tokenBuffer;
+				int $endString = (size($tokenBuffer[3]) - 2);
+				string $geoTarget = `substring $tokenBuffer[3] 1 $endString`;
+				print ("starting targetCheck on "+$geoTarget+"\n");
+				if (!`objExists $geoTarget`){
+					print ($geoTarget+" not found\n");
+					if (`objExists ("anm_"+$geoTarget)`){
+						print ("Retarget "+$geoTarget+" to anm_"+$geoTarget+"\n");
+						$nextLine = $tokenBuffer[0];
+						for ($i=1;$i<size($tokenBuffer);$i++){
+							if ($i == 3){
+								$nextLine = ($nextLine+" anm_"+$geoTarget);
+							}
+							else {
+								$nextLine = $nextLine + " " + $tokenBuffer[$i];
+							}
+						}
+					}
+				}
+			}
+			
+			// if the line is a connect Attr command
+			else if (`gmatch $nextLine "connectAttr*"`)  {
+
+				// check to make sure the incoming connection node exists, if it does not, try adding a anm_ 
+				
+				string $tokenBuffer[];
+				tokenize $nextLine " " $tokenBuffer;
+				$sourceNode = $tokenBuffer[1];
+				if (!`objExists $sourceNode`){
+					if (`objExists ("anm_"+$sourceNode)`){
+						$nextLine = $tokenBuffer[0];
+						for ($i = 1; $i < size($tokenBuffer); $i++)  {
+							if ($i == 1)  {
+								$nextLine = ($nextLine+" anm_"+$tokenBuffer[$i]);
+							}
+							else  {
+								$nextLine = ($nextLine + " " + $tokenBuffer[$i]);
+							}
+						}
+					}
+				}
+
+			}
+
+			// if layer needs renaming then substitute it in each line before executing
+			if ($renameFlag == 1){
+				
+				$nextLine = `substitute (" "+$nodeName+"\\\;") $nextLine (" "+$nodeRename+";")`;
+				$nextLine = `substitute (" "+$nodeName+" ") $nextLine (" "+$nodeRename+" ")`;
+				$nextLine = `substitute (" "+$nodeName+"\\\.") $nextLine (" "+$nodeRename+".")`;
+				
+			}
+			//print ( $nextLine );
+			if ($updateNode == 1 && `gmatch $nextLine "sets -renderable*"` || $updateNode == 1 && `gmatch $nextLine "shadingNode -as*"`) {
+				print ("ignored "+$nextLine+"\n");
+			}
+			else if ( catch( eval($nextLine)) && $nextLine != "\n"){
+				print ($nextLine);
+				print ("// Command Failed: ");
+			} 		
+	    	$nextLine = `fgetline $fileId`;
+		}
+		fclose $fileId;
+	}
+}
+
+
+global proc importShadingNetworkMEL_OLD2 (string $filenames[], int $mode)  {
+	abxExportShaderInitGlobals();
+
+	for ($filename in $filenames)  {
+		if ($filename == "")
+			continue;
+
+		print("Reading in shader file " + $filename + "\n");
+
+		// open file
+		$fileId = `fopen $filename "r"`;
+
+		string $nextLine = `fgetline $fileId`;
+		// check to see if it is an abxRenderLayer file
+		if (!`gmatch $nextLine "// abxShader Export File*"`)  {
+			error ("Not a recognized abxShader Export File\n");
+			return;
+		}
+
+		while (size($nextLine) > 0)  {
+			if (`gmatch $nextLine "sets -forceElement*"`)  {
+				string $tokBuf[];
+				tokenize $nextLine " " $tokBuf;
+				string $geo = substring($tokBuf[3], 1, size($tokBuf[3])-2);
+				
+				//string $sceneGeo[] = `ls ("*:*:geo_" + $geo)`;
+				string $sceneGeo[] = `ls -r true $geo`;
+				if (size($sceneGeo) == 0) $sceneGeo = `ls -r true ("geo_" + $geo)`;
+				if (size($sceneGeo) == 0)  {
+					warning("Cannot find geo in scene matching " + $geo + " from shader file.  Skipping.");
+					$nextLine = "\n";
+				} else if (size($sceneGeo) > 1)  {
+					warning("More than one geo element in scene matches " + $geo + " from shader file.  Skipping.");
+					$nextLine = "\n";
+				} else
+					$nextLine = substitute($geo, $nextLine, $sceneGeo[0]);
+			}
+
+			if ($nextLine != "\n")  {
+				if (catch(eval($nextLine)))  {
+					print("// Command Failed: ");
+					print($nextLine);
+				}
+			} 		
+	    	$nextLine = `fgetline $fileId`;
+		}
+		fclose $fileId;
+	}
+}
+
+
+global proc importShadingNetworkMEL (string $filenames[], int $mode)  {
+	string $shaderUpdates = "";
+
+	for ($filename in $filenames)  {
+		if ($filename == "")
+			continue;
+
+		print("Reading in shader file " + $filename + "\n");
+
+		// open file
+		$fileId = `fopen $filename "r"`;
+
+		string $nextLine = `fgetline $fileId`;
+		// check to see if it is an abxRenderLayer file
+		if (!`gmatch $nextLine "// abxShader Export File*"`)  {
+			error("Not a recognized abxShader Export File\n");
+			continue;
+		}
+
+		string $createdNodes[];
+		string $objectAssignments[];
+		string $newSG = "";
+		while (size($nextLine) > 0)  {
+			// save assignment commands (don't run now) for possible use later
+			if (`gmatch $nextLine "sets -forceElement*"`)  {
+				$objectAssignements[size($objectAssignments)] = $nextLine;
+				$nextLine = `fgetline $fileId`;
+				continue;
+			}
+
+			if ($nextLine != "\n")  {
+				if (catch(eval($nextLine)))  {
+					print("// Command Failed: ");
+					print($nextLine);
+				}
+			} 		
+
+			// store any nodes created, in case we descide to delete them
+			if (`gmatch $nextLine "*shadingNode*"` || `gmatch $nextLine "*sets -renderable*"`)  {
+				string $tb[];
+				tokenize $nextLine " " $tb;
+				global string $varVal;
+				//evalEcho("$varVal = " + $tb[1]);
+				eval("$varVal = " + $tb[1]);
+				$createdNodes[size($createdNodes)] = $varVal;
+
+				if (`gmatch $nextLine "*sets -renderable*"`) $newSG = $varVal;
+			}
+
+			$nextLine = `fgetline $fileId`;
+		}
+		fclose $fileId;
+
+		// see if we can find an existing shading network that matches this one
+		//  in that case, we will just copy over new attr values
+		if ($newSG != "")  {
+			string $sgNoNS = match("[^:]*$", $newSG);
+			string $sgs[] = `ls -r true -type shadingEngine $sgNoNS`;
+			$sgs = stringArrayRemove({$newSG}, $sgs);
+
+			string $curSG = "";
+			if (size($sgs) == 1)
+				$curSG = $sgs[0];
+			else if (size($sgs) > 1)  {
+				// matched more than one SG
+				for ($sg in $sgs)  {
+					if (size(`sets -q $sg`) > 0)  {
+						if ($curSG == "")
+							$curSG = $sg;
+						else  {
+							// found more than one SG with geo attached to it
+							print("Found more than one possible SG with geo assigned to it\n");
+							print $sgs;
+							$curSG = "";
+							break;
+						}
+					}
+				}
+			} else  {
+				print("Warning: Unable to locate SG in scene\n");
+			}
+
+			if ($curSG != "")  {
+				print("Found potentially matching SG in scene: " + $curSG + "\n");
+
+				if (shadersMatch($newSG, $curSG))  {
+					print("They appear to match.  Coping attrs...\n");
+					copyShaderAttrs($newSG, $curSG);
+
+					// delete all the new nodes
+					delete $createdNodes;
+				} else  {
+					print("They do not appear to match\n");
+					$curSG = "";
+				}
+			}
+
+			if ($curSG == "")  {
+				// failed to find a match - assign new shader to geo
+				for ($oa in $objectAssignments)  {
+					string $tokBuf[];
+					tokenize $oa " " $tokBuf;
+					string $geo = substring($tokBuf[3], 1, size($tokBuf[3])-2);	// without ; at end
+					
+					// try to find the geo in the new scene
+					//string $sceneGeo[] = `ls ("*:*:geo_" + $geo)`;
+					string $sceneGeo[] = `ls -r true $geo`;
+					if (size($sceneGeo) == 0) $sceneGeo = `ls -r true ("geo_" + $geo)`;
+
+					if (size($sceneGeo) == 0)  {
+						warning("Cannot find geo in scene matching " + $geo + " from shader file.  Skipping.");
+					} else if (size($sceneGeo) > 1)  {
+						warning("More than one geo element in scene matches " + $geo + " from shader file.  Skipping.");
+					} else  {
+						$oa = substitute($geo, $oa, $sceneGeo[0]);
+						if (catch(eval($oa)))  {
+							print("// Command Failed: ");
+							print($oa);
+						}
+						$shaderUpdates += ("Shader: " + $newSG + "  Geo: " + $geo + "\n");
+					}	
+				}
+			}
+		} else  {
+			print("No SG found in file\n");
+		}
+	}
+
+	if ($shaderUpdates != "")  {
+		confirmDialog -m ("The following shaders did not match the existing ones and had to be updated.\nAny connections on the original shaders (animations, rigs, etc.) have been lost and need to be redone:\n" + $shaderUpdates);
+	}
+}
+
+
+// replaces long case statement
+global proc string lookupShadingType (string $nodeType)  {
+	if (`getClassification -satisfies "shader" $nodeType`) return "-asShader";
+	if (`getClassification -satisfies "texture" $nodeType`) return "-asTexture";
+	if (`getClassification -satisfies "light" $nodeType`) return "-asLight";
+	if (`getClassification -satisfies "utility" $nodeType`) return "-asUtility";
+	if (`getClassification -satisfies "postprocess" $nodeType`) return "-asPostProcess";
+	return "-asUtility";
+}
+
+
+global proc int isShadingNode (string $node)  {
+	string $nodeType = `nodeType $node`;
+	if ($nodeType == "shadingEngine" || $nodeType == "container") return true;
+	return (`getClassification -satisfies "shader" $nodeType` ||
+			`getClassification -satisfies "texture" $nodeType` ||
+			`getClassification -satisfies "utility" $nodeType` ||
+			`getClassification -satisfies "light" $nodeType` ||
+			`getClassification -satisfies "postprocess" $nodeType`);
+}
+
+// filter string array
+global proc string[] onlyShadingNodes (string $list[])  {
+	string $new[] = {};
+	for ($l in $list)
+		if (isShadingNode($l)) $new[size($new)] = $l;
+	return $new;
+}
+	
+// this could also return some measure of the degree of match, such as # matching nodes / total # nodes
+//  but in that case the matching problem becomes harder
+// right now, just traverse tree and compare node type - no topology
+// could be confirmed by traversing trees depth-first as well
+global proc int shadersMatch (string $SG1, string $SG2)  {
+	string $n1[] = onlyShadingNodes(`listHistory -bf $SG1`);
+	string $n2[] = onlyShadingNodes(`listHistory -bf $SG2`);
+
+	int $isMatch = (size($n1) == size($n2));
+	if ($isMatch)  {
+		for ($i = 0; $i < size($n1); ++$i)  {
+			string $t1 = `nodeType $n1[$i]`;
+			string $t2 = `nodeType $n2[$i]`;
+			print("node1: " + $n1[$i] + "  " + $t1 + "    node2: " + $n2[$i] + "  " + $t2 + "\n");
+			if ($t1 != $t2)  {
+				$isMatch = false;
+				break;
+			}
+		}
+	}
+	return $isMatch;
+}
+
+
+// recursively follow connections - follows plugs
+// visits the same nodes many times - maybe won't termintate?
+global proc int shadersMatch2 (string $SG1, string $SG2)  {
+	return shadersMatchNode($SG1, $SG2);
+}
+
+global proc int shadersMatchNode (string $node1, string $node2)  {
+	//print(stringArrayToString(`ls -st $node1 $node2`, " ") + "\n");
+	print($node1 + " " + `nodeType $node1` + "  " + $node2 + " " + `nodeType $node2` + "\n");
+
+	if (`nodeType $node1` != `nodeType $node2`)
+		return false;
+
+/*
+	string $ch1[], $ch2[];
+	// need to handle containers separately
+	if (`nodeType $node1` == "container")  {
+		string $plugs[] = `listConnections -s 1 -d 0 -p 1 $node1`;
+		$ch1 = `listConnections -s 1 -d 0 -p 0 $plugs`;
+		$plugs = `listConnections -s 1 -d 0 -p 1 $node2`;
+		$ch2 = `listConnections -s 1 -d 0 -p 0 $plugs`;
+	} else  {
+		// check children
+		$ch1 = `listConnections -s 1 -d 0 -p 0 $node1`;
+		$ch2 = `listConnections -s 1 -d 0 -p 0 $node2`;
+	}
+*/
+
+	if (`nodeType $node1` != "container")  {
+		$node1 = match("^[^.]*", $node1);
+		$node2 = match("^[^.]*", $node2);
+	}
+
+	string $ch1[] = onlyShadingNodes(`listConnections -s 1 -d 0 -p 1 $node1`);
+	string $ch2[] = onlyShadingNodes(`listConnections -s 1 -d 0 -p 1 $node2`);
+	//print $ch1;
+	//print $ch2;
+
+	if (size($ch1) != size($ch2))
+		return false;
+
+	for ($i = 0; $i < size($ch1); ++$i)
+		if (!shadersMatchNode($ch1[$i], $ch2[$i]))
+			return false;
+	return true;
+}
+
+
+global proc copyShaderAttrs (string $SGsrc, string $SGdst)  {
+	global string $abxExportShaderArrayAttrTypes[];
+
+	print("Copy attrs on " + $SGsrc + " to " + $SGdst + "\n");
+
+	string $nsrc[] = onlyShadingNodes(`listHistory -bf $SGsrc`);
+	string $ndst[] = onlyShadingNodes(`listHistory -bf $SGdst`);
+
+	for ($i = 0; $i < size($nsrc); ++$i)  {
+		print("Nodes: " + $nsrc[$i] + "  " + $ndst[$i] + "\n");
+		string $ats[] = `listAttr -k -m $nsrc[$i]`;
+		for ($a in $ats)  {
+			print("at = " + $a + "\n");
+			string $attrType = `getAttr -type ($nsrc[$i] + "." + $a)`;
+			if (stringArrayContains($attrType, $abxExportShaderArrayAttrTypes))  {
+				// or should we just ignore array attrs, since they almost always have sub-attrs which are scalars:
+				//  eg: color -> colorR colorG colorB etc.
+				// check for connection, and for sub attrs
+				/*
+				float $vsrc[] = `getAttr ($nsrc[$i] + "." + $a)`;
+				float $vdst[] = `getAttr ($ndst[$i] + "." + $a)`;
+
+				int $same = (size($vsrc) == size($vdst));
+				if ($same)
+					for ($j = 0; $j < size($vsrc); ++$j)
+						if ($vsrc[$j] != $vdst[$j])  {
+							$same = false;
+							break;
+						}
+
+				if ($same)  {
+					print("   Array Attr " + $a + " match\n");
+				} else  {
+					print("   Array Attr " + $a + " no match\n");
+					// check dst is connected to something
+					setAttr -type $attrType ($ndst[$i] + "." + $a) $vsrc;
+				}
+				*/
+				string $anb = match("^[^[]*", $a);
+				int $nc[] = `attributeQuery -nc -n $nsrc[$i] $anb`;
+				if (size($nc) == 0)
+					print("WARNING: Array attribute without children: " + $nsrc[$i] + "." + $a + "\n");
+				else
+					print("Skip array attr with children: " + $a + "\n");
+			} else  {
+				if (!`attributeQuery -ex -n $ndst[$i] $a`)  {
+					print("WARNING: Attribute not present on destination: " + $a);
+				} else  {
+					float $vsrc = `getAttr ($nsrc[$i] + "." + $a)`;
+					float $vdst = `getAttr ($ndst[$i] + "." + $a)`;
+					if ($vsrc == $vdst)  {
+						print("   Attr " + $a + " match (" + $vsrc + ")\n");
+					} else  {
+						print("   Attr " + $a + " no match (" + $vsrc + " != " + $vdst + ")\n");
+						// check dst is connected to something (or its parent/ancestor: -id not -ied)
+						if (!`connectionInfo -id ($ndst[$i] + "." + $a)` && !`connectionInfo -il ($ndst[$i] + "." + $a)`)
+							setAttr ($ndst[$i] + "." + $a) $vsrc;
+						else
+							print("      Destination attr is connected or locked\n");
+					}
+				}
+			}
+		}
+	}
+}
+
+
+
+
+global proc clearIncomingConnections(string $node) {
+	
+	// list incoming connections
+	string $inConnections[] = `listConnections -shapes 1 -s 1 -d 0 -p 1 $node`;
+	string $inNodes[] = `listConnections -shapes 1 -s 1 -d 0 -p 0 $node`;
+
+
+	for ($i=0;$i<size($inConnections);$i++){
+
+		// if the listedConnection is the node itself
+		
+		if (`objectType $inNodes[$i]` != "renderLayer"){
+
+			// get the source of the incoming connection
+			string $destPlug[] = evalEcho("connectionInfo -destinationFromSource "+$inConnections[$i]);
+			for ($each in $destPlug){
+
+				// extract the node name returned from the connectionInfo command
+				string $tokenBuffer[];
+				tokenize $each "." $tokenBuffer;
+
+				// if incoming connection is not a renderLayer connection
+				if ($tokenBuffer[0] == $node){
+					if (`objectType $node` == "shadingEngine"){
+						if (`gmatch $inConnections[$i] "*instObjGroups*"`){
+						//if (`objectType $inNodes[$i]` == "mesh" && `objectType $inNodes[$i]` == "mesh" ){
+							//evalEcho ("sets -remove "+$node+" "+ $inNodes[$i]);
+						}
+						else {
+							evalEcho ("disconnectAttr "+$inConnections[$i]+" "+ $each);
+						}
+					}
+					else {
+						// remove the incoming connection
+						evalEcho ("disconnectAttr "+$inConnections[$i]+" "+ $each);
+					}
+				}
+			}
+		}
+	}
+}
+
+
+// with a shading group specified this function will import the specified mel file and update the nodes if possible but perserve the shader assignments, it will then rename the SG
+global proc replaceSG () {
+
+
+
+	string $slSGNodes[] = `ls -type shadingEngine -sl`;
+
+	importShadingNetworkMEL `fileDialog` 0;
+
+	for ($each in $slSGNodes){
+		
+
+	}
+
+}
+
+// parses names to extract root name and character name
+global proc string[] getAssetNames (string $node){
+
+	string $tokenBuffer[];
+	tokenize $node ":" $tokenBuffer;
+	string $charName = "";
+	string $rootName = "";
+
+	if ($tokenBuffer[0] != "anm"){
+		if ($tokenBuffer[0] != "geo"){
+			if ($tokenBuffer[1] == "geo"){
+				$charName = $tokenBuffer[0];
+				$rootName = $tokenBuffer[2];
+				for ($i=3;$i<size($tokenBuffer);$i++){
+					$rootName = ($rootName+":"+$tokenBuffer[$i]);
+				}
+			} 
+		}
+	}
+	else {
+		if ($tokenBuffer[2] == "geo"){
+				$charName = $tokenBuffer[1];
+				$rootName = $tokenBuffer[3];
+				for ($i=4;$i<size($tokenBuffer);$i++){
+					$rootName = ($rootName+":"+$tokenBuffer[$i]);
+				}
+
+		}
+	}
+	return {$rootName,$charName};
+
+
+}
+
+// renames shader netork nodes to conform to shaderName_nodeType
+// also removes underscores in shader base name for easier parsing of names
+
+global proc conformShaderNetworkNames(string $sgNodes[]){
+	for ($sgNode in $sgNodes){
+		string $incoming[] = `listConnections -p 0 -s 1 $sgNode`;
+		string $sgShaders[] = `ls -mat $incoming`;
+		string $newSGName = "";
+
+		string $uniqueShaders[] = stringArrayRemoveDuplicates($sgShaders);
+
+		// for each incoming connections
+		for ($shader in $uniqueShaders){
+
+			string $tokenBuffer[];
+			string $shaderBaseName = "";
+			tokenize $shader "_" $tokenBuffer;
+			if (size($tokenBuffer) > 1){
+				print ($shader + " contains an underscore\n");
+				$shaderBaseName = $tokenBuffer[0];
+				for ($i=1;$i<size($tokenBuffer);$i++){
+					string $letter = `substring $tokenBuffer[$i] 1 1 `;
+					int $tokenSize = size($tokenBuffer[$i]);
+					string $word = `substring $tokenBuffer[$i] 2 $tokenSize`;
+					$letter = `toupper $letter`;
+					$shaderBaseName = ($shaderBaseName + $letter + $word);
+				}
+			}
+			else {
+				print ($shader + " does not contains an underscore\n");
+				$shaderBaseName = $shader;
+			}
+
+			if ($shader != $shaderBaseName){
+				rename $shader $shaderBaseName;
+				$shader = $shaderBaseName;
+			}
+
+			// list history of incoming node
+			string $shaderHistory[] = `listHistory $shader`;
+
+			// for each in history
+			for ($node in $shaderHistory){
+				$nodeType = `objectType $node`;
+	
+				if (`objExists $node` && $node != $shader){
+					if (!`gmatch $node ($shader+"_"+$nodeType+"*")`){
+						rename $node ($shaderBaseName+"_"+$nodeType);
+					}
+				}
+
+			}
+
+			$newSGName = ($shaderBaseName+"SG");
+
+		}
+		if ($sgNode != $newSGName){
+			rename $sgNode $newSGName;
+		}
+	}
+
+}
+
+global proc stripAllShaders () {
+
+	// get all renderable geometry
+	string $allGeo[] = `ls -type mesh -type nurbsSurface`;
+
+	// get all shadingEngines
+	string $allSG[] = `ls -type shadingEngine`;
+	string $each;
+
+	for ($each in $allSG){
+		if ($each != "initialShadingGroup" && $each != "initialParticleSE"){
+			evalEcho ("delete "+$each);
+		}
+	
+	}
+
+	// assign initial shading group
+	for ($each in $allGeo){
+		if (`attributeExists $each "intermediate"`){
+			if (`getAttr ($each+".intermediate")` == 1){
+				setAttr ($each+".intermediate") 0;
+				sets -e -forceElement initialShadingGroup $each;
+				setAttr ($each+".intermediate") 1;
+			}
+			else {
+				sets -e -forceElement initialShadingGroup $each;
+			}
+		}
+		else {
+			sets -e -forceElement initialShadingGroup $each;
+		}
+		print ("assigning "+$each+"\n");
+
+	}
+
+	// remove all shading nodes
+
+}
+
+global proc string[] getCharsFromSelected () {
+
+	// get the selected object and determine the char name
+	string $sel[] = `ls -sl`;
+	string $possibleName;
+	string $results[];
+	for ($each in $sel){
+
+		string $tokenBuffer[];
+		tokenize $each ":" $tokenBuffer;
+		if (size($tokenBuffer)>1){
+			if (`gmatch "anm*" $tokenBuffer[0]`){
+				$possibleName = $tokenBuffer[0];
+			}
+			else {
+				$possibleName = $tokenBuffer[1];
+
+			}
+
+		}
+
+		// check to see if it has a MAIN set to confirm its a char
+
+		if (`objExists ($possibleName+":ROOT")` || `objExists ("anm"+$possibleName+":ROOT")`){
+			// pull off any numerals at the end of char name
+			//string $numbers = `match "[0-9]*[0-9]$" $possibleName`;
+			//int $endChar = (size($possibleName) - size($numbers));
+			//$results[size($results)] = `substring $possibleName 1 $endChar`;
+
+			$results[size($results)] = $possibleName;
+
+		}
+
+	}
+	
+	return $results;
+
+	// run the getCharShaders command
+
+}
+
+global proc string getCharPath (string $charName){
+
+	string $result = "";
+	string $baseCharName;
+
+	string $numbers = `match "[0-9]*[0-9]$" $charName`;
+	int $endChar = (size($charName) - size($numbers));
+	$baseCharName = `substring $charName 1 $endChar`;
+
+	// check the current project structure
+
+	string $projectRoot = `workspace -q -act`;
+	string $masterFolders[] = `getFileList -folder ($projectRoot + "/scenes/master/")`;
+	for ($each in $masterFolders){
+		if (`filetest -d ($projectRoot + "/scenes/master/"+$each+"/"+$baseCharName)`){
+			$result = ($projectRoot + "/scenes/master/"+$each+"/"+$baseCharName);
+			break;
+		}
+	}
+	if ($result == "")
+		warning ($baseCharName+" not found in current Project. "+$baseCharName+" ignored.\n");
+
+	// 
+
+	return $result;
+}
+
+
+global proc getCharShaders (string $charName){
+
+
+	// given the specified char name
+
+	// look in the master subfolders for that char name
+
+	// check the shader folder for mel files
+
+	// import the mel shading network
+
+	// remap the shader assignments to the selected char name
+}
+
+// gets a list of all the found assets in the scene
+global proc string[] abxShadersGetAssetsInScene (){
+
+	string $foundNamespaces[] = `namespaceInfo -lon -r`;
+	string $results[];
+	for ($each in $foundNamespaces){
+		
+		if ($each != "shared" && $each != "UI"){
+			if (`objExists ($each+":ROOT")`){
+				$results[size($results)] = $each;
+			}
+		}
+	}
+
+	return $results;
+	// assets are objects which have a ROOT && a namespace
+	// they can be either referenced or imported as long as they have the above criteria
+	// references can be reloaded or re-imported
+	// they can be delete/removed, their animation can be transferred or exported
+
+}
+// given an asset with a namespace in a lighting file, it will return the base asset name
+global proc string abxShadersGetShortAssetName (string $fullAssetName){
+	string $tokenBuffer[];
+	tokenize $fullAssetName ":" $tokenBuffer;
+	return $tokenBuffer[size($tokenBuffer)-1];
+}
+
+// given an asset path or determined from the current scene file export the shaders to the shader group
+global proc abxShadersExportAssetShaders(string $assetPath){
+
+	string $scnNameShort = basenameEx(`file -q -shn -sn`);
+	string $assetLib = "";
+	string $assetType = "";
+	string $assetName = "";
+
+	if ($assetPath != ""){
+		string $tokenBuffer[];
+		tokenize $assetPath "/" $tokenBuffer;
+		if (size($tokenBuffer) == 3){
+			$assetName = $tokenBuffer[2];
+			string $tokenBuffer2[];
+			tokenize $scnNameShort "_" $tokenBuffer2;
+			string $workVersionGuess = $tokenBuffer2[size($tokenBuffer2)-1];
+			if (size($workVersionGuess) == 4){
+				// find all the shading groups.
+				string $allSGNodes[] = `ls -type shadingEngine`;
+				string $exludeSGs[] = {"initialShadingGroup","initialParticleSE"};
+				string $sgNodes[] = stringArrayRemove($exludeSGs,$allSGNodes);
+
+				for ($each in $sgNodes){
+				// correct the names of the shading groups if they are wrong
+
+					// add/update the assetPath to the shading group attr
+					if (!`attributeExists "assetPath" $each`)
+						addAttr -longName "assetPath" -dt "string" $each;
+					setAttr -type "string" ($each+".assetPath") $assetPath;
+					// add/update the shader version to the shading group attr
+					if (!`attributeExists "shaderVersion" $each`)
+						addAttr -longName "shaderVersion" -dt "string" $each;
+					setAttr -type "string" ($each+".shaderVersion") $workVersionGuess;
+					// add/update the date/time stamp
+					if (!`attributeExists "shaderDate" $each`)
+						addAttr -longName "shaderDate" -dt "string" $each;
+					setAttr -type "string" ($each+".shaderDate") `date`;			
+					// add/update the user name who is doing the master
+					if (!`attributeExists "shaderUser" $each`)
+						addAttr -longName "shaderUser" -dt "string" $each;
+					setAttr -type "string" ($each+".shaderUser") `getenv USER`;	
+					// add/update the current scene path to the shading group attr
+					if (!`attributeExists "shaderSource" $each`)
+						addAttr -longName "shaderSource" -dt "string" $each;
+					setAttr -type "string" ($each+".shaderSource") `file -q -sn`;	
+				}
+
+				// create a folder with the asset name and the shading version in asset/shaders/master eg. (Kaos/shaders/master/Kaos_shd_master_v001/shadingGroup.mel)
+				string $masterFolderPath = (`workspace -q -rd`+$assetPath+"/shaders/master/"+$assetName+"_shd_master_"+$workVersionGuess+"/");
+				if (`filetest -d $masterFolderPath` == false){
+					evalEcho ("sysFile -makeDir \""+$masterFolderPath+"\"");
+				}
+
+				// export each shading group to the destination folder
+				exportShadingNetworkMEL $sgNodes {$masterFolderPath};
+			}
+			else {
+				error "Could not guess version number";
+			}
+		}
+	}
+}

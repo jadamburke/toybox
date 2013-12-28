@@ -1,0 +1,20 @@
+// addArnoldSubd.mel
+// Created by: raphe
+// Date: 2012/08/29 16:58:53
+
+//source "//moon/pipeline/dev/maya/common/scripts/Toolbox/Lighting/addArnoldSubdAll.mel"
+
+global proc addArnoldSubdAll(){
+	string $surfaces[] = `ls -type mesh`;
+	string $surface;
+	for ($surface in $surfaces){
+		select -r $surface;
+		string $shape[] = `ls -sl`;
+		string $myCmdA = "setAttr \"" + $shape[0] + ".aiSubdivType\" 1";
+		string $myCmdB = "setAttr \"" + $shape[0] + ".aiSubdivIterations\" 2";
+		string $myCmdC = "displaySmoothness -divisionsU 0 -divisionsV 0 -pointsWire 4 -pointsShaded 1 -polygonObject 1";
+		eval($myCmdA);
+		eval($myCmdB);
+		eval($myCmdC);
+	}
+}

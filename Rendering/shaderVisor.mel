@@ -1,0 +1,34 @@
+// shaderVisor
+
+global proc shaderVisor () {
+
+	
+	if (`window -ex abxShaderVisorWindow` != true) {
+
+		window -w 210 -h 110 -t "abxShaderVisor" -in "abxShaderVisor" -menuBar true -s true -tb true abxShaderVisorWindow;
+		formLayout abxShaderVisorForm;
+		
+		visor abxShaderVisor;
+
+		
+
+
+
+		formLayout -e
+	    		-attachForm abxShaderVisor "left" 0 
+	    		-attachForm abxShaderVisor "right" 0
+	   		-attachForm abxShaderVisor "top" 0 
+	    		-attachNone abxShaderVisor "bottom"
+		abxShaderVisorForm;
+		
+
+
+		window -e -w 400 -h 200 abxShaderVisorWindow;
+		showWindow abxShaderVisorWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 400 -h 200 abxShaderVisorWindow;
+		showWindow abxShaderVisorWindow;
+    	}
+}

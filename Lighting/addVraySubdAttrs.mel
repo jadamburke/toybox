@@ -1,0 +1,44 @@
+// addVraySubdAttrs
+// Created by: adam
+// Date: 2012/04/13 19:47:04
+
+global proc addVraySubdAttrs(){
+
+	string $meshes[] = `ls -type mesh`;
+
+	for ($each in $meshes){
+		if (!`attributeExists "vraySubdivEnable" $each`){
+			addAttr -longName "vraySubdivEnable" -at "long" $each;
+			setAttr ($each+".vraySubdivEnable") 1;
+		}
+		if (!`attributeExists "vraySubdivUVsAtBorders" $each`){
+			addAttr -longName "vraySubdivUVsAtBorders" -at "long" $each;
+			setAttr ($each+".vraySubdivUVsAtBorders") 1;
+		}
+		if (!`attributeExists "vraySubdivUVs" $each`){
+			addAttr -longName "vraySubdivUVs" -at "long" $each;
+			setAttr ($each+".vraySubdivUVs") 1;
+		}
+		if (!`attributeExists "vrayStaticSubdiv" $each`){
+			addAttr -longName "vrayStaticSubdiv" -at "long" $each;
+			setAttr ($each+".vrayStaticSubdiv") 0-9;
+		}
+		if (!`attributeExists "vrayOverrideGlobalSubQual" $each`){
+			addAttr -longName "vrayOverrideGlobalSubQual" -at "long" $each;
+			setAttr ($each+".vrayOverrideGlobalSubQual") 1;
+		}
+		if (!`attributeExists "vrayViewDep" $each`){
+			addAttr -longName "vrayViewDep" -at "long" $each;
+			setAttr ($each+".vrayViewDep") 1;
+		}
+		if (!`attributeExists "vrayEdgeLength" $each`){
+			addAttr -longName "vrayEdgeLength" -at "float" $each;
+			setAttr ($each+".vrayEdgeLength") 4.0;
+		}
+		if (!`attributeExists "vrayMaxSubdivs" $each`){
+			addAttr -longName "vrayMaxSubdivs" -at "long" $each;
+			setAttr ($each+".vrayMaxSubdivs") 3;
+		}
+	}
+
+}

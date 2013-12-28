@@ -1,0 +1,352 @@
+// abxFracture
+
+global proc abxFracture() {
+
+	if (`window -ex abxFractureWindow` != true)
+	{
+		window -w 150 -h 300 -t "abxFracture" -in "abxFracture" -s true -tb true abxFractureWindow;
+ 
+		columnLayout -rs 1 -w 400 -cal "center" -cat "both" 0 -adj true abxFractureColLyt;
+
+		
+		textFieldButtonGrp -label "Splitter Geo" -text "" -buttonLabel "<--" -bc "abxFractureGetSlice" abxFractureSlicerTextField;
+		radioButtonGrp -numberOfRadioButtons 2 -label "Method" -sl 1 -labelArray2 "Per Obj" "Group" abxFractureMethodRBG;
+		intSliderGrp -label "Iterations" -field true -s 1 -fs 1 -minValue 1 -maxValue 8 -fieldMinValue 1 -fieldMaxValue 10 -value 1 abxFractureIntField;
+		intSliderGrp -enable false -label "Cuts Per Iteration" -field true -s 1 -fs 1 -minValue 1 -maxValue 8 -fieldMinValue 1 -fieldMaxValue 10 -value 1 abxFractureCutIG;
+		checkBoxGrp -l "Keep History" -v1 1 abxFractureHistoryCB;
+		checkBoxGrp -l "Cleanup" abxFractureCleanupCB;
+		checkBoxGrp -l "Center Pivots" abxFractureCenterCB;
+		checkBoxGrp -l "Check for Errors" abxFractureErrorCB;
+		checkBoxGrp -l "Seperate Faces" abxFractureSeperateCB;
+		floatSliderGrp -enable true -label "Center Cut Bias" -field true -minValue 0 -maxValue 1 -fieldMinValue 0 -fieldMaxValue 1.0 -value 0  abxFractureCutBiasFloatSlider;
+
+		button -label "RandomCut" -h 20 -w 60 -c "abxFractureProc `intSliderGrp -q -v abxFractureIntField` `textFieldButtonGrp -q -text abxFractureSlicerTextField` `floatSliderGrp -q -v abxFractureCutBiasFloatSlider` 1 `radioButtonGrp -q -sl abxFractureMethodRBG` `intSliderGrp -q -v abxFractureCutIG` `checkBoxGrp -q -v1 abxFractureHistoryCB` `checkBoxGrp -q -v1 abxFractureCleanupCB` `checkBoxGrp -q -v1 abxFractureCenterCB` `checkBoxGrp -q -v1 abxFractureErrorCB` `checkBoxGrp -q -v1 abxFractureSeperateCB`";
+		button -label "Cut" -h 20 -w 60 -c "abxFractureProc `intSliderGrp -q -v abxFractureIntField` `textFieldButtonGrp -q -text abxFractureSlicerTextField` `floatSliderGrp -q -v abxFractureCutBiasFloatSlider` 0 `radioButtonGrp -q -sl abxFractureMethodRBG` `intSliderGrp -q -v abxFractureCutIG` `checkBoxGrp -q -v1 abxFractureHistoryCB` `checkBoxGrp -q -v1 abxFractureCleanupCB` `checkBoxGrp -q -v1 abxFractureCenterCB` `checkBoxGrp -q -v1 abxFractureErrorCB` `checkBoxGrp -q -v1 abxFractureSeperateCB`";
+		button -label "Cleanup GEO" -h 20 -w 60 -c "polyCleanupArgList 3 { \"0\",\"1\",\"0\",\"0\",\"1\",\"0\",\"0\",\"0\",\"0\",\"1e-005\",\"0\",\"0.001\",\"0\",\"1e-005\",\"0\",\"1\",\"1\" };";
+		button -label "Delete History" -h 20 -w 60 -c "DeleteHistory";
+	
+
+		window -e -w 413 -h 300 abxFractureWindow;
+		showWindow abxFractureWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 413 -h 300 abxFractureWindow;
+		showWindow abxFractureWindow;
+    	}
+}
+
+
+// main slicing procedure
+global proc abxFractureProc (int $iterations, string $splitObj, float $cutBias, int $random, int $method, int $cutNum ,int $keepHistory, int $cleanup, int $centerPiv, int $errorCheck, int $autoSeparate) {
+
+	string $sel[] = `ls -sl`;
+
+	string $obj = $sel[0];
+
+
+	// set seed to time to prevent repetitive cuts
+	string $systemTime = `about -currentTime`;
+	string $tokenBuffer[];
+	string $timeWithoutColons = "";
+	tokenize $systemTime ":" $tokenBuffer;
+	for ($i=0;$i<size($tokenBuffer);$i++){
+		$timeWithoutColons = $timeWithoutColons + $tokenBuffer[$i];
+	}
+	int $sysTimeInt = int($timeWithoutColons);
+	print ("seeding "+ $sysTimeInt+"\n");
+	seed $sysTimeInt;
+
+
+	// constant seed time for use in cutting multiple objects with one cut
+	int $constantSeed = $sysTimeInt;
+	int $seedVal;
+
+	// find the first shape node to get better bounding box shape
+	string $bboxShapeNodes[];
+	int $shapeNodeIndex = 0;
+	for ($each in $sel){
+		string $shapeNode[] = `listRelatives -shapes`;
+		$bboxShapeNodes[$shapeNodeIndex] = $shapeNode[0];
+		$shapeNodeIndex++;
+	}
+	
+
+	float $bboxAll[] = `exactWorldBoundingBox $bboxShapeNodes`;
+	float $bbox[];
+
+
+	// fills the object queue with the first selected item
+	string $newObj[];
+	string $result[];
+
+	for ($eachSelected in $sel) {
+
+		$newObj = {$eachSelected};
+
+		// if method is GROUP then it slices all orginal objects as one
+		if ($method == 2){
+			$seedVal = $constantSeed;
+			$bbox = $bboxAll;
+		}
+		// if method is Per OBJ then it cuts each piece individually
+		else{
+			$seedVal = -1;
+			string $shapeNode[] = `listRelatives -shapes $eachSelected`;
+			$bbox = `exactWorldBoundingBox $shapeNode[0]`;
+		}
+		
+		// for each iteration	
+		for ($i=1;$i<=$iterations;$i++){
+			string $bufferArray[] = $newObj;
+			$newObj = {};	
+			for ($each in $bufferArray){
+
+
+				// initial cleanup before boolean operation. (gets rid of non-manifold geo)
+				if ($cleanup == 1){
+					abxCleanupPoly {$each};
+				}
+	
+				// if not first iteration calculate new bounding box
+				if ($i != 1){
+					$bbox = `exactWorldBoundingBox $each`;
+					$seedVal = -1;
+				}
+
+
+				// splits the object randomly, returns the resulting polyShapes
+				$result = `abxShardSplit $splitObj $each $cutBias $random $seedVal $bbox`;
+
+
+
+
+				if ($keepHistory == 0){
+
+					// deletes result polyShapes that have no faces
+					int $j=0;
+					for ($j=0;$j<size($result);$j++){
+						string $tempObj =  $result[$j];
+						int $vertexCount[] = `polyEvaluate -v $tempObj`;
+						if ( $vertexCount[0] < 3){
+							delete $result[$j];
+							//hide $result[$j];
+							stringArrayRemoveAtIndex($j,$result);
+							warning ($result[$j]+" deleted. 0 Faces Found\n");
+						}
+					}
+
+					string $temp[] = `ls -sn -sl`;
+					select $result;
+					DeleteHistory;
+					if (`objExists $temp[0]`)
+						delete $temp[0];
+					if (`objExists $each`)
+						delete $each;
+					
+				}
+
+				// auto separates multiple poly shells
+				if ($autoSeparate == 1){
+					
+					string $bufferArray[];
+					for ($every in $result){
+						string $newObj[] = `abxPolySeparate $every`;
+						string $prevObj[] = $bufferArray;
+						$bufferArray = `stringArrayCatenate $prevObj $newObj`;
+					}
+					clear $result;
+					$result = $bufferArray;
+				}
+
+				// cleanup geometry if requested
+				if ($cleanup == 1){
+					abxCleanupPoly $result;
+				}
+
+				// center pivots if requested
+				if ($centerPiv == 1){
+					for ($every in $result){
+						xform -cp $every;
+					}
+				}
+				
+		
+				string $arrayCatBuffer[] = stringArrayCatenate($newObj,$result);
+				$newObj = $arrayCatBuffer;
+			}	
+		}
+	}
+}
+
+// this does the work of spliting an object once and returning the names of the resulting objects
+global proc string[] abxShardSplit(string $splitObj, string $obj, float $centerCut, int $random, int $seedVal, float $bbox[]) {
+
+
+	string $result[];
+	$newObj = `duplicate $splitObj`;
+
+
+	// calls fractureRandomSlice to get a position and rotation of cutter object to use
+	float $sliceMatrix[] = `abxFractureRandomSlice $seedVal $bbox $centerCut`;
+
+
+	if ($random == 1){
+		move -a -rpr $sliceMatrix[0] $sliceMatrix[1] $sliceMatrix[2] $newObj;
+		rotate -a $sliceMatrix[3] $sliceMatrix[4] $sliceMatrix[5] $newObj;
+	}
+
+	// manually connects a boolean
+	$splitObj = $newObj[0] ;
+	string $splitObjShape[] = `listRelatives -shapes $newObj`;
+	string $objShape[] = `listRelatives -shapes $obj`;
+	$polyBoolName = ($obj+"_boolA");
+	$polyBoolNameB = ($obj+"_boolB");
+	$cutObjA = ($obj+"_pieceA");
+	$cutObjB = ($obj+"_pieceB");
+
+	createNode polyBoolOp -name $polyBoolName;
+	setAttr ($polyBoolName+".op") 3;
+	connectAttr ($objShape[0]+".outMesh") ($polyBoolName+".inputPoly[0]");
+	connectAttr ($objShape[0]+".worldMatrix[0]") ($polyBoolName+".inputMat[0]");
+	connectAttr ($splitObjShape[0]+".outMesh") ($polyBoolName+".inputPoly[1]");
+	connectAttr ($splitObjShape[0]+".worldMatrix[0]") ($polyBoolName+".inputMat[1]");
+	createNode mesh -name $cutObjA;
+	connectAttr ($polyBoolName+".output") ($cutObjA+".inMesh");
+	//connectAttr -na ($cutObjA+".instObjGroups[0]") "initialShadingGroup.dagSetMembers";
+	sets -e -forceElement initialShadingGroup $cutObjA;
+
+	createNode polyBoolOp -name $polyBoolNameB;
+	setAttr ($polyBoolNameB+".op") 2;
+	connectAttr ($objShape[0]+".outMesh") ($polyBoolNameB+".inputPoly[0]");
+	connectAttr ($objShape[0]+".worldMatrix[0]") ($polyBoolNameB+".inputMat[0]");
+	connectAttr ($splitObjShape[0]+".outMesh") ($polyBoolNameB+".inputPoly[1]");
+	connectAttr ($splitObjShape[0]+".worldMatrix[0]") ($polyBoolNameB+".inputMat[1]");
+	createNode mesh -name $cutObjB;
+	connectAttr ($polyBoolNameB+".output") ($cutObjB+".inMesh");
+	//connectAttr -na ($cutObjB+".instObjGroups[0]") "initialShadingGroup.dagSetMembers";
+	sets -e -forceElement initialShadingGroup $cutObjB;
+
+	setAttr ($splitObj+".visibility") 0;
+	setAttr ($obj+".visibility") 0;
+
+	string $temp[] = `listRelatives -parent $cutObjA`;
+	string $temp2[] = `listRelatives -parent $cutObjB`;
+	string $result[] = {$temp[0],$temp2[0]};
+
+	select $splitObj;
+
+	return $result;
+
+}
+
+
+// button command procedure for filling the cutter object texT field with selected object
+global proc abxFractureGetSlice(){
+	$sel = `ls -sl`;
+	textFieldButtonGrp -e -text $sel[0] abxFractureSlicerTextField;
+}
+
+
+// this checks for an error that sometimes occurs with booleans whereby a vertex is erroneously positioned at origin.
+global proc int abxFractureOriginCheck(string $obj){
+		
+
+	int $vtxCount = `polyEvaluate -v $obj`;
+	int $i=0;
+	for ($i=0;$i<$vtxCount;$i++){
+		float $ppos[] = `pointPosition -w ($obj+".pt["+$i+"]")`;
+		if ($ppos[0] == 0 && $ppos[1] == 0 && $ppos[2] == 0){
+			return 1;
+		}
+	}
+	
+	return 0;
+}
+
+// abxFractureRandomSlice(): this generates random position and rotation for the cutter object based on a bounding box and random seed
+// giving the same bbox dimensions and seed it will make the identical cut, useful for cutting multiple objects with one cut.
+// returns the matrix of the slice in worldspace
+
+global proc float[] abxFractureRandomSlice(int $seedVal, float $origBbox[], float $centerCut){
+
+
+	print ("Seeding="+$seedVal+"; CenterCut="+$centerCut+"; BBox="+$origBbox[0]+","+$origBbox[1]+","+$origBbox[2]+","+$origBbox[3]+","+$origBbox[4]+","+$origBbox[5]+"\n");
+	
+	
+	float $centerX = ($origBbox[3]-$origBbox[0])/2+$origBbox[0];
+	float $centerY = ($origBbox[4]-$origBbox[1])/2+$origBbox[1];
+	float $centerZ = ($origBbox[5]-$origBbox[2])/2+$origBbox[2];
+	float $center[] = {$centerX ,$centerY ,$centerZ };
+	float $bbox[] = {((($origBbox[0]-$center[0])*$centerCut)+$center[0]),
+		((($origBbox[1]-$center[1])*$centerCut)+$center[1]),
+		((($origBbox[2]-$center[2])*$centerCut)+$center[2]),
+		((($origBbox[3]-$center[0])*$centerCut)+$center[0]),
+		((($origBbox[4]-$center[1])*$centerCut)+$center[1]),
+		((($origBbox[5]-$center[2])*$centerCut)+$center[2])};
+
+	/*float $bbox[] = {($center[0] - $origBbox[0]*$centerCut+$origBbox[0]),
+		($center[1] - ($origBbox[1]*$centerCut)+$origBbox[1]),
+		($center[2] - ($origBbox[2]*$centerCut)+$origBbox[2]),
+		($center[0] - ($origBbox[3]*$centerCut)+$origBbox[3]),
+		($center[1] - ($origBbox[4]*$centerCut)+$origBbox[4]),
+		($center[2] - ($origBbox[5]*$centerCut)+$origBbox[5])};
+	*/
+
+
+	if ($seedVal != -1)
+		seed $seedVal;
+	float $randPos[] = {rand($bbox[0],$bbox[3]),rand($bbox[1],$bbox[4]),rand($bbox[2],$bbox[5])};
+	//float $randRot[] = {rand(-180,180), rand(-180,180), rand(-180,180)};
+	//float $randRot[] = {0.0, rand(-180,180),0.0};
+	float $randRot[] = {rand(-50,50), rand(-180,180), rand(-50,50)};
+
+	print ("RandPos:"+$randPos[0]+":"+$randPos[1]+":"+$randPos[2]+".   RandRot:"+$randRot[0]+":"+$randRot[1]+":"+$randRot[2]+"\n");
+	return {$randPos[0],$randPos[1],$randPos[2],$randRot[0],$randRot[1],$randRot[2],0,0,0};
+	
+
+	// return matrix for slice, xyz pos, xyz rotation, xyz scale;
+	
+}
+
+
+global proc string[] abxPolySeparate(string $obj) {
+
+	int $shellCount[] = `polyEvaluate -s $obj`;
+	if ($shellCount[0] > 1){
+
+		string $result[] = `polySeparate -ch 0 $obj`;
+
+		// string $children[] = `listRelatives -parent $obj`;
+		for ($each in $result){
+			parent -world $each;
+		}
+		delete $obj;
+		return $result;
+	}
+	else {
+		return {$obj};
+	}
+
+}
+
+global proc abxCleanupPoly (string $objs[]){
+
+	$temp = `ls -sl`;
+	//print ("abxCleanup Called with "+$objs[0]+"\n");
+	for ($each in $objs){
+		select $each;
+		string $nmVertices[] = `polyInfo -nmv`;
+		string $nmEdges[] = `polyInfo -nme`;
+		print ("nonmanifold "+size($nmVertices)+"\n");
+		
+		//if (size($nmVertices) > 0 || size($nmEdges) > 0){
+	
+			//eval("polyCleanupArgList 3 { \"0\",\"1\",\"0\",\"0\",\"0\",\"0\",\"0\",\"0\",\"1\",\"1e-005\",\"1\",\"0.001\",\"0\",\"1e-005\",\"0\",\"1\",\"1\"}");
+			eval("polyCleanupArgList 3 { \"0\",\"1\",\"0\",\"0\",\"0\",\"0\",\"0\",\"0\",\"1\",\"1e-005\",\"1\",\"0.001\",\"0\",\"1e-005\",\"0\",\"1\",\"1\"}");
+			print ("Nonmanifold Geometry Deleted\n");
+		//}
+	}	
+	select $temp;
+	
+}

@@ -1,0 +1,117 @@
+// booleanBatch
+
+global proc booleanBatch () {
+
+	// get list of objects to cut
+	string $objects[] = `listRelatives objectSet`;
+	
+	// get list of cutter objects
+	string $cutters[] = `ls -sl`;
+
+
+	int $amount = 0;
+	int $index = 0;
+	progressWindow -title "Batch Boolean Intersect" -progress $amount -status "Preparing to Cut" -min 0 -max 100 -isInterruptable true;
+
+
+
+	// for each cutter object
+	for ($each in $cutters){
+	
+
+
+		// for each object to cut
+		for ($every in $objects){
+			
+			// get bounding box of cutter
+			// get bounding box of object to cut
+
+			string $cutterShapeNode[] = {$each} ;//`listRelatives -shapes $each`;
+			float $cutterBBox[] = `exactWorldBoundingBox $cutterShapeNode[0]`;
+			//print ($cutterBBox);
+
+			string $objectShapeNode[] = {$every} ; //`listRelatives -shapes $every`;
+			float $objectBBox[] = `exactWorldBoundingBox $objectShapeNode[0]`;
+			//print ($objectBBox);
+
+			int $test1 = booleanBatchBBoxTest($objectBBox, $cutterBBox);
+			int $test2 = booleanBatchBBoxTest($cutterBBox,$objectBBox);
+			//print ($test1+":"+$test2+"/n");
+
+			// if object to cut bbox is within cutter bbox or vice versa
+			if ($test1 || $test2){
+
+				string $newCutter[] = `duplicate $each`;
+				string $newObj[] = `duplicate $every`;
+				//print ("Doing Boolean\n");
+				//boolean intersect the the object to cut
+				$result = `polyBoolOp -op 3 -ch 0 -useThresholds 0 -preserveColor 0 $newCutter[0] $newObj[0]`;
+				int $polyCount[] = `polyEvaluate -v $result`;
+				rename $result ($every+"_"+$each);
+				if ($polyCount[0] < 1){
+					warning ("Boolean Failed on object "+$every+" with cutter "+$each);
+					rename ($every+"_"+$each) ($every+"_"+$each+"_failed");
+				}
+
+			}
+			$amount = (float($index)/float(size($cutters)*size($objects)))*100;
+			progressWindow -edit -progress $amount -status ($each+" on "+$every+" "+$amount+"%");
+			$index++;
+
+		}
+	}
+	progressWindow -endProgress;
+
+}
+
+global proc int booleanBatchBBoxTest (float $bbox1[], float $bbox2[]){
+
+	$isWithin = 0;
+
+	// test the eight points (corners) of bbox2 to see if any are within bbox 1
+
+	int $x1 = 0;
+	int $y1 = 0;
+	int $z1 = 0;
+	int $x2 = 0;
+	int $y2 = 0;
+	int $z2 = 0;
+
+	// test the min max points first
+	if ($bbox2[0] > $bbox1[0] && $bbox2[0] < $bbox1[3])
+		$x1 = 1;
+	if ($bbox2[1] > $bbox1[1] && $bbox2[1] < $bbox1[4])
+		$y1 = 1;
+	if ($bbox2[2] > $bbox1[2] && $bbox2[2] < $bbox1[5])
+		$z1 = 1;
+	if ($bbox2[3] > $bbox1[0] && $bbox2[3] < $bbox1[3])
+		$x2 = 1;
+	if ($bbox2[4] > $bbox1[1] && $bbox2[4] < $bbox1[4])
+		$y2 = 1;
+	if ($bbox2[5] > $bbox1[2] && $bbox2[5] < $bbox1[5])
+		$z2 = 1;	
+
+	//print ($x1+":"+$x2+":"+$y1+":"+$y2+":"+$z1+":"+$z2+"\n");
+
+	if ($x1 && $y1 && $z1)
+		return 1;
+	if ($x2 && $y1 && $z1)
+		return 1;
+	if ($x2 && $y2 && $z1)
+		return 1;
+	if ($x2 && $y2 && $z2)
+		return 1;
+	if ($x2 && $y1 && $z2)
+		return 1;
+	if ($x1 && $y2 && $z1)
+		return 1;
+	if ($x1 && $y2 && $z2)
+		return 1;
+	if ($x1 && $y1 && $z2)
+		return 1;
+
+	return 0;
+
+
+
+}

@@ -1,0 +1,92 @@
+// mentalRay_LOW
+// Created by: raphe
+// Date: 2012/03/09 11:17:18
+
+global proc mentalRay_LOW(){
+	if(! `pluginInfo -q -l "Mayatomr"`){
+		loadPlugin -addCallback "mrPostLoadLOW" "Mayatomr";
+		print ("loading plugin\n");
+	}else{
+		mrPostLoadLOW("Mayatomr");
+		print ("didnt have to load plugin\n");
+	}
+}
+
+global proc mrPostLoadLOW(string $pluginName){
+
+	// source the original maya scripts for the render globals window
+	eval("source \""+`getenv MAYA_LOCATION`+"/scripts/others/createMayaSoftwareCommonGlobalsTab.mel\"");
+	eval("source \""+`getenv MAYA_LOCATION`+"/scripts/others/shouldAppearInNodeCreateUI.mel\"");
+	eval("source \""+`getenv MAYA_LOCATION`+"/scripts/others/unifiedRenderGlobalsWindow.mel\"");
+
+	string $renderPresetFound = attributeExists("renderPreset","defaultRenderGlobals");
+	if ($renderPresetFound == 0){
+	    addAttr -ln "renderPreset" -dt "string" defaultRenderGlobals;
+	}
+	
+	setAttr -type "string" defaultRenderGlobals.renderPreset "LO";
+
+	unifiedRenderGlobalsWindow;
+	evalDeferred -lowestPriority ("setCurrentRenderer mentalRay;");
+
+	evalDeferred -lowestPriority ("applyPresetToNode \"miDefaultFramebuffer\" \"\" \"\" (`getenv MAYA_PPTOOLS`+\"/presets/attrPresets/mentalrayFramebuffer/mentalRay_defaults.mel\") 1");
+	evalDeferred -lowestPriority ("applyPresetToNode \"mentalrayGlobals\" \"\" \"\" (`getenv MAYA_PPTOOLS`+\"/presets/attrPresets/mentalrayGlobals/mentalRay_defaults.mel\") 1");
+	evalDeferred -lowestPriority ("applyPresetToNode \"miDefaultOptions\" \"\" \"\" (`getenv MAYA_PPTOOLS`+\"/presets/attrPresets/mentalrayOptions/mentalRay_defaults.mel\") 1");
+	evalDeferred -lowestPriority ("applyPresetToNode \"miDefaultOptions\" \"\" \"\" (`getenv MAYA_PPTOOLS`+\"/presets/attrPresets/mentalrayOptions/mentalRay_LOW.mel\") 1");
+	evalDeferred -lowestPriority ("applyPresetToNode \"defaultRenderGlobals\" \"\" \"\" (`getenv MAYA_PPTOOLS`+\"/presets/attrPresets/renderGlobals/mentalRay_defaults.mel\") 1");
+	evalDeferred -lowestPriority ("applyPresetToNode \"defaultResolution\" \"\" \"\" (`getenv MAYA_PPTOOLS`+\"/presets/attrPresets/resolution/mentalRay_defaults.mel\") 1");
+
+	$cmd = "";
+	
+	string $scenePath = `file -q -sn`;
+	string $scenePath = `workspace -pp $scenePath`;
+	string $tokenBuffer[];
+	tokenize $scenePath "/" $tokenBuffer;
+	
+	string $shotsFolder = $tokenBuffer[1];
+	string $seq = $tokenBuffer[2];
+	string $shotName = $tokenBuffer[3];
+	string $deptName = $tokenBuffer[4];
+
+	string $jobFolder = `workspace -q -rd`;
+	string $buffer[];
+	tokenize $jobFolder "/" $buffer;
+
+	string $filePath = (`workspace -q -rd`+"scenes/"+$buffer[3]+"_defaults.txt");
+
+	int $height = 0;
+	int $width = 0;
+
+	if (`filetest -r $filePath`){
+		$fileId = `fopen $filePath "r"` ;
+		string $nextLine = `fgetline $fileId` ;
+		while (size($nextLine) > 0) { 
+			string $cleanLine = strip($nextLine) ; 
+			string $buffer[] ;
+			tokenize $cleanLine "=" $buffer ;
+			string $value = $buffer[1];
+			float $lowValue = $value;
+			$lowValue = $lowValue / 2;
+			if(`gmatch $cleanLine "renderWidth*"`){
+				$cmd += ("setAttr \"defaultResolution.width\" "+$lowValue+";");
+				$width = $value;
+			}
+			if(`gmatch $cleanLine "renderHeight*"`){
+				$cmd += ("setAttr \"defaultResolution.height\" "+$lowValue+";");
+				$height = $value;
+			}
+			$nextLine = `fgetline $fileId` ; 
+		}
+		float $pixelAspect = 1;
+		float $deviceAspectRatio = 0.0;
+		$deviceAspectRatio = (($width * $pixelAspect) / $height);
+		$cmd += ("setAttr \"defaultResolution.deviceAspectRatio\" "+$deviceAspectRatio+";");
+		$cmd += ("setAttr \"defaultResolution.pixelAspect\" "+$pixelAspect+";");
+		$cmd += ("setAttr defaultViewColorManager.imageColorProfile 3;");
+		print ($cmd);
+		evalDeferred -lowestPriority ($cmd);
+	}else{
+		print ("Warning: could not find job defaults. Looked here: "+$filePath+"\n");
+	}
+
+}

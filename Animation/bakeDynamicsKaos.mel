@@ -1,0 +1,9 @@
+// bakeDynamicsKaos
+// Created by: adam
+// Date: 2012/04/24 16:45:47
+
+global proc bakeDynamicsKaos(){
+	python("import bakeDynamicsKaos");
+	python("reload (bakeDynamicsKaos)");
+	python("import bakeDynamicsKaos;bakeDynamicsKaos.bakeDynamicsKaos();");
+}

@@ -1,0 +1,9 @@
+// selChildren
+// Created by: adambu
+// Date: 2011/11/30 11:57:34
+
+global proc selChildren(){
+
+	select `listRelatives -fullPath -children`;
+	
+}

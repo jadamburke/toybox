@@ -1,0 +1,272 @@
+/*  This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: attrMove v1.0
+''    Author: Ciaran Devine
+''    Last Updated: September 3, 2002
+''    Update/Change this file at:
+''    http://www.highend3d.com/maya/mel/?section=modeling#1874
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+
+//***************************************************************
+//* File:   attrMove.mel                                        *
+//* Descr:  Move custom Attributes from many nodes to one node  *
+//* Ver:    1.0                                                 *
+//* Date:   9th June 2002                                       *
+//* Author: C. Devine -  cybotic@cybotic.net                    *
+//* URL:    http://cybotic.net/                                 *
+//***************************************************************
+//
+// Useage: select node(s) with custom attributes, followed by a destination node
+//         to which the attribs. will be moved
+
+proc string attrName (string $objName, string $testName)
+	{
+	string $result;
+	string $destObjAttr=$objName+"."+$testName;
+	if (`objExists $destObjAttr`) 
+		{
+		//attr exists on obj - append...
+		int $n=0;
+		string $destObjAttr=$objName+"."+$testName+$n;		
+		while (`objExists $destObjAttr`)
+			{
+			$n++;
+			$destObjAttr=$objName+"."+$testName+$n;		
+			}
+		$result=$testName+$n;
+		}
+	else
+		$result=$testName;	//not exist - set to desired name
+	return $result;
+	}
+
+proc addKeyable (string $objName, string $attrName, string $attrType)
+	{
+	addAttr -ln $attrName -at $attrType $objName;
+	string $cmd="setAttr -e -keyable true "+$objName+"."+$attrName;
+	eval($cmd);
+	}
+
+global proc attrMove ()
+	{
+	print ("attrMove...\n");
+
+	string $numHasQuerys[4] = {"-hasMinValue","-hasMaxValue","-hasSoftMinValue","-hasSoftMaxValue"};
+	string $numQuerys[4] = {"-minValue","-maxValue","-softMinValue","-softMaxValue"};
+
+	//*** list selections ***//
+	string $selected[] = `ls -sl`;
+	int $noOfSel = size($selected);
+	print ($noOfSel+"\n");
+
+	//string $cmd;
+	string $destObject = $selected[$noOfSel-1];
+	//print ("Destination object "+$destObject+"\n");
+
+	int $i;
+	for ($i = 0; $i < $noOfSel-1; $i++)
+		{
+		string $uAttr[] = `listAttr -userDefined $selected[$i]`;
+		if ($uAttr[0]!="")
+			{
+			int $a=0;
+			while ($a<size($uAttr))
+				{
+				$att=$uAttr[$a];
+				//prepare names
+				string $srcObjAttr=$selected[$i]+"."+$att;
+				string $goodAttrName=attrName($destObject,$att);
+				string $destObjAttr=$destObject+"."+$goodAttrName;
+
+				string $attrType=`eval("addAttr -q -attributeType "+$srcObjAttr)`;
+				string $dataType[]=`eval("addAttr -q -dataType "+$srcObjAttr)`;
+	//			print("       Attr type : "+$attrType+",	Data type : "+$dataType[0]+"\n");
+	//			print("Source Obj> "+$srcObjAttr+"\n");
+	//			print("Dest Obj  > "+$destObjAttr+"\n");
+
+				//define set attr command for common values.
+				string $setValCmd="; setAttr "+$destObjAttr+" `getAttr(\""+$srcObjAttr+"\")`";
+
+				switch ($attrType)
+					{
+					case "double3":
+						{
+						//add attr
+						string $cmds[9];
+						int $c=0;
+
+						$cmds[$c]="addAttr -ln " + $goodAttrName + " -at double3 "+$destObject;
+						$c++;
+
+						string $dim;
+						string $dims[3]={"X","Y","Z"};
+						for ($dim in $dims)
+							{
+							$cmds[$c]="addAttr -ln "+$goodAttrName+$dim+" -at \"double\" -p " +$goodAttrName+ " " + $destObject;
+							$c++;
+							}
+
+						$cmds[$c]="setAttr -type double3 "+$destObjAttr+ " 0 0 0";
+						$c++;
+
+						$cmds[$c]="setAttr -e -keyable true "+$destObjAttr;
+						$c++;
+
+						for ($dim in $dims)
+							{
+							$setValCmd="; setAttr "+$destObjAttr+$dim+
+										" `getAttr(\""+$srcObjAttr+$dim+"\")`";
+
+							$cmds[$c]="setAttr -e -keyable true "+$destObjAttr+$dim+$setValCmd;
+							$c++;
+							}
+
+						for ($c = 0; $c < 9; $c++)
+							eval($cmds[$c]);
+						}
+						break;
+
+					case "typed":
+						{
+						addAttr -ln $goodAttrName -dt "string" $destObject;
+						setAttr -e -keyable true $destObjAttr;
+
+
+						//setAttr -type "string" locator1.aS "test";
+						$setValCmd="getAttr(\""+$srcObjAttr+"\")";
+						$setValCmd="\""+`eval($setValCmd)`+"\"";
+
+						$setValCmd="; setAttr -type \"string\" "+$destObjAttr+$setValCmd;
+						eval($setValCmd);
+						}
+						break;
+
+					case "enum":
+						{
+						//to return enum list:   addAttr -q -en "nurbsSphere2.aE";
+						string $enVal="addAttr -q -en \""+$srcObjAttr+"\"";
+						$enVal="\""+`eval($enVal)`+":\"";
+
+						//add and make keyable
+						string $cmd="addAttr -ln "+$goodAttrName+" -at \"enum\" -en "+$enVal+" "+$destObject;
+						eval($cmd);
+						$cmd="setAttr -e -keyable true "+$destObjAttr;
+						eval($cmd);
+
+						eval($setValCmd);
+
+						}
+						break;
+
+					case "bool":
+						{
+						addKeyable($destObject,$goodAttrName,$attrType);
+						eval($setValCmd);
+						}
+						break;
+
+					default :
+						{
+						addKeyable($destObject,$goodAttrName,$attrType);
+						eval($setValCmd);
+
+						//check min/max slider params
+						int $i;
+						for ($i = 0; $i < size($numHasQuerys); $i++)
+							{
+							$cmd = "addAttr -q "+$numHasQuerys[$i]+" "+$srcObjAttr;
+							if (`eval($cmd)`==1)
+								{
+								//add HAS to new objAttrib
+								addAttr -e $numHasQuerys[$i] 1 $destObjAttr;
+								//it HAS that query, so get value..	
+								string $cmd="addAttr -q "+$numQuerys[$i]+" "+$srcObjAttr;
+								float $value=eval($cmd);
+								//then apply that value to that attib 
+								addAttr -e $numQuerys[$i] $value $destObjAttr;
+								}
+							}
+						}
+					}
+
+				//do 'from' and 'to' attribs - will ensure
+				//that connections between user attribs get
+				//made, even if new attrib not yet created.
+
+				//list connections to old attrib
+				string $cmd = "listConnections -plugs true -s 1 -d 0 "+$srcObjAttr;
+				string $connSrc[] = `eval ($cmd)`;
+				//reconnect TO new attrib
+				string $conn;
+				for ($conn in $connSrc)
+					{
+					//these prints actually perform the disconnecting & re-connecting
+					print(`disconnectAttr $conn $srcObjAttr`);
+					print(" ->- ");
+					print(`connectAttr -f $conn $destObjAttr`) ;
+					print("\n");
+					}
+
+				//list connections FROM old attrib
+				string $cmd = "listConnections -plugs true -s 0 -d 1 "+$srcObjAttr;
+				string $connDest[] = `eval ($cmd)`;
+				//reconnect FROM new 
+				for ($conn in $connDest)
+					{
+					//these prints actually perform the disconnecting & re-connecting
+					print(`disconnectAttr $srcObjAttr $conn`);
+					print(" ->- ");
+					print(`connectAttr -f $destObjAttr $conn`);
+					print("\n");
+					}
+
+				// skip individual parts of vector (next three listed)
+				if ( $attrType=="double3" && $dataType[0]=="double3" )
+					$a+=3;
+
+				//inc current user attrib index count
+				$a++;
+				}	//while loop (each attr)
+
+			}	//if uattr
+		}	//selected obj loop
+
+	//loop thru selected again to delete original user Attribs
+	int $i;
+	for ($i = 0; $i < $noOfSel-1; $i++)
+		{
+		string $uAttr[] = `listAttr -userDefined $selected[$i]`;
+		//step thru user atribs on selected source 			
+		if ($uAttr[0]!="")
+			{
+			int $a=0;
+			while ($a<size($uAttr))
+				{
+				string $srcObjAttr=$selected[$i]+"."+$uAttr[$a];
+				string $cmd = "listConnections -plugs true -s 1 -d 1 "+$srcObjAttr;
+				string $conns[] = `eval ($cmd)`;
+				string $attrType=`eval("addAttr -q -attributeType "+$srcObjAttr)`;
+				string $dataType[]=`eval("addAttr -q -dataType "+$srcObjAttr)`;
+
+				//delete original attribute on source node
+				if ( size($conns) > 0 )
+					print("Unknown error: "+$srcObjAttr+" still connected, not deleting original attribute/n");
+				else
+					deleteAttr $srcObjAttr;
+
+				// skip individual parts of vector (next three listed)
+				if ( $attrType=="double3" && $dataType[0]=="double3" )
+					$a+=3;
+				//inc current user attrib index count
+				$a++;
+
+				}//while loop (each attr)			
+			}//if uAttr
+		}
+	}

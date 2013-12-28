@@ -1,0 +1,128 @@
+// setTo30FPS
+// Created by: adam
+// Date: 2012/03/28 15:07:19
+
+global proc setTo30FPS(){
+
+	float $targetFPS = 30;
+	float $framePivot = 1; 
+	int $moveKeys = 0 ;
+	int $moveRange = 0; 
+	int $snapKeys = 0;
+	int $snapRange  = 0;
+
+	// get list of all animation curves
+	string $animNodeList[] = `ls -type animCurve`;
+
+	// find current frameRate
+
+	float $oldFrameRate = `fpsNumeric`;
+
+	float $cTime= `currentTime -q`;
+
+
+	// get the playback range before unit change
+	float $rangeStart = `playbackOptions -q -min`;
+	float $rangeEnd = `playbackOptions -q -max`;
+	float $animStart = `playbackOptions -q -ast`;
+	float $animEnd = `playbackOptions -q -aet`;
+
+
+	// change the playback speed without moving keyframes
+
+	currentUnit -ua false -t `fpsNumericToUnit $targetFPS `;
+
+	print ($animStart+":"+$animEnd+":"+$rangeStart+":"+$rangeEnd +"\n");
+
+	// move the keyframes based on pivot frame
+	float $scaleAmt =  ($targetFPS-1) / ($oldFrameRate-1);
+	//print ($scaleAmt+"\n");
+
+	if ($moveKeys) {
+		for ($each in $animNodeList){
+			
+			scaleKey -tp $framePivot -ts $scaleAmt $each;
+			if ($snapKeys){
+				snapKey $each;
+			}
+			if (`gmatch $each "timeWarp*"`){
+				scaleKey -vp $framePivot -vs $scaleAmt $each;
+			}
+		}
+	}
+
+
+	// set the new playback range
+	float $newAnimStart = ($animStart - $framePivot) * $scaleAmt + $framePivot;
+	float $newAnimEnd = ($animEnd - $framePivot) * $scaleAmt + $framePivot;
+	float $newRangeStart = ($rangeStart - $framePivot) * $scaleAmt + $framePivot;
+	float $newRangeEnd = ($rangeEnd - $framePivot) * $scaleAmt + $framePivot;
+
+	currentTime -e (($cTime - $framePivot)*$scaleAmt + $framePivot);
+
+	print ($newAnimStart+":"+$newAnimEnd+":"+$newRangeStart+":"+$newRangeEnd +"\n");
+	
+	if ($moveRange){
+		if ($snapRange){
+			playbackOptions -min ((int)($newRangeStart+0.5))-max ((int)($newRangeEnd+0.5)) -ast ((int)($newAnimStart+0.5)) -aet ((int)($newAnimEnd+0.5));
+		}
+		else{
+			playbackOptions -min $newRangeStart -max $newRangeEnd -ast $newAnimStart -aet $newAnimEnd;
+					
+		}
+		
+	}
+	else {
+		playbackOptions -min $rangeStart -max $rangeEnd -ast $animStart -aet $animEnd;	
+	}
+}
+
+global proc float fpsNumeric () {
+
+	string $frameRateUnit = `currentUnit -q -f -t`;
+	switch ($frameRateUnit){
+		case "film":
+			return 24;
+			break;
+		case "ntsc":
+			return 30;
+			break;
+		case "game":
+			return 60;
+			break;
+		default:
+			return 0;
+			break;
+	}
+	
+
+}
+
+global proc string fpsNumericToUnit (float $fps){
+	
+	// 1 = 1 frame per second;
+	// 
+
+	switch ($fps){
+		case 24.0:
+			return "film";
+			break;
+		case 48.0:
+			return "show";
+			break;
+		case 30.0:
+			return "ntsc";
+			break;
+		case 1.0:
+			return "seconds";
+			break;
+		case 0.017:
+			return "minutes";
+			break;
+		default:
+			return "unknown";
+			break;
+	}
+
+
+}

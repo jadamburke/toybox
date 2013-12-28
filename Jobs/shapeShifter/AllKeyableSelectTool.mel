@@ -1,0 +1,40 @@
+// abxSelector
+global proc AllKeyableSelectTool() {
+
+scriptCtx 
+    -title "ProxySelect"
+    -totalSelectionSets 1
+    -fcs "select -r $Selection1; performProxyAllKeyableSelect;"
+    -setNoSelectionPrompt "Select two curves close to the attachment points"
+    -setSelectionPrompt "Select a second curve close to the attachment point"
+
+    -setSelectionCount 1
+    -sae true
+    -setAutoComplete true
+    -euc false
+    -sm true
+    -alo true 
+
+    proxySelectAllKeyableTool;
+
+    setToolTo proxySelectAllKeyableTool;
+
+}
+
+global proc performProxyAllKeyableSelect () {
+	$sel = `ls -sl`;
+	select -cl;
+	string $each2;
+	for ($each2 in $sel){
+		string $pNode[] = `listRelatives -parent $each2`;
+		string $tokenbuffer[];
+		tokenize $pNode[0] "_" $tokenbuffer;
+		if (`objExists ($tokenbuffer[0]+"_ALLKEYABLE")`)
+			select -r ($tokenbuffer[0]+"_ALLKEYABLE");
+		else
+			select -r $pNode[0];
+
+	}
+
+	print ("Done\n");
+}

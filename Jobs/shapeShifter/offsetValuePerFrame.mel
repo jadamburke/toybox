@@ -1,0 +1,11 @@
+// offsetValuePerFrame
+global proc offsetValuePerFrame(){
+
+	$sel = `ls -sl`;
+
+	for ($each in $sel){
+		findKeyframe -count ($each+".tz");
+		
+	}
+
+}

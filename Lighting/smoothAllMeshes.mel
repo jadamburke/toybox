@@ -1,0 +1,10 @@
+// smoothAllMeshes
+// Created by: adam
+// Date: 2012/04/12 18:39:44
+
+global proc smoothAllMeshes(){
+	$sel = `ls -type mesh`;
+	for ($each in $sel){
+		setAttr ($each+".dsm") 2;
+	}
+}

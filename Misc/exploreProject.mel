@@ -1,0 +1,16 @@
+// exploreProject
+
+global proc exploreProject () {
+	$projPath = toNativePath(`workspace -q -rd`); 
+	
+	if (`about -os ` == "mac"){
+		
+		exec ("open -a finder \""+$projPath+"\"");
+	}
+	else if (`about -os ` == "linux" || `about -os` == "linux64"){
+		system("konqueror "+$projPath+" &");
+	}
+	else{ 
+		system(("start explorer "+$projPath));
+	}
+}

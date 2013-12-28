@@ -1,0 +1,40 @@
+// dupePerFrame
+global proc dupePerFrame () {
+
+
+	$selected = `ls -sl`;
+	float $startFrame = `playbackOptions -q -min`;
+	float $endFrame = `playbackOptions -q -max`;
+	
+	for ($f= $startFrame;$f <= $endFrame; $f++){
+		
+		currentTime -e $f;
+
+		string $results[] = `duplicate -rr -rc $selected`;
+		
+		// get any intermediate shape nodes that were accidentally duplicated
+		string $interShapes[] = `listRelatives -shapes $results`;	
+		delete `ls -intermediateObjects $interShapes`;
+
+		string $each;
+		for ($each in $results){
+			setAttr -l false ($each+".translateX");
+			setAttr -l false ($each+".translateY");
+			setAttr -l false ($each+".translateZ");
+			setAttr -l false ($each+".rotateX");
+			setAttr -l false ($each+".rotateY");
+			setAttr -l false ($each+".rotateZ");
+			setAttr -l false ($each+".scaleX");
+			setAttr -l false ($each+".scaleY");
+			setAttr -l false ($each+".scaleZ");
+			setAttr -l false ($each+".visibility");
+
+				
+		}
+
+		$results = `parent -w $results`;
+		$groupName = `group -n ("frame"+$f) $results`;
+
+	}
+
+}

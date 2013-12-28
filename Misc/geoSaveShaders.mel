@@ -1,0 +1,58 @@
+//
+//	geoSaveShaders.mel
+//
+//	Clay Budin
+//	clay_budin@hotmail.com
+//	PandaPanther
+//	Apr 05 2012
+//
+//	Called when a model is mastered, saves all of the shaders associated with a model
+//	 and stores SG name and version number on all geo of model
+//
+
+string $gssVersionStr = "0.1b";
+
+
+global proc geoSaveShaders (string $rootObj, string $assetName, string $versionStr)  {
+	// make sure this is loaded and up-to-date
+	source "\\\\monkey\\resources\\maya\\common\\scripts\\Toolbox\\Lighting\\abxExportShaderMel";
+
+	string $shapes[] = `listRelatives -allDescendents -type mesh -type nurbsSurface -noIntermediate $rootObj`;
+	string $sgNodes[];
+
+	for ($sh in $shapes)  {
+		string $sgs[] = `listSets -t 1 -o $sh`;
+		if (size($sgs) > 0)  {
+			string $sg = $sgs[0];
+			$sgNodes[size($sgNodes)] = $sg;
+
+			if (!`attributeQuery -n $sh -ex "PP_SGName"`)  {
+				addAttr -dt "string" -ln "PP_SGName" $sh;
+				addAttr -dt "string" -ln "PP_SGVersion" $sh;
+			}
+			setAttr -type "string" ($sh + ".PP_SGName") $sg;
+			setAttr -type "string" ($sh + ".PP_SGVersion") $versionStr;
+		}
+	}
+
+	string $dirPath = ("M:/Skylanders2_Giants_PP10092/3D/skylanders2_giants_maya/assets/test/KaosShaderTest/shaders/" + $assetName + "_" + $versionStr);
+	if (!`filetest -d $dirPath`)  {
+		print("Create Directory: " + $dirPath + "\n");
+		if (!`sysFile -makeDir $dirPath`)  {
+			print("makeDir failed\n");
+			return;
+		}
+	}
+
+	exportShadingNetworkMEL(stringArrayRemoveDuplicates($sgNodes), {$dirPath});
+}
+
+geoSaveShaders("GEO", "KaosShaderTest", "v001");
+
+
+
+
+
+
+
+

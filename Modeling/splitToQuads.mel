@@ -1,0 +1,830 @@
+
+
+global proc splitToQuads() {
+
+	//  Store selected face paths
+	string $faceSelection[] = `getFaceSelection`;
+
+	// Return error if no faces selected
+	if (size($faceSelection) == 0) {
+
+		error "No faces selected";
+
+	}
+
+	string $tokenBuffer[5];
+	tokenize $faceSelection[0] ".[]" $tokenBuffer;
+	string $hostObject = $tokenBuffer[0];
+
+	// Stores sorted faces
+	string $fourSided[];                       
+	string $fiveSided[2];                       
+	string $sixSided[1];                       
+
+	// Buffers for storing component paths
+	string $vertBuffer[2];                     
+	string $edgeBuffer[6];                     
+	string $faceBuffer;              
+
+	string $orderedEdge[6];		// Stores ordered edge information
+
+	// Loop through faces
+	for ($faceBuffer in $faceSelection) {
+
+		 // Convert face to edge selection and record edges
+		select -r $faceBuffer;
+		PolySelectConvert 2;
+		$edgeBuffer = `ls -sl -fl`;
+
+		// Sort faces by number of sides
+		if (size ($edgeBuffer) == 4) {
+
+			$fourSided[size ($fourSided)] = $faceBuffer;
+
+		} else if (size ($edgeBuffer) == 5) {
+
+			$fiveSided[size ($fiveSided)] = $faceBuffer;
+
+		} else if (size ($edgeBuffer) == 6) {
+
+			$sixSided[size ($sixSided)] = $faceBuffer;
+
+		}
+	}
+
+	clear $faceSelection;                // No longer needed
+
+	// See if there are the required number of 6-sided faces
+	if (size ($sixSided) == 1) {
+
+		// No longer needed
+		clear $fourSided;
+		clear $fiveSided;
+        
+		// Order edges of and split face
+		$orderedEdge = organizeEdges($sixSided[0], $hostObject);
+		splitFace($orderedEdge, $hostObject);
+       
+	// See if there are the required number of 5-sided faces
+	} else if (size ($fiveSided) == 2) {
+
+		// Convert 4/5-sided to 6-sided while tracing a face path
+		$sixSided = traceConnection($fourSided, $fiveSided);
+
+		// Return if trace failed
+		if (size($sixSided) == 0) {
+
+			select -r $hostObject;
+			error "Failed to trace a path through selected faces";
+
+		}
+
+		// No longer needed
+		clear $fourSided;
+		clear $fiveSided;
+
+		// Order edges of  and split faces
+		for ($faceBuffer in $sixSided) {
+
+			$orderedEdge = organizeEdges($faceBuffer,  $hostObject);
+			splitFace($orderedEdge, $hostObject);			
+
+		}
+	} else {
+
+		select -r $hostObject;
+		error "Invalid selection of faces";
+
+	}
+
+	return;
+
+}
+
+proc string[] getFaceSelection () {
+
+	string $Selection[] = `ls -sl -fl`;            //  Get the raw selection
+	string $faceSelection[] = {};                   //  Stores selected face index numbers
+	string $hostObject = "";                          //  Stores object name
+    	                                 
+    	string $tokenBuffer[5] = {};
+    	string $selectBuffer = "";
+
+    	// Filter selection for component faces of a single mesh object
+    	for ($selectBuffer in $Selection) {
+
+        	tokenize $selectBuffer ".[]" $tokenBuffer;        // Parse first selection
+
+        	// Identify face selection
+        	if ($tokenBuffer[1] == "f") {
+   
+            	$faceSelection[size($faceSelection)] = $selectBuffer;    // Record face selection
+
+            	// Record name of first face selection's host object
+            	if ($hostObject == "") {
+
+                		$hostObject = $tokenBuffer[0];
+
+            	// Make sure subsequent faces have same host object
+            	} else if ($hostObject != $tokenBuffer[0]) {
+
+                		error "More than one mesh object selected \n";
+
+            	}
+        	}
+    	}
+
+    	return $faceSelection;
+
+}
+
+proc string[] organizeEdges(string $facePath, string $hostObject) {
+
+    	// Used to measure angles between sets of neighboring vertices
+    	vector $coordVector[6];
+    	float $vectorBuffer[3];
+    	float $angle[6];
+    	float $coordPosition1[3];
+    	float $coordPosition2[3];
+
+    	string $tokenBuffer[];
+    	int $i;
+	int $j;
+    	string $loopBuffer;
+    	string $edgeDirection = "0";
+	string $nextEdge;
+
+    	// Convert face to edge selection and record edges
+    	select -r $facePath;
+    	PolySelectConvert 2;
+    	string $edgeBuffer[] = `ls -sl -fl`;
+
+    	// Convert edge to vert selection and record verts
+    	select -r $edgeBuffer[0];
+    	PolySelectConvert 3;
+    	string $vertBuffer[2] = `ls -sl -fl`;
+
+    	// Parse first edge path and record index
+    	tokenize $edgeBuffer[0] ".[]" $tokenBuffer;
+    	string $edgeIndex = $tokenBuffer[2];
+
+    	// Parse first vert path and record index
+    	tokenize $vertBuffer[0] ".[]" $tokenBuffer;
+    	string $firstVert = $tokenBuffer[2];
+
+    	// Parse second vert path and record index
+    	tokenize $vertBuffer[1] ".[]" $tokenBuffer;
+    	string $secondVert = $tokenBuffer[2];
+
+    	$coordPosition1 = `pointPosition -w ($hostObject + ".vtx[" + $firstVert + "]")`;
+    	$coordPosition2 = `pointPosition -w ($hostObject + ".vtx[" + $secondVert + "]")`;
+
+    	for ($i = 0; $i <3; $i++) {
+
+        	$vectorBuffer[$i] = $coordPosition2[$i] - $coordPosition1[$i];
+   
+    	}
+
+    	$coordVector[0] = <<$vectorBuffer[0], $vectorBuffer[1], $vectorBuffer[2]>>;
+
+    	// Concatenate  first ordered edge information as string
+    	string $orderedEdge[6] = {($edgeIndex + "," + $firstVert + "," + $secondVert +"," + $edgeDirection)};
+
+    	// Register remaining 5 edges as unordered
+    	string $unorderedEdge[5] = {$edgeBuffer[1], $edgeBuffer[2], $edgeBuffer[3], $edgeBuffer[4], $edgeBuffer[5]};
+
+    	// Loop until there are no unordered edges
+	for ($i = 0; $i < 5; $i++) {
+
+		$edgeBuffer = $unorderedEdge;
+		$unorderedEdge = {};
+
+        	// Loop through unordered edges
+        	for ($loopBuffer in $edgeBuffer) {
+
+            	// Convert edge to vert selection and record verts
+            	select -r $loopBuffer;
+            	PolySelectConvert 3;
+            	$vertBuffer = `ls -sl -fl`;
+
+            	// See if vert 0 matches the trailing vert of previous edge
+            	if ($vertBuffer[0] == $hostObject + ".vtx[" + $secondVert + "]") {
+
+				$nextEdge = $loopBuffer;
+                       
+            	// See if vert 1 matches the trailing vert of previous edge
+            	} else if ($vertBuffer[1] == $hostObject + ".vtx[" + $secondVert + "]") {
+
+				$nextEdge = $loopBuffer;
+
+            	// if neither vert matches, register edge as unordered and advance loop to next edge
+            	} else {
+
+                		$unorderedEdge[size($unorderedEdge)] = $loopBuffer;
+
+            	}
+		}
+
+		tokenize $nextEdge ".[]" $tokenBuffer;
+		$edgeIndex = $tokenBuffer[2];
+
+		select -r $nextEdge;
+		PolySelectConvert 3;
+		$vertBuffer = `ls -sl -fl`;
+
+		if ($vertBuffer[0] == $hostObject + ".vtx[" + $secondVert + "]") {
+
+			$firstVert = $secondVert;
+                	tokenize $vertBuffer[1] ".[]" $tokenBuffer;
+                	$secondVert = $tokenBuffer[2];
+
+		// See if vert 1 matches the trailing vert of previous edge
+            } else if ($vertBuffer[1] == $hostObject + ".vtx[" + $secondVert + "]") {
+                   
+                	// Assign new first and second verts
+                	$firstVert = $secondVert;
+                	tokenize $vertBuffer[0] ".[]" $tokenBuffer;
+                	$secondVert = $tokenBuffer[2];
+		
+		}
+
+            // See if relationship between first and second vert index is low-to-high
+            if ((int) $firstVert < (int) $secondVert) {
+
+                	$edgeDirection = "0";
+
+            // See if relationship between first and second vert index is high-to-low
+            } else  {
+
+                	$edgeDirection = "1";
+
+            }
+
+            // Record first edge vector
+            $coordPosition1 = `pointPosition -w ($hostObject + ".vtx[" + $firstVert + "]")`;
+            $coordPosition2 = `pointPosition -w ($hostObject + ".vtx[" + $secondVert + "]")`;
+
+            for ($j = 0; $j < 3; $j++) {
+
+            	$vectorBuffer[$j] = $coordPosition2[$j] - $coordPosition1[$j];
+
+            }
+
+            $coordVector[size($coordVector)] = <<$vectorBuffer[0], $vectorBuffer[1], $vectorBuffer[2]>>;
+               
+		// Concatinate new ordered edge information string and add to array
+            $orderedEdge[size($orderedEdge)] = ($edgeIndex + "," + $firstVert + "," + $secondVert + "," + $edgeDirection);
+
+    	}
+
+    	for ($i = 0; $i < size($coordVector); $i++) {
+
+        	if ($i == 0) {
+
+            	$angle[0] = angle($coordVector[0], $coordVector[(size($coordVector) -1)]);
+       
+        	} else {
+
+            	$angle[$i] = angle($coordVector[$i], $coordVector[($i -1)]);
+        	}
+
+    	}
+
+    	int $openVert[2];                //  Stores 2 highest angle indices
+    	float $lowAngle = 4;           //  Keeps current highest angle
+    	string $vertState;                //  Defines vert as closed (0) or open (1)
+
+    	// Find the first highest angle
+    	for ($i = 0; $i < size($angle); $i++) {
+
+        	if ($angle[$i] < $lowAngle) {
+           
+            	$lowAngle = $angle[$i];
+            	$openVert[0] = $i;
+        	}
+
+    	}
+   
+    	$lowAngle = 4;
+
+    	// Find the second highest angle
+    	for ($i = 0; $i < size($angle); $i++) {
+
+        	if ($angle[$i] < $lowAngle && $openVert[0] != $i) {
+           
+            	$lowAngle = $angle[$i];
+            	$openVert[1] = $i;
+
+        	}
+    	}
+
+    	// Loop through ordered edges and mark them as open or closed
+    	for ($i = 0; $i < size($orderedEdge); $i++) {
+
+        	if ($i == $openVert[0]) {
+
+            	$vertState = "1";
+
+        	} else if ($i == $openVert[1]) {
+
+            	$vertState = "1";
+
+        	} else {
+   
+            	$vertState = "0";
+
+        	}
+
+        	$orderedEdge[$i] = $orderedEdge[$i] + "," + $vertState;
+
+    	}
+
+    	// Return completed ordered edge list
+    	return $orderedEdge;
+
+}
+
+proc splitFace(string $orderedEdge[], string $hostObject) {
+
+    	int $i;
+    	string $tokenBuffer[5];
+
+    	int $edgeIndex[6];
+	int $vertIndex[6];
+    	float $edgeDirection[6];
+    	int $vertState[6];                                    //  Open or closed vert
+
+    	// Parse and assign ordered edge data
+    	for ($i = 0; $i < size($orderedEdge); $i++) {
+
+        	tokenize $orderedEdge[$i] "," $tokenBuffer;
+        	$edgeIndex[$i] = (int) $tokenBuffer[0];
+		$vertIndex[$i] = (int) $tokenBuffer[1];
+        	$edgeDirection[$i] = (float) $tokenBuffer[3];
+        	$vertState[$i] = (int) $tokenBuffer[4];
+
+    	}
+
+    	int $openIndex[2];                                //  local index corresponding to open verts (0-6)
+
+    	// Find and assign open verts
+    	for ($i = 0; $i < size($vertState); $i++) {
+
+        	if ($vertState[$i] == 1) {
+
+            	$openIndex[size($openIndex)] = $i;
+
+        	}
+    	}
+
+    	// Buffers for polySplit arguments
+    	int $cutIndex[3];          
+	int $cutVert[3];                      
+    	float $cutDirection[3];                                
+    	int $deleteOffset = 0;
+    	string $vertPath[2];
+	int $deleteVert;
+
+    	// Buffers for final scale arguments
+    	float $pointCoord1[3];
+    	float $pointCoord2[3];
+
+    	// Record object edge count
+    	select -r $hostObject;
+    	int $objectEdgeCount[1];
+	$objectEdgeCount = `polyEvaluate -e`;
+
+
+    	//  Split a face with open verts that are directly across from each other
+    	if ($openIndex[1] - $openIndex[0] == 3) {
+
+        	$cutIndex = {$edgeIndex[$openIndex[0]], $edgeIndex[$openIndex[1]]};
+        	$cutDirection = {$edgeDirection[$openIndex[0]], $edgeDirection[$openIndex[1]]};
+		$cutVert = {$vertIndex[$openIndex[0]], $vertIndex[$openIndex[1]]};
+
+        	// Split a new edge straight across face
+		correctSplit($cutIndex, $cutDirection, $cutVert, $hostObject);
+
+    	// Split a face with open verts that are ~90 degrees
+    	} else if ($openIndex[1] - $openIndex[0] == 2 || $openIndex[1] - $openIndex[0] == 4) {
+
+        	if ($openIndex[1] - $openIndex[0] == 2) {
+
+			$cutIndex[0] = $edgeIndex[($openIndex[0] + 1)];
+			$cutDirection[0] = $edgeDirection[($openIndex[0] + 1)];
+			$cutVert[0] = $vertIndex[($openIndex[0] + 1)];
+
+			if ($openIndex[1] + 2 > 5) {
+
+            		$cutIndex[1] = $edgeIndex[($openIndex[1] - 4)];
+          		  	$cutDirection[1] = $edgeDirection[($openIndex[1] - 4)];
+				$cutVert[1] = $vertIndex[($openIndex[1] - 4)];
+
+        		} else {
+
+            		$cutIndex[1] = $edgeIndex[($openIndex[1] + 2)];
+            		$cutDirection[1] = $edgeDirection[($openIndex[1] + 2)];
+				$cutVert[1] = $vertIndex[($openIndex[1] + 2)];
+
+        		}
+
+		} else {
+
+			if ($openIndex[0] == 0) {
+
+				$cutIndex[0] = $edgeIndex[5];
+				$cutIndex[1] = $edgeIndex[2];
+
+				$cutDirection[0] = $edgeDirection[5];
+				$cutDirection[1] = $edgeDirection[2];
+
+				$cutVert[0] = $vertIndex[5];
+				$cutVert[1] = $vertIndex[2];
+
+			} else {
+
+				$cutIndex[0] = $edgeIndex[($openIndex[0] - 1)];
+				$cutIndex[1] = $edgeIndex[($openIndex[0] + 2)];
+
+				$cutDirection[0] = $edgeDirection[($openIndex[0] - 1)];
+				$cutDirection[1] = $edgeDirection[($openIndex[0] + 2)];
+
+				$cutVert[0] = $vertIndex[($openIndex[0] - 1)];
+				$cutVert[1] = $vertIndex[($openIndex[0] + 2)];
+
+			}
+		}
+
+		$deleteVert = $cutVert[0];
+
+        	// Split a new edge diagonally across face
+		correctSplit($cutIndex, $cutDirection, $cutVert, $hostObject);
+
+       	if ($cutIndex[0] > $cutIndex[1]) {
+
+            	$deleteOffset = 1;
+
+        	}
+
+        	$cutIndex = {$edgeIndex[$openIndex[0]], $objectEdgeCount[0], $edgeIndex[$openIndex[1]]};
+        	$cutDirection = {$edgeDirection[$openIndex[0]], 0.5, $edgeDirection[$openIndex[1]]};
+		$cutVert = {$vertIndex[$openIndex[0]], (-1), $vertIndex[$openIndex[1]]};
+
+        	// Split 2 new edges connecting open verts through previous new edge
+		correctSplit($cutIndex, $cutDirection, $cutVert, $hostObject);
+        	
+		// Remove unwanted edge
+        	select -r ($hostObject + ".e[" + (string) ($objectEdgeCount[0] + $deleteOffset) + "]");
+
+		PolySelectConvert 3;
+		$vertPath = `ls -sl -fl`;
+
+		tokenize $vertPath[0] ".[]" $tokenBuffer;
+		$cutVert[0] = (int) $tokenBuffer[2];
+
+		tokenize $vertPath[1] ".[]" $tokenBuffer;
+		$cutVert[1] = (int) $tokenBuffer[2];
+
+		if ($cutVert[0] != $deleteVert && $cutVert[1] != $deleteVert) {
+			
+			$deleteOffset = 1 - $deleteOffset;
+
+		}
+
+		select -r ($hostObject + ".e[" + (string) ($objectEdgeCount[0] + $deleteOffset) + "]");		
+        	polyDelEdge;
+		select -r $hostObject;
+
+    	// Split a face with open verts that are ~0 degrees
+    	} else if (($openIndex[1] - $openIndex[0]) == 1 || $openIndex[1] - $openIndex[0] == 5) {
+ 
+        	$cutIndex[0] = $edgeIndex[$openIndex[0]];
+        	$cutDirection[0] = $edgeDirection[$openIndex[0]];
+		$cutVert[0] = $vertIndex[$openIndex[0]];
+
+		if ($openIndex[1] - $openIndex[0] == 5) {
+
+			$cutIndex[1] = $edgeIndex[$openIndex[0] + 2];
+			$cutDirection[1] = $edgeDirection[$openIndex[0] + 2];
+			$cutVert[1] = $vertIndex[$openIndex[0] + 2];
+
+		} else {
+
+			if ($openIndex[0] - 2 < 0) {
+
+				$cutIndex[1] = $edgeIndex[$openIndex[0] + 4];
+				$cutDirection[1] = $edgeDirection[$openIndex[0] + 4];
+				$cutVert[1] = $vertIndex[$openIndex[0] + 4];
+
+			} else {
+
+				$cutIndex[1] = $edgeIndex[$openIndex[0] - 2];
+				$cutDirection[1] = $edgeDirection[$openIndex[0] - 2];
+				$cutVert[1] = $vertIndex[$openIndex[0] - 2];
+			
+			}
+		}
+
+        	// Split a new edge from one open vert to opposite vert
+		correctSplit($cutIndex, $cutDirection, $cutVert, $hostObject);
+
+        	$cutIndex[0] = $edgeIndex[$openIndex[1]];
+        	$cutDirection[0] = $edgeDirection[$openIndex[1]];
+		$cutVert[0] = $vertIndex[$openIndex[1]];
+
+		if ($openIndex[1] - $openIndex[0] == 5) {
+
+			$cutIndex[1] = $edgeIndex[$openIndex[1] - 2];
+        		$cutDirection[1] = $edgeDirection[$openIndex[1] - 2];
+			$cutVert[1] = $vertIndex[$openIndex[1] - 2];
+
+		} else {
+
+        		if ($openIndex[1] + 2 > 5) {
+
+            		$cutIndex[1] = $edgeIndex[$openIndex[1] - 4];
+            		$cutDirection[1] = $edgeDirection[$openIndex[1] - 4];
+				$cutVert[1] = $vertIndex[$openIndex[1] - 4];
+
+        		} else {
+
+            		$cutIndex[1] = $edgeIndex[$openIndex[1] + 2];
+            		$cutDirection[1] = $edgeDirection[$openIndex[1] + 2];
+				$cutVert[1] = $vertIndex[$openIndex[1] + 2];
+
+			}
+        	}
+
+        	// Split a new edge from other open vert to opposite vert
+        	correctSplit($cutIndex, $cutDirection, $cutVert, $hostObject);
+
+        	// Split a new edge between midpoints of previous 2 new edges
+        	polySplit -ep $objectEdgeCount[0] 0.5 -ep ($objectEdgeCount[0] + 1) 0.5 $hostObject;
+
+        	select -r ($hostObject + ".e[" + (string) ($objectEdgeCount[0] + 4) + "]");
+        	PolySelectConvert 3;
+        	$vertPath = `ls -sl -fl`;
+
+        	// Gather coordinate information of endpoints of last new edge
+        	$pointCoord1 = `pointPosition -w $vertPath[0]`;
+        	$pointCoord2 = `pointPosition -w $vertPath[1]`;
+
+       	// Find the midpoint of last edge
+         	for ($i = 0; $i < 3; $i++) {
+
+            	$pointCoord1[$i] = ($pointCoord1[$i] + $pointCoord2[$i])/2;
+
+        	}
+       
+        	// Scale last edge using midpoint as pivot
+        	select -r ($hostObject + ".e[" + (string) ($objectEdgeCount[0] + 4) + "]");
+        	scale -r -p $pointCoord1[0] $pointCoord1[1] $pointCoord1[2] 0.5 0.5 0.5;
+
+		select -r $hostObject;
+
+    	}
+
+    	return;
+    
+}
+
+proc string[] traceConnection(string $fourSided[], string $fiveSided[]) {
+
+    	//Construct ordered/unordered  face arrays
+    	string $orderedFace[] = {$fiveSided[0]};
+	string $unorderedFace[] = $fourSided;
+    	$unorderedFace[size($unorderedFace)] = $fiveSided[1];
+
+    	string $matchEdge[];                //  Stores edge progression of valid shared adges
+    	string $faceCandidate;               //  Stores candidate for next face in path
+
+    	// Buffers
+    	string $edgeBuffer1[5];
+    	string $edgeBuffer2[5];
+    	string $faceBuffer[];
+    	string $edge1;
+    	string $face2;
+    	string $edge2;
+    	string $sharedEdge[5];
+    	int $edgeNumber[5];
+    	int $i;
+    	string $tokenBuffer[5];
+	int $loopCount = size($unorderedFace);
+
+    	// Loop through unordered faces
+    	for ($i = 0; $i < $loopCount; $i++) {
+
+        	// Get edges of current ordered face
+        	select -r $orderedFace[size($orderedFace) - 1];
+        	PolySelectConvert 2;
+        	$edgeBuffer1 = `ls -sl -fl`;
+
+        	// Loop through edges of current ordered face
+        	for ($edge1 in $edgeBuffer1) {
+
+            	// Loop through unordered faces
+            	for ($face2 in $unorderedFace) {
+
+                		// Get edges of current unordered face
+                		select -r $face2;
+                		PolySelectConvert 2;
+                		$edgeBuffer2 = `ls -sl -fl`;
+
+                		// Loop through edges of current unordered face
+                		for ($edge2 in $edgeBuffer2) {
+
+                    		// See if current unordered face edge matches current ordered face edge
+                    		if ($edge1 == $edge2) {
+
+                        		// Record as a shared edge, mark candidate face
+                        		$sharedEdge[size($sharedEdge)] = $edge2;
+                        		$faceCandidate = $face2;
+
+                        		// Return if there are more than 1 shared edge found
+                        		if (size($sharedEdge) > 1) {
+		
+                            			clear $orderedFace;
+                            			return $orderedFace;
+                        		}
+                    		}
+                		}
+            	}
+        	}
+
+        	// Return if no shared edges are found
+        	if (size($sharedEdge) == 0) {
+
+            	clear $orderedFace;
+            	return $orderedFace;
+
+        	}
+
+        	// Rebuild unordered faces to exclude newly ordered face
+        	$faceBuffer = $unorderedFace;
+        	clear $unorderedFace;
+
+        	for ($face2 in $faceBuffer) {
+       
+            	if ($face2 != $faceCandidate) {
+
+                		$unorderedFace[size($unorderedFace)] = $face2;
+
+            	}
+        	}
+
+        	// Add confirmed candidate to ordered faces
+        	$orderedFace[size($orderedFace)] = $faceCandidate;
+		
+        	// Add single shared edge to matched edges
+        	$matchEdge[size($matchEdge)] = $sharedEdge[0];
+
+        	// Get the number of edges of new ordered face
+        	select -r $faceCandidate;
+        	$edgeNumber = `polyEvaluate -e`;
+
+        	// See if connection to other 5-sided face is complete
+        	if ( $edgeNumber[0] == 5) {
+
+            	break;
+
+        	}
+
+        	// Prepare for next iteration
+        	clear $sharedEdge;
+
+    	}
+
+    	// Convert all faces to 6-sided
+    	for ($edge1 in $matchEdge) {
+
+        	tokenize $edge1 ".[]" $tokenBuffer;
+        	polySplit -ep ((int) $tokenBuffer[2]) 0.5 $tokenBuffer[0];
+
+    	}
+
+    	return $orderedFace;
+
+}
+
+proc correctSplit(int $inIndex[], float $inDirection[], int $inVert[], string $hostObject) {
+
+	int $componentCount[2];
+	select -r $hostObject;
+	$componentCount = `polyEvaluate -e -v`;
+
+	int $cutVert[2];
+	int $cutIndex[2];
+	float $cutDirection[2];
+
+	string $vertBuffer[2];
+	int $checkIndex[2];
+	int $reDo;
+	int $newVert;
+	int $prevCount[2];
+
+	int $i;
+	int $j;
+	string $tokenBuffer[5];
+
+	// Loop through split one new edge at a time
+	for ($i = 0; $i < (size($inIndex) - 1); $i++) {
+
+		$cutIndex[0] = $inIndex[$i];
+		$cutIndex[1] = $inIndex[$i + 1];
+		$cutDirection[0] = $inDirection[$i];
+		$cutDirection[1] = $inDirection[$i + 1];
+		$cutVert[0] = $inVert[$i];
+		$cutVert[1] = $inVert[$i + 1];
+		$redo = 0;
+		$newVert = 0;
+
+		// See if previous split made a new vert
+		if ($i > 0) {
+
+			if ($cutDirection[0] > 0 && $cutDirection[0] < 1) {
+
+				$cutDirection[0] = 1;
+				$cutVert[0] = $componentCount[1] - 1;
+
+			}
+		}
+
+		select -r $hostObject;
+		$prevCount = `polyEvaluate -e -v`;
+		polySplit -ep $cutIndex[0] $cutDirection[0] -ep $cutIndex[1] $cutDirection[1] $hostObject;
+
+		select -r $hostObject;
+		$componentCount = `polyEvaluate -e -v`;
+
+		select -r ($hostObject + ".e[" + (string) ($componentCount[0] - 1) + "]");
+		PolySelectConvert 3;
+		$vertBuffer = `ls -sl -fl`;
+
+		tokenize $vertBuffer[0] ".[]" $tokenBuffer;
+		$checkIndex[0] = (int) $tokenBuffer[2];
+
+		tokenize $vertBuffer[1] ".[]" $tokenBuffer;
+		$checkIndex[1] = (int) $tokenBuffer[2];
+
+		// Check if new edge contains desired vertex 1
+		if ($cutDirection[0] == 1 || $cutDirection[0] == 0) {
+
+			if ($cutVert[0] != $checkIndex[0] && $cutVert[0] != $checkIndex[1]) {
+			
+				$cutDirection[0] = 1 - $cutDirection[0];
+				$redo = 1;
+
+			}
+
+		} else {
+
+			$newVert++;
+
+		}
+
+		// Check if new edge co0ntains desired vertex 2
+		if ($cutDirection[1] == 1 || $cutDirection[1] == 0) {
+
+			if ($cutVert[1] != $checkIndex[0] && $cutVert[1] != $checkIndex[1]) {
+			
+				$cutDirection[1] = 1 - $cutDirection[1];
+				$redo = 1;
+
+			}
+
+		} else {
+
+			$newVert++;
+
+		}
+
+		// Delete and redraw edge if necessary
+		if ($redo == 1) {
+
+			select -r $hostObject;
+			$componentCount = `polyEvaluate -e -v`;
+
+			if ($componentCount[0] > $prevCount[0] + $newVert) {
+
+				select -r ($hostObject + ".e[" + (string) ($componentCount[0] - 1) + "]");
+				polyDelEdge;
+
+			}
+
+			for ($j = 0; $j < $newVert; $j++) {
+
+				select -r $hostObject;
+				$componentCount = `polyEvaluate -e -v`;
+
+				select -r ($hostObject + ".vtx[" + (string) ($componentCount[1] - 1) + "]");
+				delete;
+			}
+			
+
+			polySplit -ep $cutIndex[0] $cutDirection[0] -ep $cutIndex[1] $cutDirection[1] $hostObject;
+		
+		}
+	}
+
+	select -r $hostObject;
+}

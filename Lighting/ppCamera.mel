@@ -1,0 +1,18 @@
+// ppCamera
+// Created by: raphe
+// Date: 2012/03/22 16:50:42
+
+global proc ppCamera(){
+	if(`objExists "renderCam"`){
+		print "\"renderCam\" already exists!";
+	}else{
+		createNode camera;
+		pickWalk -d up;
+		$camera = "ls -selected";
+		rename $camera "renderCam";
+		setAttr renderCam.horizontalFilmAperture .980;
+		setAttr renderCam.verticalFilmAperture  .735;
+		setAttr renderCam.lensSqueezeRatio 1;
+		setAttr "renderCam.locatorScale" 75;
+	}
+}

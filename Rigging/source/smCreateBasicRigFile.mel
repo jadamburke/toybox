@@ -1,0 +1,84 @@
+// smCreateBasicRigFile
+// stephenkmann@yahoo.com
+// this is added to the create character dirs.mel
+// creates real files, instead of dummy files.
+// the rig file automatically references the "empty" geo file.
+//
+// $currentProject - return of workspace -q -act
+// $cName = "name of character"
+// $type = props / char
+// $dataType = ma/mb
+global proc smCreateBasicRigFile (string $currentProject ,string $cName , string $type, string $dataType)
+{
+string $dataTypeLong;
+if ($dataType == "")
+	$dataType = "ma";
+	$dataTypeLong = "mayaAscii";
+if ($dataType == "mb")
+	$dataTypeLong = "mayaBinary";
+//source propifyUI;
+string $item;
+        $item =($currentProject + "/scenes/master/" + $type + "/" + $cName + "/geo/" + $cName + "." + $dataType);
+// create an empty geo file
+if (`filetest -s $item` == false)
+	{
+	print ("creating geo masterFile " + $dataType+" . . . \n");
+	NewScene;
+	file -rename $item;
+	string $outGeoFile = `file -save -type $dataTypeLong -de 1`;
+	print ("geo file "+$outGeoFile +" created\n");
+	}
+
+// create the rig file(s)
+print "creating rig file . . . \n";
+NewScene;
+file -reference -type $dataTypeLong -rpr geo $item;
+// create top groups and sets for the rig file
+smStartChar;
+// get the top groups of the reffed geo if there is any . . .
+string $theTopGrps[];	
+string $rFile[] = `file -q -r`;
+for ($rfile in $rFile)
+	 {
+	 string $file = `match "[^/ ]*$" $rfile`;
+	 string $refObjs[] = `reference -f $file -q -node`;
+	 for ($obj in $refObjs)
+		{
+			if (`nodeType $obj` == "mesh" || `nodeType $obj` == "nurbsSurface")
+			      {
+			      print ("adding " + $obj + " to the HIRES Set\n");
+				sets -add "HIRES" $obj;
+				}
+		string $parent[] = `listRelatives -ap $obj`;
+		if (`size $parent` <= 0 && `nodeType $obj` == "transform")
+		  $theTopGrps[`size$theTopGrps`] = $obj;
+		}
+	print $theTopGrps;
+	catchQuiet(`parent $theTopGrps BODY`);
+	 }
+// the reffed geo should now all be grouped under the BODY node 
+// and the geo added to the HIRES set.
+print "ready to save (smCreateBasicRigFile)\n";
+// save a workshop
+print ("currentProject:" + $currentProject + "\n");
+print ("cName:"  + $cName + "\n");
+print ("type:" + $type + "\n");
+print ("dataType:" + $dataType + "\n");
+smFiler "workshop" ($cName + "." + $dataType) "rig" $type $dataType $currentProject 0 "";
+smFiler "master" ($cName + "." + $dataType) "rig" $type $dataType $currentProject 0 "";
+print "smCreateBasicRigFile done\n";
+NewScene;
+}
+ //-----------------------------------------------------------------------------------------------------------------------------------
+/*  example of how to run the script
+
+{
+waitCursor -state on;
+// actually do something
+string $currentProject = `workspace -q -act`;
+string $cName = "testMonkey";
+string $type = "char";
+system ("mayabatch -batch -log \"c:/TEMP/charBuildLog.txt\" -proj  \"" + $currentProject  + "\"; -c \"source \\\"propifyUI.mel\\\"; smCreateBasicRigFile \\\"" + $currentProject + "\\\" \\\"" + $cName + "\\\" \\\"" + $type + "\\\";\" ");
+print "done";
+waitCursor -state off;
+}

@@ -1,0 +1,14 @@
+// selectBorderEdges
+
+global proc selectBorderEdges () {
+
+	//$sel = `ls -sl`;
+	//for ($each in $sel) {
+		// convert selections to edges
+		ConvertSelectionToEdges;
+		// convert edge selections to shell border
+		polyConvertToShellBorder;
+	//}
+
+
+}

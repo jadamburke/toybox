@@ -1,0 +1,350 @@
+//
+// uberCam.mel
+//
+// Clay Budin
+// clay_budin@hotmail.com
+// PandaPanther
+// Apr 11 12
+//
+
+string $uberCamVersionStr = "1.18b";
+
+float $uberCamData[];
+string $uberCamSceneNames[];
+string $uberCamWarnings[];
+
+string $uberCamTSSceneList;
+
+global proc uberCamGUI ()  {
+	global string $uberCamVersionStr;
+	global string $uberCamTSSceneList;
+
+	if (`window -ex uberCamGUIWindow` != true)  {
+		string $window = `window -w 800 -title ("uberCam Generator v" + $uberCamVersionStr) uberCamGUIWindow`;
+		columnLayout;
+		$uberCamTSSceneList = `textScrollList -w 800 -numberOfRows 10 -allowMultiSelection true -dkc "uberCamGUIDeleteSelected" uberCamGUITScrlList`;
+		rowLayout -nc 11;
+		button -label "Create uberCam + Scene Cams" -command ("window -e -visible 0 " + $window + "; uberCamRun");
+		text -label "   ";
+		button -label "Add Scene(s)" -command "uberCamGUIAddScene";
+		text -label "   ";
+		button -label "Delete Selected" -command "uberCamGUIDeleteSelected";
+		button -label "Clear List" -command ("textScrollList -e -removeAll " + $uberCamTSSceneList);
+		text -label "   ";
+		button -label "Move Up" -command "uberCamGUIMoveSelected -1";
+		button -label "Move Down" -command "uberCamGUIMoveSelected 1";
+		text -label "   ";
+		button -label "Cancel" -command ("window -e -visible 0 " + $window);
+		showWindow $window;
+	} else
+		showWindow uberCamGUIWindow;
+}
+
+global proc uberCamGUIAddScene ()  {
+	global string $uberCamTSSceneList;
+
+	string $multipleFilters = "Maya Files (*.ma *.mb);;Maya ASCII (*.ma);;Maya Binary (*.mb);;All Files (*.*)";
+	string $result[] = `fileDialog2 -fileFilter $multipleFilters -selectFileFilter "Maya Files" -dialogStyle 2 -fm 4 -cap "Choose scene file(s)" -okc "Choose"`;
+	if (size($result) > 0)  {
+		string $sceneFile;
+		for ($sceneFile in $result)  {
+			string $sceneList[] = `textScrollList -q -allItems $uberCamTSSceneList`;
+			if (!stringArrayContains($sceneFile, $sceneList))
+				textScrollList -e -append $sceneFile $uberCamTSSceneList;
+			else
+				warning("Scene file is already in uberCam Scene List");
+		}
+	}
+}
+
+global proc uberCamGUIDeleteSelected ()  {
+	global string $uberCamTSSceneList;
+	
+	int $delIdx[] = `textScrollList -q -sii $uberCamTSSceneList`;
+	for ($i = size($delIdx)-1; $i >= 0; --$i)
+		textScrollList -e -rii $delIdx[$i] $uberCamTSSceneList;
+}
+
+global proc uberCamGUIMoveSelected (int $dir)  {
+	global string $uberCamTSSceneList;
+
+	int $numItems = `textScrollList -q -ni $uberCamTSSceneList`;
+	string $selItems[] = `textScrollList -q -si $uberCamTSSceneList`;
+	int $selItemsIdx[] = `textScrollList -q -sii $uberCamTSSceneList`;
+
+	string $newIdxStr = "";
+	int $numSel = size($selItemsIdx);
+	if ($dir == -1)  {
+		for ($i = 0; $i < $numSel; ++$i)  {
+			string $sel = $selItems[$i];
+			int $selIdx = $selItemsIdx[$i];
+			if ($selIdx > ($i+1))  {
+				textScrollList -e -rii $selIdx $uberCamTSSceneList;
+				textScrollList -e -ap ($selIdx-1) $sel $uberCamTSSceneList;
+				$newIdxStr += (" -sii " + ($selIdx-1));
+			}
+		}
+	} else  {
+		for ($i = 0; $i < $numSel; ++$i)  {
+			string $sel = $selItems[$numSel-$i-1];
+			int $selIdx = $selItemsIdx[$numSel-$i-1];
+			if ($selIdx < ($numItems-$i))  {
+				textScrollList -e -rii $selIdx $uberCamTSSceneList;
+				textScrollList -e -ap ($selIdx+1) $sel $uberCamTSSceneList;
+				$newIdxStr += (" -sii " + ($selIdx+1));
+			}
+		}
+	}
+	eval("textScrollList -e " + $newIdxStr + " " + $uberCamTSSceneList);
+}
+
+
+
+global proc uberCamGatherData ()  {
+	global float $uberCamData[];	// for each scene: startFrame endFrame nearClip farClip locatorScale per-frame:[tx ty tz rx ry rz focal]
+	global string $uberCamSceneNames[];
+	global string $uberCamWarnings[];
+
+	// remove any duplicates from scene list
+	global string $uberCamTSSceneList;
+	string $origSceneList[] = `textScrollList -q -allItems $uberCamTSSceneList`;
+	string $sceneList[] = stringArrayRemoveDuplicates($origSceneList);
+	if (size($origSceneList) != size($sceneList))
+		warning("Duplicate scene entries were detected in the list.  Only the first occurrance will be processed.");
+
+	if (size($sceneList) == 0)  {
+		warning("No scenes chosen to generate uberCam from");
+		return;
+	}
+
+	if (`file -q -mf`)  {
+		string $result = `confirmDialog -title "Scene Needs Saving" -message "The scene appears to need saving.  You can cancel uberCam and save it, or continue with uberCam and not save scene" -button "Cancel and Save" -button "Continue Without Saving" -defaultButton "Cancel and Save" -cancelButton "Cancel and Save" -dismissString "Cancel and Save"`;
+		if ($result == "Cancel and Save")  {
+			print("uberCam: Cancelled.\n");
+			return;
+		}
+	}
+
+	// set Maya so that it doesn't open extra windows on scene open
+	global int $gUseScenePanelConfig;
+	int $save_gUseScenePanelConfig = $gUseScenePanelConfig;
+	$gUseScenePanelConfig = false;
+
+	clear($uberCamData);
+	clear($uberCamSceneNames);
+	clear($uberCamWarnings);
+
+	string $camAttrsNoFL[] = {"tx", "ty", "tz", "rx", "ry", "rz"};
+
+	int $idx = 0;
+	string $scene;
+	for ($scene in $sceneList)  {
+		print("uberCam: Opening scene file " + $scene + "\n");
+		string $shortScene = basenameEx($scene); //basename($scene, ".m.");
+		$uberCamSceneNames[size($uberCamSceneNames)] = $shortScene;
+
+		// Bizzarely, it appears that the frame rate setting of the previous scene affects the frame range of
+		//  the newly-loaded scene, especially if the new scene was created from an Export Selected, like the
+		//  camera masters.  It looks like they don't get written out with the standard scriptNode expressions
+		//  to properly setup the time slider.
+		// So, we will always set the frame rate to 30 fps before loading a scene.  This may cause problems for
+		//  scenes which are (incorrectly) set to 24 fps.
+		//currentUnit -t ntsc;
+		//refresh -f;
+		file -mf false;
+		if (`exists ppDoNewSceneQuiet`) ppDoNewSceneQuiet "empty";
+		file -f -options "v=0" -prompt 0 -uc 0 -o $scene;
+
+		float $startT = `playbackOptions -q -min`;
+		float $endT = `playbackOptions -q -max`;
+
+		if ($startT != int($startT) || $endT != int($endT))  {
+			$uberCamWarnings[size($uberCamWarnings)] = ("Scene: " + $shortScene + "  Start and/or end frames are not integers");
+			$startT = int($startT);
+			$endT = int($endT);
+		}
+
+		if ($endT - $startT < 3)
+			$uberCamWarnings[size($uberCamWarnings)] = ("Scene: " + $shortScene + "  Scene length is less than 3 frames");
+
+		$uberCamData[$idx++] = $startT;
+		$uberCamData[$idx++] = $endT;
+
+		if ($startT != 101)
+			$uberCamWarnings[size($uberCamWarnings)] = ("Scene: " + $shortScene + "  Does not start at frame 101");
+
+		string $camera = "renderCam";
+		if (! `objExists $camera`)  {
+			$camera = "master:renderCam";
+			if (! `objExists $camera`)  {
+				$uberCamWarnings[size($uberCamWarnings)] = ("Scene: " + $shortScene + "  Could not find renderCam");
+				$camera = "persp";
+			}
+		}
+
+		float $camAp[] = `getAttr ($camera + ".cameraAperture")`;
+		if ($camAp[0] != .98 || $camAp[1] != .735)
+			$uberCamWarnings[size($uberCamWarnings)] = ("Scene: " + $shortScene + "  Camera Film Gate not set to 35mm Full Aperture");
+
+		if (`currentUnit -q -a` != "deg" || `currentUnit -q -l` != "cm" || `currentUnit -q -t` != "ntsc")
+			$uberCamWarnings[size($uberCamWarnings)] = ("Scene: " + $shortScene + "  Units not set to cm/deg/ntsc");
+
+		// blank out the maya screen so that stepping through the animation goes faster
+		setNamedPanelLayout "Single Perspective View";
+		outlinerPanel -rp `getPanel -withFocus`;
+
+		$uberCamData[$idx++] = `getAttr ($camera + ".nearClipPlane")`;
+		$uberCamData[$idx++] = `getAttr ($camera + ".farClipPlane")`;
+		float $locScl = `getAttr ($camera + ".locatorScale")`;
+		if ($locScl < .001)  {
+			$uberCamWarnings[size($uberCamWarnings)] = ("Scene: " + $shortScene + "  Camera locator scale is ~0");
+			$locScl = .001;
+		}
+		$uberCamData[$idx++] = $locScl;
+
+		// set up a locator parent-constrained to the camera - this will give cam data in world space
+		string $locs[] = `spaceLocator -a -p 0 0 0`;
+		string $loc = $locs[0];
+		select -r $camera;
+		select -add $loc;
+		parentConstraint -weight 1;
+
+		//for ($t in {$startT, ($startT + $endT)*.5, $endT})  {
+		for ($t = $startT; $t <= $endT; ++$t)  {
+			currentTime $t;
+			for ($at in $camAttrsNoFL)
+				$uberCamData[$idx++] = `getAttr ($loc + "." + $at)`;
+			$uberCamData[$idx++] = `getAttr ($camera + ".fl")`;
+		}
+	}
+
+	// set Maya setting back to original value
+	$gUseScenePanelConfig = $save_gUseScenePanelConfig;
+}
+
+global proc uberCamCreate ()  {
+	global float $uberCamData[];
+	global string $uberCamSceneNames[];
+
+	if (size($uberCamSceneNames) == 0)
+		return;
+
+	file -f -new;
+	setAttr defaultResolution.pixelAspect 1.0;
+	setAttr defaultResolution.width 1920;
+	setAttr defaultResolution.height 1080;
+	currentUnit -l cm -a deg -t ntsc;
+
+	// create the uberCam
+	string $uberCam[] = `camera`;
+	rename $uberCam[0] "uberCam";
+	setAttr uberCam.cameraAperture .98 .735;
+
+	string $camAttrs[] = {"tx", "ty", "tz", "rx", "ry", "rz", "fl"};
+	string $camAttrsWithScale[] = {"tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "fl"};
+
+	string $uberCamExprStr = "//make this expr stick to uberCam\nint $vis = uberCam.visibility;\nuberCam.visibility = $vis;\n\n";
+
+	int $uberFrame = 101;
+	int $frame;
+	int $idx = 0;
+	int $minFrame = 100000000, $maxFrame = -100000000;
+	float $nearMin = 100000000, $farMax = 0, $locMax = 0;
+	for ($scene in $uberCamSceneNames)  {
+		// create the scene cam
+		string $sceneCam = ($scene + "_Cam");
+		string $cam[] = `camera`;
+		rename $cam[0] $sceneCam;
+		setAttr ($sceneCam + ".cameraAperture") .98 .735;
+
+		int $startT = $uberCamData[$idx++];
+		int $endT = $uberCamData[$idx++];
+		int $midT = ($startT + $endT) * .5;
+
+		if ($startT < $minFrame) $minFrame = $startT;
+		if ($endT > $maxFrame) $maxFrame = $endT;
+
+		float $nearClip = $uberCamData[$idx++];
+		float $farClip = $uberCamData[$idx++];
+		float $locScl = $uberCamData[$idx++];
+
+		if ($nearClip < $nearMin) $nearMin = $nearClip;
+		if ($farClip > $farMax) $farMax = $farClip;
+		if ($locScl > $locMax) $locMax = $locScl;
+
+		setAttr ($sceneCam + ".nearClipPlane") $nearClip;
+		setAttr ($sceneCam + ".farClipPlane") $farClip;
+		setAttr ($sceneCam + ".locatorScale") $locScl;
+
+		int $frame;
+		for ($frame = $startT; $frame <= $endT; ++$frame)  {
+			// set the uberCam at start, mid and end frame values
+			if ($frame == $startT || $frame == $midT || $frame == $endT)  {
+				currentTime $uberFrame;
+				for ($at in $camAttrs)  {
+					setKeyframe -v $uberCamData[$idx++] -at $at "uberCam";
+				}
+				$idx -= 7;
+				$uberCamExprStr += ("if (frame == " + $uberFrame + ") headsUpMessage \"uberCam Scene: " + $scene + "  Frame: " + $frame + "\";\n");
+				++$uberFrame;
+			}
+
+			currentTime $frame;
+			for ($at in $camAttrs)  {
+				setKeyframe -v $uberCamData[$idx++] -at $at $sceneCam;
+			}
+		}
+
+		// lock the scene cam attrs
+		for ($at in $camAttrsWithScale) 
+			setAttr -l true ($sceneCam + "." + $at);
+	}
+
+	// uberCam gets min/max of all scene cams
+	setAttr "uberCam.nearClipPlane" $nearMin;
+	setAttr "uberCam.farClipPlane" $farMax;
+	setAttr "uberCam.locatorScale" $locMax;
+
+	// lock uberCam attrs
+	for ($at in $camAttrsWithScale) 
+		setAttr -l true ("uberCam." + $at);
+
+	// create expression to show uberCam scene and frame
+	expression -n "uberCamTextExpr" -s $uberCamExprStr -o uberCam -ae 1 -uc all;
+
+	// animation range
+	int $uberMaxFrame = ($uberFrame-1);
+	if ($minFrame > 101) $minFrame = 101;
+	if ($maxFrame < $uberMaxFrame) $maxFrame = $uberMaxFrame;
+	playbackOptions -min 101 -max $uberMaxFrame -ast $minFrame -aet $maxFrame;
+	currentTime 101;
+
+	clear($uberCamData);
+	clear($uberCamSceneNames);
+
+	select -r uberCam;
+}
+
+global proc uberCamRun ()  {
+	print("uberCam: Begin.\n");
+
+	uberCamGatherData();
+	uberCamCreate();
+
+	// if any warnings were generated, display them in a pop-up window at the end
+	global string $uberCamWarnings[];
+	if (size($uberCamWarnings) > 0)  {
+		confirmDialog -title "Scene Warning" -button "OK"
+			-message ("The following scene files reported problems:\n\n" + stringArrayToString($uberCamWarnings, "\n"));
+		clear($uberCamWarnings);
+	}
+
+	print("uberCam: Done.\n");
+}
+
+global proc uberCam ()  {
+	uberCamGUI();
+}
+
+//uberCam;
+

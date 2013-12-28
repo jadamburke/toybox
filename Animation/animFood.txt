@@ -1,0 +1,381 @@
+[Checklist]>
+SQUASH AND STRETCH\n\nThis action gives the illusion of weight and volume to a character as it moves. Also squash and stretch is useful in animating dialogue and doing facial expressions. How extreme the use of squash and stretch is, depends on what is required in animating the scene. Usually it's broader in a short style of picture and subtler in a feature. It is used in all forms of character animation from a bouncing ball to the body weight of a person walking. This is the most important element you will be required to master and will be used often.>
+ANTICIPATION\n\nThis movement prepares the audience for a major action the character is about to perform, such as, starting to run, jump or change expression. A dancer does not just leap off the floor. A backwards motion occurs before the forward action is executed. The backward motion is the anticipation. A comic effect can be done by not using anticipation after a series of gags that used anticipation. Almost all real action has major or minor anticipation such as a pitcher's wind-up or a golfers' back swing. Feature animation is often less broad than short animation unless a scene requires it to develop a characters personality>
+STAGING\n\nA pose or action should clearly communicate to the audience the attitude, mood, reaction or idea of the character as it relates to the story and continuity of the story line. The effective use of long, medium, or close up shots, as well as camera angles also helps in telling the story. There is a limited amount of time in a film, so each sequence, scene and frame of film must relate to the overall story. Do not confuse the audience with too many actions at once. Use one action clearly stated to get the idea across, unless you are animating a scene that is to depict clutter and confusion. Staging directs the audience's attention to the story or idea being told. Care must be taken in background design so it isn't obscuring the animation or competing with it due to excess detail behind the animation. Background and animation should work together as a pictorial unit in a scene.>
+STRAIGHT AHEAD AND POSE TO POSE\n\nStraight ahead animation starts at the first drawing and works drawing to drawing to the end of a scene. You can lose size, volume, and proportions with this method, but it does have spontaneity and freshness. Fast, wild action scenes are done this way. Pose to Pose is more planned out and charted with key drawings done at intervals throughout the scene. Size, volumes, and proportions are controlled better this way, as is the action. The lead animator will turn charting and keys over to his assistant. An assistant can be better used with this method so that the animator doesn't have to draw every drawing in a scene. An animator can do more scenes this way and concentrate on the planning of the animation. Many scenes use a bit of both methods of animation.>
+FOLLOW THROUGH AND OVERLAPPING ACTION\n\nWhen the main body of the character stops all other parts continue to catch up to the main mass of the character, such as arms, long hair, clothing, coat tails or a dress, floppy ears or a long tail (these follow the path of action). Nothing stops all at once. This is follow through. Overlapping action is when the character changes direction while his clothes or hair continues forward. The character is going in a new direction, to be followed, a number of frames later, by his clothes in the new direction.DRAG, in animation, for example, would be when Goofy starts to run, but his head, ears, upper body, and clothes do not keep up with his legs. In features, this type of action is done more subtly. Example: When Snow White starts to dance, her dress does not begin to move with her immediately but catches up a few frames later. Long hair and animal tail will also be handled in the same manner. Timing becomes critical to the effectiveness of drag and the overlap.>
+SLOW-OUT AND SLOW-IN\n\nAs action starts, we have more drawings near the starting pose, one or two in the middle, and more drawings near the next pose. Fewer drawings make the action faster and more drawings make the action slower. Slow-ins and slow-outs soften the action, making it more life-like. For a gag action, we may omit some slow-out or slow-ins for shock appeal or the surprise element. This will give more snap to the scene.>
+ARCS\n\nAll actions, with few exceptions (such as the animation of a mechanical device), follow an arc or slightly circular path. This is especially true of the human figure and the action of animals. Arcs give animation a more natural action and better flow. Think of natural movements in the terms of a pendulum swinging. All arm movement, head turns and even eye movements are executed on an arcs.>
+SECONDARY ACTION\n\nThis action adds to and enriches the main action and adds more dimension to the character animation, supplementing and/or re-enforcing the main action. Example: A character is angrily walking toward another character. The walk is forceful, aggressive, and forward leaning. The leg action is just short of a stomping walk. The secondary action is a few strong gestures of the arms working with the walk. Also, the possibility of dialogue being delivered at the same time with tilts and turns of the head to accentuate the walk and dialogue, but not so much as to distract from the walk action. All of these actions should work together in support of one another. Think of the walk as the primary action and arm swings, head bounce and all other actions of the body as secondary or supporting action.>
+TIMING\n\nExpertise in timing comes best with experience and personal experimentation, using the trial and error method in refining technique. The basics are: more drawings between poses slow and smooth the action. Fewer drawings make the action faster and crisper. A variety of slow and fast timing within a scene adds texture and interest to the movement. Most animation is done on twos (one drawing photographed on two frames of film) or on ones (one drawing photographed on each frame of film). Twos are used most of the time, and ones are used during camera moves such as trucks, pans and occasionally for subtle and quick dialogue animation. Also, there is timing in the acting of a character to establish mood, emotion, and reaction to another character or to a situation. Studying movement of actors and performers on stage and in films is useful when animating human or animal characters. This frame by frame examination of film footage will aid you in understanding timing for animation.>
+EXAGGERATION\n\nExaggeration is not extreme distortion of a drawing or extremely broad, violent action all the time. It¹s like a caricature of facial features, expressions, poses, attitudes and actions. Action traced from live action film can be accurate, but stiff and mechanical. In feature animation, a character must move more broadly to look natural. The same is true of facial expressions, but the action should not be as broad as in a short cartoon style. Exaggeration in a walk or an eye movement or even a head turn will give your film more appeal. Use good taste and common sense to keep from becoming too theatrical and excessively animated.>
+SOLID DRAWING\n\nThe basic principles of drawing form, weight, volume solidity and the illusion of three dimension apply to animation as it does to academic drawing. The way you draw cartoons, you draw in the classical sense, using pencil sketches and drawings for reproduction of life. You transform these into color and movement giving the characters the illusion of three-and four-dimensional life. Three dimensional is movement in space. The fourth dimension is movement in time.>
+APPEAL\n\nA live performer has charisma. An animated character has appeal. Appealing animation does not mean just being cute and cuddly. All characters have to have appeal whether they are heroic, villainous, comic or cute. Appeal, as you will use it, includes an easy to read design, clear drawing, and personality development that will capture and involve the audience¹s interest. Early cartoons were basically a series of gags strung together on a main theme. Over the years, the artists have learned that to produce a feature there was a need for story continuity, character development and a higher quality of artwork throughout the entire production. Like all forms of story telling, the feature has to appeal to the mind as well as to the eye.>
+LINE OF ACTION>
+SILHOUETTE>
+ACTION = REACTION!>
+TENSION>
+STRAIGHT AGAINST CURVE>
+POSITIVE AND NEGATIVE SHAPES>
+CONTRAST\n\nRemember contrast in all aspects of the shot:\n\npacing\nbroad action\nemotional changes\nshape\nsize\nspeed\nvolume\nrhythm\nstaging\ncamera movements\nfacial poses\ngestures\ntiming\nspacing\ndepth\ncharacter sizes\nsquash and stretch\n\nThese are just a few. All of the 12 principles can be contrasted against one another, and against themselves>
+BALANCE>
+LEAD AND FOLLOW\n\nThink about what elements of the character are leading the action, and where the eye is looking. You are looking to lead both the movement of the body from a specific point or set of points, but also use this to lead the audience.\n\nA squirrell walking along the ground sniffing for food is really using its legs and feet to drive the action, but the artistic impression is the nose leading the squirrell.>
+SEE THE FLAW\n\nWhat makes a character relatable? Well, I think a primary one is flaw. A flawed character is one we can all identify with because we are all flawed.>
+THE TOKEN VILLAIN THAT JUST WANTS TO BE RICH OR RULE THE WORLD IS NOT COMPELLING IN THE LEAST\n\nWe don't identify emotionally with those motives-- yes, we even have to identify to a degree with the villain. What if he's the kind of villain who was just like you or me at one point and took a wrong turn? What if he's looking for love in all the wrong places, that adds sympathy which adds empathy and helps to make you care about them.>
+I make sure that the scene isn't even, and then I start analyzing my individual motions making sure they are not even also. Posing is next, looking for tangents, silhouette, attitude, complex shapes, awkward shapes, balance, etc. Then I make sure I'm using anticipation before my major moves, gestures or actions. Next on the list is Arcs, checking the wrists, nose, fingertips, root, shoulders, etc. I'm checking all of these parts to main camera in my shot. Finally I think about the overlap, you might say your character doesn't have a tail or floppy hat so what is there to overlap? The whole body is made up of elements that can drag, overlap, and follow through. The arms are a huge element that you can apply the principle of overlap too. Fingers, legs, eyebrows, jaws, eyelids and many more elements can also all overlap depending on the action.>
+wrist- you need to keep an eye on these to fight that marionette feel>
+elbows- if you're using IK arms, then you absolutely MUST check your elbow arcs>
+feet- track the heel & the toes to see if you're getting clean arcs on both>
+head- the most obvious motion hitches will show up in the head. It's usually a torso problem, it just shows up in the head arc>
+knees- watch for pops and skips>
+hips- the center of mass is vital to believable weight, so check the hip arcs.>
+props- so many time we forget that the prop the character is holding/using is as important to the motion as the character>
+eyes- when they turn, are they linear turns? If so, add some arc.>
+face (lipsync)- make sure your face doesn't linearly go from static morph target to target. The face needs to feel organic.>
+tails- way overlooked, and very tricky to get right.>
+check break downs and make stronger if needed- weak arc? Push that breakdown pose.>
+no two motions should have same arcs- feels very unnatural. Weave the arc lines like a tapestry of interesting motion.>
+cross arcs and overlap for interest>
+Have you pushed your line so it reads clearly?>
+Is your line interesting?>
+Is your line strongly concave or convex?>
+When going from one pose to another can you invert your lines for stronger contrast?>
+If all you had was one still frame to show for this pose, is your line of action capturing the kinetic energy of your character like a good illustration would?>
+Check for twins. Shifting one arm by a frame or two is not fundamentally addressing the issue of twinning. You need more than that.>
+Does it fit for you to offset the hand from the elbow? The elbow from the shoulder?>
+For this move should your arms lead the torso or do they follow it's weight?>
+For this move should your hand lead the arm or follow it's weight?>
+Does your upper torso move independently from your hips?>
+For this move, should the head lead or follow?>
+Have you seen if offsetting your rotation keys from the translation keys adds any life to the character? How about individual rotation channels from each other?>
+Do your fingers each move independently from the other fingers?>
+Should your fingers flow after the hand or stay tight to it?>
+Is this the right place to use the offset (aka \"pixar\") blink?>
+Are you overlapping too much? Is it too soft? (mushy)>
+Are you not overlapping enough? Is it too hard? (sticky)>
+Are your motions distracting? (poppy)>
+Does it feel like your ease outs are too linear? (robotic)>
+Will this move benefit from the successive breaking of joints?>
+Do your body parts overlap with believable physics? Are the hands too slow (heavy) or too fast (light)?>
+Don’t blindly trust overlap or lag plug ins… check each frame for accuracy.>
+Does the size of the anticipation match the speed of the subsequent action?>
+Does your character flow well from one thing to another? Should they?>
+Does your character's body language and gestures' energy match tone & energy of the dialogue?>
+Look for ways to build texture into a shot- building across phrases and releasing. Not every pose or move is the same length.>
+Move your character around on their feet to keep them believable. Nothing says \"I'm not believable\" like frozen feet.>
+Does the energy of your character keep building up during hold when appropriate? tip: if the pose hit didn't have an extreme with a recoil, but is rather meant to build energy for release (like an anticipation hold) then you'll keep growing the energy up into the pose, like a long ease into the extreme.>
+Does the energy of your character keep settling with gravity during hold when appropriate? tip: If the pose hit had a settleback after an extreme, you'll generally want to keep the held energy settling into gravity.>
+Are you motions too even across the shot?>
+Are all the motions too fast? Are they too slow?>
+Do you have an appropriate mix of fast moves verse slower ones?>
+Be aware of the appropriate speed for a given set of appropriate actions.>
+Mix up the pacing of motion. Fast flurries followed by long simmering holds. Great contrast.>
+Don't make every move the same speed & flavor.>
+Favor the anticipation or the breakdown or the ease out. Meaning: think what works best for a given action- slow in/fast out? Or fast in/slow out? Or even in/out but fast breakdown in the middle?>
+What would Character A move like compared to character B?>
+Do your poses read clearly in plain black & white?>
+Funky lines in the silhouette? Check elbows to see if they're sticking out unnaturally.>
+Check spine & your line of action.>
+Think of ways to compressing the pose/action into planes in space for cleaner reads. Perpendicular to camera plane, or parallel to it. think Woody's \"cool sheriff\" walk from the cardboard box in Toy Story 2. Look at how his motion is compressed into a single easy to read plane that is parallel to the camera plane.>
+Check for IK pops>
+Look for and fix hitches in the arcs>
+Smooth out any hiccups in line of motion>
+Destroy any and all distracting moves>
+Do you overshoot on moves too much? Not enough?>
+Is there enough \"keep alive\" on your moving holds? Is there too much so that you're adding noise to the signal?>
+Clean out any and all distracting nasty geometry intersections. The small single frame ones in the middle of big moves, forget about those. Nobody will notice.>
+Do your character's gestures & actions lead words appropriately in dialog?>
+Feel free to play with physics a bit to add some texture. Give some jump & hold to things in the air.>
+A move should never be linear and it should never be even.>
+Are your physics believable (weight)?>
+Break up long holds with secondary action (scratching, wiping nose, weight shift, etc.)>
+For visually pleasing images compose on thirds>
+Avoid staging your character directly down the middle unless you have a reason to.>
+Use those lines of action to add visual angles to lead your viewer's eye where it needs to go.>
+In production you must keep the integrity of the layout composition and then plus it with solid lines of action & silhouettes.>
+If your character is doing something important, make sure we can stinkin' see what's going on!>
+Track your eye as you watch. Where does it go? Is it where it should go? Do your eyes feel like they awkwardly jump from cut to cut? Is this the  desired effect (sometimes it is)?>
+Stay true to character. Buzz Lightyear will not flail like a spaz like Woody would.>
+Does acting match dialog intensity? Are you being too vaudeville?>
+Do the hands & body merely illustrate words that your character is saying? How many times do you make a punching motion with your hands when you say the word \"hit\"? Not many. How many times do you make a kicking motion when you say the word \"kick\"? Not many. How many times do you spread your arms like an airplane when you say the word \"fly\"? Not often. Guess what? Neither should your character!>
+Do the eye emotions match dialog?>
+Reveal your character's inner thoughts or emotions beginning with the eyes first. Cascade out from there.>
+Emotion drives motion. Motion does not illustrate emotion. (no vaudeville. See above note) Also, thought does not drive action- emotion drives action. Thoughts merely drive decisions. but decisions are not acted upon without the emotion to drive them.>
+Avoid overacting. Keep it simpler.>
+Don’t try to do too much in one shot. Less is more>
+If your character's face needs to show an emotional shift, it's easier to read that shift while they are in a pose hold, not in a move. Emotional shifts should occur when the character is generally held still..>
+Who owns the shot? Don’t upstage the owner of the shot. Keep the secondary and background characters from being distracting with their motions. Sometimes breathing & blinking is enough.>
+When the time comes to transfer shot ownership from character to character, make sure it's a clean hand off. Only one owner at a time. The audience should instinctually know who to watch based on what you show them.>
+Maintain proper intensity levels appropriate for where character is on character arc. If your character has a major anger blow out in the third act, don't show that level of anger anywhere before that point.>
+Brows can be treated as two blocks connected. They affect each other. Shapes should be thought as a combination of BOTH brows, not each of them separately.>
+Brows & Eyes can also create SHAPES. Think of the compositional advantages this gives you. Avoid complicated shapes and think of simplicity.>
+I think of a Brow as if there is an imaginary line connecting both of them. That way, whatever on of them is doing, will affect in some way what the other one is doing. Moving just one separate eyebrow, although possible, it makes the eye area of the face somewhat disconnected.>
+Brows should always keep their volume. Parts of the face can stretch, like the sides of the eyebrows. This area starts to be subjective, and up to peoples sensibilities. But I try to think of brows as muscle and skin underneath it. Muscles do stretch when being pulled.>
+The eyebrows can have really tiny almost micro movements that yet say so much about what a character is thinking. Go study clips of people thinking. A good test is to study people when they are not watching or when they are not acting as that will give you a good and more realistic idea about what muscles are being used and why.>
+Be very careful about leading the eye of the audience. It's better to have one character bordering on \"dead\" than having the audience not knowing where to look. Most importantly, make sure it's very clear which character is talking when. Overacting can wreck a scene, but it can doubly wreck a multiple character scene because you can't tell who is talking or who the animator wants you to be looking at.... Anticipation can help you direct the eye of the audience, as can staging/composition, etc.>
+Anticipation is one of the big ways though. It's like your secret line of communication with the audience. \"hey - look over here because something funny is about to happen!\" or maybe subtly moving a character's left hand just before he waves with his right gets the audience to switch over to look at that character and not miss the wave...  >
+As a general rule of thumb, leading with the eyes first is what humans do 90% of the time, so it's usually a safe bet.>
+If you want to lead with the head first, make sure it's for a reason. Leading with the head first has a very dramatic feeling associated with it. Film yourself looking around normally, or turning towards a sound you hear - you will lead with your eyes every time. If you try leading with the head first, you will have a whole different feeling associated with the performance - especially if the head turn is fairly slow. It will feel very scary or dramatic. >
+1) If you are really really interested in this third person that's calling you (maybe the girl of your dreams, who knows...), then for sure I'll have that character lead with the eyes.>
+2) If you are really really interested in the conversation/subject you are having (more than who is the third person calling)...then I'll start twisting the body, then the chest, then the head, and I'll have the eyes be the last thing that turns. Mostly because his head is still in that conversation with the guy.>
+3)If the third person pushes you from behind, same case as number 2. I may have the eyes move the last (after the head).>
+Animation is all about trickery. Use whatever tricks are necessary to get the idea across. Literalism in form and function is NOT a pre-requisite to good animation>
+Even \"cartoony\" work needs to be grounded in reality (both in physical motion and in a believable acting performance) for an audience to identify with it.>
+\"WHO IS THIS CHARACTER?\" You have to know who your charcter is. That's not just to say it and dismiss it. If you are trying to convince people that your character has ANY kind of personality you have to BELIEVE that this character exists. You create a back story. You give your character an Age, a history.>
+In \"Finding Nemo\" I had a HUGE BOOOM revelation and I called this \"Animating from the INSIDE out.\" My character is not just some spans of geometry. My character has a heart, has flesh, has a brain, thinks on their own, etc. AfterI would put my blocking in there shortly thereafter I would think, okay, this character has ALWAYS done this, they have always moved in this way, They are living this moment of their life RIGHT NOW. I think this kind of thinking has happened over many years of thinking and animating. But the sooner anyone can start thinking about Animation like this the sooner their animation willl become \"ALIVE\" and not just a series of movements.>
+Facial animation I block out with Poses. I get the key poses in there and then I usually work that area more \"Straight Ahead.\">
+Sure there are natural Peaks in the audio track. Those tend to be the places where we choose to put a \"Drawing\" or Image/Pose whatever. I call these Drawings. It is key to SIMPLIFY what you are hearing make it clear and easy to read. If you hit EVERY beat in a line you will kill the audience with too much information. This is a common tendency with new animators. Too much too complicated. Just keep it simple and clear and the audience will thank you for it! >
+The torso, how the pelvis and spine are working together to move your body.>
+fingers and toes come last>
+Don’t get overwhelmed by all the limbs and appendages….it’s a bouncing ball.>
+Give the eye enough time to see a pose, or an action. If you have two objects touching one another- 1 frame is not enough time to see it.>
+Pauses are as important as the action. The contrast between them is what makes each work>
+Each part of an arm, leg or torso doesn’t move at the same time.>
+Decide where the energy or need for the movement is coming from – and move that part first. Follow the this flow of energy as it travels through the body.>
+Flow. One part of the body starts to move into the next pose as another part is still finishing it’s motion from the last pose.>
+Within the human body, the majority of the weight lies in the pelvis and lower torso area. On every single pose, and throughout animation you must keep track of that weight. There is a constant relationship between the 2 feet and that lower torso area. If the lower part of the body is off balance – it must counterbalance using the rest of the weight it’s got. This could be arms, other legs, the upper torso or an object or prop. > Everything you touch or move including yourself or your character has it’s own weight. Decide how much each thing weighs. Show us how much by how it affects the body. Am I holding a pillow, or am I holding a safe? What does my arm look like when holding each? How I choose to hold it will show weight and how much the rest of my body is affected by it will show weight.>
+Tension or Effort. Sometimes you have to put in some random looking frames to show tension, struggle, or effort. If you are trying to move something heavy- it is not going to “give” right away. Your arms may “give” before the object does. Try dragging something along a carpet- it will catch on the rug fibers…this is quite different than dragging something along a cement floor- or ice for that Matter. Things get rub, slow down or get stuck when in contact with other things. >
+Hips... The hip is there to help “take up” the weight of the lower torso, pelvis area. Animate the majority of the pelvis direction with the root. Save the hip control For another pass. It is there to help your leg take the weight. It will go into action shortly after the weight has moved over one leg – and it will happen in a matter of a couple of frames. If you were a giant dinosaur- this hip shift would take longer to happen – bigger bones have to rotate more to get the same effect.>
+Clavicles or Shoulders…….. are very similar in function to the hip rotation. Particularly If the hand is being used to rest on or leaned on. The arm will try to take up as much weight as possible- then the scapula be forced to take up the rest.>
+Breathing …. Think about when your character is going to take a breath. A breath can happen during an anticipation. When swimming it literally happens before you dive in and swim underwater. Perhaps you take a big gulp before a golf swing. Yoga is based entirely on breath and motion. Pulling in the air before a posture and pushing it out through the next posture. >
+A breath can determine the character’s mood or state of mind. Nervous people breathe fast, shallow breaths. Someone who has just run may be out of breath to the point where they literally can’t get it back to normal breathing. Someone who is asleep may snore or “saw logs” in a regular rhythm. Or they may have sleep apnea which can cause them to gasp violently all of a sudden. Have someone scare you- did you suck in air- or blow it out?\n\n Breathing doesn’t just happen with one bone rotation. There is no breath control. The entire spine and shoulders, head and neck are involved in breathing. If it is the out of breath runner- than maybe the whole body. Again- here is your timing and overlap following the breath in the abdomen, up through the diaphragm, into the lungs, up in the chest- up the shoulders and neck into the nasal or mouth.>>
+And don't worry about everyone having different approaches. I've changed my approach like 57,000,000 times in the last few years. We are learning here man. You'll know when something starts working for you...and things will start rolling>>
+Keeping animation crisp:\n\n It's all on the Spacing and Timing of the character going from one pose to the other. If the character is only taking a few frames to go from one pose to the next, then it may need different cushioning than a move with more frames. No matter what, you'll need to add cushion to your moves, or else, you'll get pops all over the place, or mechanical types of moves. It's important to play with the timing to see what results you get. I could tell you right now, a pose A to a pose B in 10 frames will need about another 10 frames of Slow Out. But the truth is, every action is different. Every action fits a different mood, a different personality and so on. So you have to ask yourself those questions before animating the character, and the timing of the character will follow after that. I always try to add slow outs, even if we are talking for just a couple of frames. Nothing just stops unless it hits a wall.>>
+The basic stuff like silouette will help you started. Silouette explains in part the concept of negative and positive space. Basically, imagine your own shadow in a wall. You have the white wall, and then a silouette of yourself. Well, in there you are already playing with negative and positive space. What you do with your arms in relationship with your body, your head direction...your spine. If you experiment in just a wall with your shadow, you'll notice how certain poses where the arms are out, seem more clear than poses with the arms around the body. When too much of the action in the arms is around the body, you are playing with elements that can confuse one to the other. It starts to become more of a design/composition issue...but clarity should be number 1.>
+is the pose a cliche? Is it a pose we can relate to nowadays? As animators, sometimes we get very influenced by old Disney films. Sometimes, the poses of some of those old characters worked those days, but some of the poses don't work these days. They become obsolete...and that's why it's important to pay attention to what people do TODAY. So that audiences can relate to what your character is doing. It's the difference between acting today and acting of a 50's Film Noir. The acting in some of those of films becomes old school or even cheesy very fast. >
+Is the pose dynamic? When I say dynamic, I am also referring, is the pose interesting to watch? Stay away from anything default. And assymetry will also help you. One arm in a different pose as the other arm, to break things up. Same thing applies to the spine and head. If we look at the spine and the head, we'll notice that there is an imaginary line that goes from your hips all the way to your head. Play with that line, and get some nice line of actions throughout the character that express emotion. Definitely try to get Emotion, mood and personality out of the character's pose. It's the number one thing.>
+Every time you have a very quick move, you have to be able to prepare the audience for it, and know how to finish the move. It's the anticipation, action and reaction of things. You can totally have a 1 frame move, if you anticipate it properly, and cushion it or overshoot it properly. Sometimes, a action is not really about the action itself, but more the before and after of the action. That's when you are selling the action itself. Think Coyote, or TexAvery...they can have the character literaly dissapear in 0 frames...maybe just add some smoke from how fast they leave the screen. Yet, they know that for such an exageratted move, they need an incredible amount of anticipation...or sle audiences would be like \"uh? what? what did just happened?\". So it's important to not really think about it in terms of the action itself, but more the before and after the action. Theat's when you can sell whatever the hell you want to sell>
+Up and to the Left\n\nIndicates: Visually Constructed Images (Vc)If you asked someone to \"Imagine a purple buffalo\", this would be the direction their eyes moved in while thinking about the question as they \"Visually Constructed\" a purple buffalo in their mind.\n\n Up and to the Right \n\nIndicates: Visually Remembered Images (Vr) If you asked someone to \"What color was the first house you lived in?\", this would be the direction their eyes moved in while thinking about the question as they \"Visually Remembered\" the color of their childhood home.\n\n Down and to the Left \n\nIndicates: Feeling / Kinesthetic (F) If you asked someone to \"Can you remember the smell of a campfire? \", this would be the direction their eyes moved in while thinking about the question as they used recalled a smell, feeling, or taste. \n\n Down and To the Right \n\n Indicates: Internal Dialog (Ai) This is the direction of someone eyes as they \"talk to themselves\". >
+Milt Kahl: \"Sometimes I work straight ahead, and sometimes it's a combination. I'll go through the stuff where I'm going to go straight ahead and I'll kind of plan where I'm going to be at various places in the scene, so I'll have something to kind of aim at, and I'll go straight ahead to it.\">
+Blink When a thought process is finished or a decision is made - I once heard a film editor say that he likes to cut on blinks because blinks signal completion of whatever is going on in a character's mind>
+blinks on fast head turns, or changes in focus are good. If you are listening to one person and then another, you will most likely blink somewhere between that change of attention.>
+\"In blinks there should be a feeling of flesh and thickness to the eyelids. Where there is only one inbetween, slow out of each extreme. Inbetweens on a blink should animate smoothly and not change angle or wobble. Blinks of disbelief, puzzlement or wonder usually are shown with a slight squint. Blinks area useful device to ease the shock of going into a held drawing. The simple addition of a blink during a hold recaptures the living quality. \">
+Other stuff I try to do is to actually anticipate eyeblinks over a frame or two. Not that is very noticeable, but when you have closeups I really think it makes a difference. When we dart our eyes, the pupil eases out...I also noticed that with blinks. The eyelid doesn't close in a constant way, we have slows in and out of the open/close move....and sometimes I noticed we hold the blink for more than one frame. Depending on the emotional state of the character you can also play with the timing on the eyelids when blinking. It's not the same thing to have a character closing his eyelids over three frames, that over ten frames. It tells you a lot about how this character is feeling at the time...or about the personality of this character. Also, the number of times we blink repeadtely can add to another emotional state of the character....>
+Blinking. A human blinks once every four seconds. This timing can change according to what emotional state the character is in. If anger is your dominant attribute then the blink rate should decrease to once every six seconds. The reason behind this is physical; the eyes open wide in anger, achieving a glare. If you are acting nervous then the blink rate increases to once every two seconds. This reaction is involuntary. Blinking brings realism to your characters but also emphasizes a particular emotion or mood.>
+usually blink into and our of each action and on eye direction changes. It's a good idea not to let too much time go by without a blink (3-4 seconds) or your character will take on an odd look. You can also mix in 1/2 blinks and blinks in pairs to give a more informal look.>
+I like to avoid making the right blink precisely identical to the left blink. I'm talking about tiny, almost-imperceptible differences that help me avoid perfect symmetry, and thus help the blink to appear more natural rather than robotic. For example, the in-between (halfway between closed and open) could be slightly higher in the left eye than it is for the right.>
+Scenes begin in the middle, not the beginning.>
+A character should be \"doing\" something 100 percent of the time.>
+A character enters a scene for a reason, and he exits for a reason.>
+Thinking tends to lead to conclusions; emotion tends to lead to action.>
+A gesture need not be an illustration of the spoken word.>
+Audiences empathize with emotion. The key to good animation is in empathy.>
+Comedy is drama heightened, oxygenated.>
+An action pursues a longer term objective. (Smile at the girl because you want to date her.)>
+Short term memory causes eyes to glance upward.>
+Long term memory causes eyes to glance downward, into the soul.>
+The human sense of sight is many times more powerful than the sense of hearing.>
+Humans act to survive. Find the survival mechanism in your character.>
+Play an action until something happens to make you play a different one.>
+A scene is a negotiation.>
+\"Actors are athletes of the heart\" - Artonin Artaud>
+Anxiety is a high or heady power center; confidence is a low power center.>
+Emotions are automatic value responses.>
+Characters that make steady eye contact for more than a few seconds are either going to fight or make love.>
+The human smile says, \"I won't hurt you.\">
+Never underestimate the audience.>
+When you animate, you are saying to the audience, \"I understand this.\" When the audience applauds, laughs or cries, it is saying, \"I see what you mean.\">
+Actors lead; audiences follow.>
+Background characters can be defined with shadow movement - a jiggling knee, a charcter's mouth moving when he reads the paper, biting fingernails and so on.>
+\"The Iron Giant\" is an animation classic. Every animator should study it, like visiting Mecca.>
+We see things before we hear them; we hear things before we touch them; we touch things before we smell them; we smell things before we taste them.>
+A villain is a regular person that has a fatal flaw.>
+A hero is a regular person that has to rise to extreme heights to overcome an extraordinary obstacle.>
+The \"beats\" in a scene or script are better perceived as \"beads\" in a necklace. One bead leads to the next to the next and so on. Put the beads together, and you have a story.>
+The purpose of (character) movement is destination.>
+Acting has almost nothing to do with words.>
+Commercials convey almost zero actual information. They are about emotion.>
+Humans and other animals negotiate status continually.>
+To energize a scene, convert the character's \"wants\" to \"needs.\">
+Theatrical reality isn't the same thing as regular reality.>
+Acting is reacting.>
+Animators are not mimes. Mime is a specialized art.>
+A key ingredient of empathy is distance.>
+Old people stoop because their bodies ache.>
+A drunk character tries to counteract the effects of the alcohol.>
+To show that a character is hot, have him try to get cool.>
+To show that a character is cold, have him try to get warm.>
+An \"adrenaline\" moment is one the character will remember when he turns eighty and looks back on his life. The best movies include plenty of adrenaline moments. >
+A character analysis is like a character biography.>
+When a character is faced with a choice, be specific. Avoid ambivalence.>
+Allow your characters to be affected by the atmosphere in a location, the \"feeling\" it projects. (A car wreck has an atmosphere; a church has an atmosphere; a marriage bed has an atmosphere.)>
+Yelling is a weak acting choice.>
+We speak of memory in general terms, but it is referenced in specific mental images.>
+A character that is listening to another is actually preparing to speak.>
+The camera tends to follow the character's gaze.>
+A scene should have conflict, otherwise known as an obstacle.>
+Trick for suggesting villainy: tilt head forward; eyes peer upward, exposing whites in lower portion of eyeball.>
+Character \"personality\" is actually character \"behavior.\">
+The human eye can not see (comprehend) an action done in less then 5 frames, for an action to be readable it must be done in 5 or more frames.>
+On in-betweens don't animate in a straight-line use curved paths>
+A character should never take off or land on both feet at the same time.>
+Always create your heel strike poses first.>
+A counter action is where one part moves in the opposite direction to counter the weight and thrust of another part.>
+To really add SNAP to a movement put one \"crazy\" position the frame before the extreme position.>
+Break up the action and the dialog - do one thing at a time! For example talk then point or point then talk>
+Animate dialogue on level sync, then in post, test delaying the voice audio by approximately 2 frames to see what works best.>
+When giving dialogue a character should be progressing (or regressing) somewhere.>
+Get the body action right then add the mouth.>
+Never in-between the tongue, always snap it from one position to the next.>
+The tongue is hooked at the back of the lower jaw, not stuck in the throat>
+Men (50/50) show upper or lower teeth only a rare few show both ( lipsync ) Women usually show upper teeth only.>
+\"Boil it down\" - Keep the mouth movement simple.>
+What is animation?\n\nChange is the basis of all animation...There are two types of animation, Morphing and the type that gives the illusion of life.>
+KEY FRAMES - are the story telling frames (The story board drawings) Frames where the character makes contact (heel strike pose, touching an object, etc.)\n\nEXTREMES - are the where there is a change of direction. They are NOT Key Frames.\n\nBREAKDOWNS are the middle or passing position. On breakdowns always add an extra bit of movement -- almost anything will work. Don't go from A to B. Go from A to Z to B>
+(1) Guidelines for showing the expression change:\n\n(a) Avoid making a fast body move while changing the expression. (b) Change your expression before or after the body move. (c) Don't lose the expresison change in an active secondary action. Eg. clothing catching up with body move.>
+Don't try to tell too much in one drawing. Work out the idea over a series of drawings.>
+Don't let facial expressions conflict with dialogue: The idea behind the words should suggest expression.>
+Be sure you have the right staging to show all the expression in your scene to best advantage:>
+Have you the right expression to show what your character is thinking? Are all the parts of the head & face related to this one idea?>
+The expression of the idea behind the words must be captured throught the whole body as well as in the face. But remember: that expression originates in the eyes.>
+Remember the triangle that originates from your character's main focal point ( usually their eyes ) .. the further away they get from here, the less the audience notices what is happening, but is easily distracted by broad movements in this area >
+It is the change of shape of the eyes that shows what the character is thinking, It is the thinking that gives the illusion of life.>
+Don't hide a smile with the head tilted down too far, or behind a big nose or moustache.>
+Don’t illustrate words or mechanical movements. Illustrate ideas or thoughts, with the attitudes and actions.>
+Squash and stretch entire body for attitudes.>
+If possible, make definite changes from one attitude to another in timing and expression.>
+What is the character thinking?>
+It is the thought and circumstances behind the action that will make the action interesting.\n\n Example:\n\nA man walks up to a mailbox, drops in his letter and walks away. OR A man desperately in love with a girl far away carefully mails a letter in which he has poured his heart out. >
+When drawing dialogue, go for phrasing. (Simplify the dialogue into pictures of the dominating vowel and consonant sounds, especially in fast dialogue.>
+Lift the body attitude 4 frames before dialogue modulation (but use identical timing on mouth as on X sheet).>
+Change of expression and major dialogue sounds are a point of interest. Do them, if at all possible, within a pose. If the head moves too much you won’t see the changes.>
+Don’t move anything unless it’s for a purpose.>
+Think in terms of drawing the whole character, not just the head or eyes, etc. Keep a balanced relation of one part of the drawing to the other.>
+Stage for most effective drawing.>
+Usually the break in the eyebrow relates to the highpoint of the eye.>
+Simple animated shapes.>
+The audience has a difficult time reading the first 6-8 frames in a scene.>
+Does the added action in a scene contribute to the main idea in that scene? Will it help sell it or confuse it?>
+Don’t animate for the sake of animation but think what the character is thinking and what the scene needs to fit into the sequence.>
+Actions can be eliminated and staging \"cheated\" if it simplifies the picture you are trying to show and is not disturbing to the audience.>
+Spend half your time planning your scene and the other half animating.>
+How to animate a scene of a four-legged character acting and walking?\n\n Work out the acting patterns first with the stretch and squash in the body, neck and head; then go back in and animate the legs. Finally, adjust the up and down motion on the body according to the legs.>
+If the character has no eyes, such as an inanimate object like a Luxo lamp, it is even more important to lead with the head. The number of frames to lead the eyes and head depends on how much thought precedes the main action. The animator must first understand a character’s thought process for any given action. Consider a character wanting to snatch some cheese from a mouse trap; the eyes will lead the snatch by quite a bit because this is a big decision. The character needs time to think, \"...Hmm...This looks tricky, is this cheese really worth it or is it just processed American cheese food?...Oh what the heck...,\" he decides, and snatches the cheese.>
+The only time that the eyes or head would not lead the action would be when an external force is driving the character’s movements, as opposed to his thought process. For example, if that character was hit in the back by the low flying sheep, the force of the impact would cause the body to move first, snapping the head back and dragging it behind the main action of the body.>
+To convey the idea that the thoughts of a character are driving its actions, a simple trick is in the anticipation; always lead with the eyes or the head. If the character has eyes, the eyes should move first, locking the focus of its action a few frames before the head. The head should move next, followed a few frames later by his body and the main action. The eyes of a character are the windows to its thoughts; the character’s thoughts are conveyed throught the actions of its eyes.>
+It must be the combination of the dimensional, realistic look and the smooth motion (usually on \"ones\") that makes a hold cause the motion to die. The eye picks it up immediately, it begins to look like robotic motion. To combat this, use a \"moving hold.\" Instead of having every part of the character stop, have some part continue to move slightly in the same direction, like an arm, a head, or even have the whole body.>
+To make a character’s personality seem real to an audience, he must be different than the other characters on the screen. A simple way to distinguish the personalities of your characters is through contrast of movement. No two characters would do the same action in the same way. For example, in Luxo Jr., both Dad and Jr. bat the ball with their heads. Yet Dad, who is larger and older, leans over the ball and uses only his shade to bat it. Jr., however, is smaller, younger, and full of energy, he whacks the ball with his whole shade, putting his whole body into it.>
+Proper timing is critical to making ideas readable. It is important to spend enough time (but no more) preparing the audience for: the anticipation of an action; the action itself; and the reaction to the action (the follow through). If too much time is spent on any of these, the audience’s attention will wander. If too little time is spent, the movement may be finished before the audience notices it, thus wasting the idea.>
+The faster the movement, the more critical it is to make sure the audience can follow what is happening. The action must not be so fast that the audience cannot read it and understand the meaning of it>
+To make sure an idea or action is unmistakably clear, the audience’s eye must be led to exactly where it needs to be at the right moment, they must not miss the idea or action. Timing, as well as staging and anticipation are all integral to directing the audience’s eye. A well-staged anticipation will be wasted if it is not timed properly>
+It is important that only one idea is seen by the audience at a time. If a lot of action is happening at once, the eye does not know where to look and the main idea will be overlooked. The object of interest should be significantly contrasted against the rest of the scene. In a still scene, the eye will be attracted to movement. In a very busy scene, the eye will be attracted to something that is still. Each idea or action must be timed and staged in the strongest and simplest way before going on to the next idea or action. The animator is saying, in effect, \"Look at this, now look at this, and now look at this.\">
+In most cases, an action should not be brought to a complete stop before starting another action; the second action should overlap the first. This slight overlapping maintains a flow and continuity between whole phrases of actions.>
+Most of the time Jr. is on-screen, Dad’s actions are timed to be very subtle, so the attention of the audience is always on Jr. where most of the story was being told. If Dad’s actions were important, Jr.’s actions were toned down and Dad’s movements were emphasized then the attention of the audience would transfer to Dad. For example, when Jr. looks up to Dad after he’s popped the ball and Dad shakes his head, all eyes are on Jr>
+In every step of the production of your animation, the story, the design, the staging, the animation, the editing, the lighting, the sound, etc., ask yourself why? Why is this here? Does it further the story? Does it support the whole? To create successful animation, you must understand why an object moves before you can figure out how it should move. Character animation isn’t the fact that an object looks like a character or has a face or hands. Character animation is when an object moves like it is alive, when it looks like it is thinking and all of its movements are generated by its own thought process. It is the change of shape that shows that a character is thinking. It is the thinking that gives the illusion of life.>
+The most important thing to remember is that great animation doesn't happen from Point A to Point B, it happens at point A and Point B. Meaning that we must show the audience what is going to happen by anticipating the action (Point A) , do the action, then show the audience what just happened by overshooting the pose and settling back in (Point B).>
+Exaggerated action is what makes good animation great.>
+see how far you can push those extreme poses, then add a little flavor to it by doing something unexpected in between>
+Using the principle of progressively breaking joints is a way to get that snap, crackle and pop into your animation. This principle basically builds on top of the principle of Overlapping Action. It can most easily be described as a whip or a character throwing a football. First the upper arm rotates in an arc, then the forearm breaks or rotates in an arc and finally the wrist breaks and releases the ball>
+(lipsync) Don't go from wide open to closed in one frame and vice versa. Definitely don't go from open to closed to open in 3 frames>
+Don't hold a mouth shape static. An "Ah" shape should shift into a slightly different "Ah" as it's being held.>
+Keep M's and F's for 2 frames. If it's tight, steal from the previous sound.>
+Hit the sound shape at least 2 frames before the sound is heard. Even if you're right on the nose, it will feel late when played at full speed. Humans see things faster than they hear them, so we pick up our cues from the shape before the sound.>
+Break up the mouth angles. Shift the mouth up and down, tilt it left or right, get some snarls in there. Show emotion as the character speaks. We can speak and smile, speak and frown, speak and yawn at the same time. Built rigs that allow you to keep that kind of life in your lipsync animation.>
+When building your sound shapes and facial controls, don't forget the cheeks and the nose! The cheeks move when we speak, as does our nose. The cheeks and nose are the great connectors in facial animation, crossing the bridge from mouth animation to eye and brow animation. By keeping your nose and cheeks in the action you tie together the entire face of the character, creating a far more believable character who can act.>
+Don't be afraid to go extreme. Avoid the Princess Fiona Final Fantasy Syndrome(tm). Keep the energy of the sound track in mind when you're doing the mouth shapes. Louder sounds with more energy should be shown with the mouth open wider, sound shapes more extreme. Watch TV announcers talk. Those faces are movin' baby!>
+Think phonetically. Don't literally articulate every letter unless it's called for. Sometimes a few letters in a word are bunched together; the word \"probably\" might be spoken as "probbly," with only two syllables.>
+In animating a figure it is usual for the animator actually to draw forms. When he draws forms, he gets forms - generally lifeless. For a long time here in the life classes there has been emphasis placed on the forces of drawing - drawing symbols of forms, of expressive tensions of force>
+One misconception that I often hear from students is that \"using reference is cheating.\" Well, if using reference is cheating, then 99% of the world's top animators are cheaters! Nothing could be further from the truth. Using reference is essential, especially for animation students, to finding the most believable and unique performance for your scene.>
+Copying reference verbatim generally results in a robotic lifeless feel. Your job as an animator is to take that reference and apply your ART to it.>
+STUDY LIVE ACTION. Don't study animation.>
+When watching live action.. dont ask \"how\"..e.g how is the head moving, or how is it arcing, ask \"why\" are you noticing this motion or gesture? why does it matter?>
+A character is perfectly able to communicate a lot of information to JUST the audience, and not to the other characters around him">
+If you have no heart and soul for your character.. your character won't have any either.>
+Treat the eyes and eyelids like dominoes.\n\nSmall flickers before a blink, a slight lag on the eyelid after the pupil. Play with the physical connections that really are happening, and illustrate them through overlap.>
+You can't under-research animation. Everything you do is valid.>
+The eyes will tell 99.99% of what the character feels, wants, needs.. whatever. No matter what the body is doing.. the eyes always have the final say.>
+When a character does a simple transition from A to B... something that seems uninteresting at first, like walking up to a door, or going from standing to sitting, or simply turning... these are the moments where an intimate knowledge of your character will allow you to do something interesting that truly reveals who they are and how they feel about their situation.>
+Dialogue starts in the brain.\n\nIt works its way out through the brows, through the eyes, trough the body and finally through the mouth ...and into audiable words. Often characters will \"act\" the broad body movement before they even say the line that they are going to speak, particularly if they are waiting their turn to say something.>
+You have to make things your own. Put your own spin on things... thats when it starts to get interesting. You have to feel what you're doing.>
+Don't forget you have to take a break from time to time. Step back, get a coffee.. get some fresh eyes for when you come back. Get someone to look at it.>
+At some point.. you have to let the scene go.. let it live, see it as finished. You have a life outside of animation, as well as more things to animate!>
+Be your own director - if another animator showed you this shot.. what would you say?>
+In 2D animation there are \"two schools\" of drawing... the concise and tight, and the freeform and loose. Both are trying to find the middle ground!\n\nin CG animation, when \"drawing\" your poses, don't be too tight, but don't be too loose. Block what you need in a freeform way, but keep it logical and understandable. Work in 2 passes - loose, then tie-down.>
+There are no hard and fast rules in animation, only principles which are springboards to approaches; all of which can be twisted and broken.>
+Can you convey the action and acting in your scene in one pose? If thats not enough add another one... is it clear yet?>
+Trust yourself. Have confidence that its going to work... don't sweat the poses that you don't really need yet, or spend too much time figuring out how to get between the poses. have \"animation faith\". Get the broad thing working first.>
+The audience often tries to put themselves in the character's place, in order to figure out what is happening, or verify how the character feels. If the character is behaving in a way so removed from any human experience, how can the audience ever relate to it?>
+It always works well to push something in the opposite direction against the movement of something else.>
+Grab your video (or webcam) and act out your scene. Don’t do it once, or twice, but 20 times. It’s going to probably take you a few ‘takes’ to get ‘into’ character - not to mention get your lines right>
+Analyze the video and look for the actions that are appealing to you and feel \“in character\”. Sometimes you will take parts of one ‘take’ and parts of another ‘take’ as reference for your animation. Either way, don’t be bogged down by the details of your performance - look for broad actions and maybe later for some detailed secondary motion (motion that isn’t primary, but secondary - you know, like scratching the nose while the character is thinking).>
+If you are like me, there will be times when you discover something ’serendipitously’ and it works and feels right. Great! But try not to stop there. Try to evaluate why it works and feels right - more often than not, you will discover a reason and that will help you to make that next piece even that much better because you are not relying on accidents\n\nAccidents usually end up being disasters instead of successes. I suspect we want to get more successes than failures.>
+OPPOSING ACTION\nOPPOSING ACTION\nOPPOSING ACTION\nOPPOSING ACTION\nOPPOSING ACTION\nOPPOSING ACTION\nOPPOSING ACTION\nOPPOSING ACTION !!!!\nget the idea?>
+try to avoid the "W" pose with the body and the arms... is it neccesary? try and use it only if it really works>
+Remember that gestures can usually come ahead of the dialogue on specific words.\n\nSee what happens if you put the action a few frames before the sync, rather than right on or after the word>
+Don't underestimate the power of small things.. \nsmall anticipations\n\nsmall overlaps\n\nsmall delays\n\nsmall ease-ins and outs\n\nits often about what we \"feel\" rather than see directly.>
+I start with the thought process for the concept, then onto Staging, Pose to Pose, Exaggeration, Spacing and Arcs, Anticipations, Opposite Actions, Squash and Stretch (in body poses) and then Timing.\n\nAfter Timing, I would probably take a Straight Ahead pass through every limb and body part making sure it's flowing, that some parts are stopping before others and that there is a nice sense of Follow Through.  I also may add in some Secondary Actions if needed.  Once the body and facial is done, I'll layer on some squash and stretch on head, cheeks and jaw area. - Jason Ryan>
+\"make sure you animate emotion and attitude and not action. More important than what the character is saying is how the character is saying it. It's a subtle difference in the way you approach a scene, but it'sthe difference between just simply animating and acting.\">
+Is the character doing what the director wants in the sequence?>
+Is the character doing only one thing at a time?\n\n( on main action related to the story? - they should be so its as clear as possible>
+Is the character putting over the story point in the scene you are doing?>
+Is the character acting as if there is something going on in his mind?>
+Does the character appear to be doing something on his own?>
+Can the audience tell what the character is thinking?>
+How does what the character is doing effect what the audience is thinking?>
+Does the character have appeal?>
+Is it passionate? Is passion going into the drawing and coming out of the character?>
+Is it the simplest way to do it?>
+Have you made small story sketches of one important character to be sure everything is working before you make a lot of drawings?>
+Would any one else besides your mother like what you have done?>
+In my mind, it seems like there are three times that you know when you're finished with a shot:\n\n1) When there is nothing mechanically wrong with the movement and the performances truly LIVE\n\n2) When you're out of time\n\n3) When the director says so>
+You hold a mirror up to your screen and watch your animation in the mirror. This tricks your brain into seeing the shot \"fresh\" and can be a huge help in determining where you are at with the shot. I do this myself sometimes and find it very helpful.>
+It is impossible to make it in this industry if you don't TRULY love animation as an art. \"You have to love it\". And that's the absolute truth. If you don't have that passion for the art, you will never have the patience to power through all the years of learning. To some, these years were tedious and frustrating, but for those of us who truly love what we do, they were rewarding and incredibly fun.>
+Your goal, in almost every scene you will ever touch... is CLARITY.>
+Body language, as an animator uses it, can be employed to show the truth of an emotion or thought, regardless of what the actual line of dialogue happens to be.>
+The emotion of the character should always read first in the body language, and you should always think of the facial performance as the \"icing\" on your cake.>
+It's Too Much Exaggeration When the Audience is Confused>
+A great animator IS a great actor, and that needs to be a goal for each and every one of you.>
+The Pixar animators breathed such life into Buzz and Woody, that children all over the world believed, truly believed - even if only for those 80 minutes, that those characters were truly alive. That Buzz had real feelings. That Woody had real dreams.>
+If you do a bunch of animation that is mechanically correct, has beautiful arcs, and some really nice timing, but it doesn't communicate the idea to the audience, what's the point? No one will care if our animation \"looks pretty\" if they miss the story point that they should have noticed, or can't identify with the character's emotion.>
+Expression Changes Get Lost in Movement> What you'd usually want to do is slip the timing of the facial transition either earlier or later. Have her face start to transition into happiness just before the head turn, or leave it sad, turn the head, and then move from sadness to happiness once she sees the other character.>
+No Expression Changes in the First or Last 8 Frames of Your Scene\n\\nAs a general rule, whenever the camera cuts to a new angle or location, it takes about 6-8 frames for the audience to see and understand where they are. I'd suggest being conscious of not doing ANYTHING of importance with your character within those frames, and caution you to avoid any kind of quick pose change or changes in direction within those bookend frame-ranges. Just like with the face, any overall body change in direction will also read as a pop, and be very distracting to the audience.>
+->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

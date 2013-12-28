@@ -1,0 +1,67 @@
+global proc abxNudge(){
+	
+	string $parent = `window -w 200 -h 300 -t abxNudge -tlb true abxNudge`;
+	$panelName = "abxNudge";
+	setParent $parent;
+	$panelName = `formLayout -w 500 -h 500 $panelName`;
+	//if (`objectTypeUI $parent` == "tabLayout")
+	//	tabLayout -e -tabLabel $panelName "Tangents" $parent;
+	
+	columnLayout -rs 1 -w 400 -cal "center" -cat "both" 0 -adj true abxTanColLyt;
+	
+	frameLayout -label "Keyframe" -labelAlign "top" -cll true -borderStyle "etchedIn";
+	columnLayout -rs 1 -cal "center" -cat "both" 4 -adj true;
+	
+
+	rowLayout -nc 3 -adj 2 -cw3 30 30 40 -co3 0 0 0 -ct3 "both" "both" "both";
+	text -label "Nudge";
+	floatField -precision 2 -step 1 -value 10 abxWeightAmt;
+	button -label "Nudge" -h 20 -w 40 -c "abxNudgeCmd(\"key\",`floatField -q -value abxWeightAmt`)";
+	setParent ..;
+
+	rowLayout -nc 4 -adj 4 -co4 0 3 3 3 -cw4 30 30 30 30 -ct4 "both" "both" "both" "both" -cl4 "center" "center" "center" "center";
+		button -label "+1" -h 20 -w 40 -c "abxNudgeCmd(\"key\",1)";
+		button -label "+2" -h 20 -w 60 -c "abxNudgeCmd(\"key\",2)";
+		button -label "+4" -h 20 -w 40 -c "abxNudgeCmd(\"key\",4)";
+		button -label "+8" -h 20 -w 40 -c "abxNudgeCmd(\"key\",8)";
+		setParent ..;
+
+	rowLayout -nc 4 -adj 4 -co4 0 3 3 3 -cw4 30 30 30 30 -ct4 "both" "both" "both" "both" -cl4 "center" "center" "center" "center";
+		button -label "-1" -h 20 -w 40 -c "abxNudgeCmd(\"key\",-1)";
+		button -label "-2" -h 20 -w 60 -c "abxNudgeCmd(\"key\",-2)";
+		button -label "-4" -h 20 -w 40 -c "abxNudgeCmd(\"key\",-4)";
+		button -label "-8" -h 20 -w 40 -c "abxNudgeCmd(\"key\",-8)";
+		setParent ..;
+	
+	
+	setParent ..;
+	setParent ..;
+	
+
+
+	showWindow $parent;
+}
+
+global proc abxNudgeCmd(string $op, float $amount) {
+
+	//string $timeFlag = "";
+	//global string $gPlayBackSlider;
+	
+	
+	// if no keys are selected in the graph editor use the timeline
+	//float $selKeys[] = `keyframe -q -sl`;
+	//if (size($selKeys) < 1)
+	//	$timeFlag = (" -t "+`timeControl -q -rng $gPlayBackSlider`);
+
+	switch ($op){
+	case "key":
+
+		keyframe -animation keysOrObjects -relative -timeChange $amount;
+		break;
+			
+		
+	}
+
+
+}
+

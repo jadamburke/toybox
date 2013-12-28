@@ -1,0 +1,24 @@
+// exportAnimCurves
+
+global proc exportAnimCurves () {
+	string $selObj = `ls -sl`;
+
+	$sourceNamespace = "";
+	
+	if (size($tokenBuffer) > 1){
+		$sourceNamespace = ($tokenBuffer[0]+":");
+		if (size($tokenBuffer)>2){
+			for ($i=1;$i<size($tokenBuffer)-1;$i++){
+				$sourceNamespace += ($tokenBuffer[$i]+":");
+			}
+		}
+	}
+
+
+}
+
+global proc exportAssetAnimCurves (string $assetNamespace) {
+	
+
+
+}

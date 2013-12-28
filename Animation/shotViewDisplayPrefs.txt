@@ -1,0 +1,62 @@
+[ShotCamera]>
+global int $global_ShotCamera[];>
+global string $global_svStrings[];>
+$global_ShotCamera[0] = 958;>
+if (`window -exists SVPrefWindow`){ intField -e -v 958 IF_svWindow0;}>
+$global_ShotCamera[1] = 559;>
+if (`window -exists SVPrefWindow`){ intField -e -v 559 IF_svWindow1;}>
+$global_ShotCamera[2] = 100;>
+if (`window -exists SVPrefWindow`){ intField -e -v 100 IF_svWindow2;}>
+$global_ShotCamera[3] = 50;>
+if (`window -exists SVPrefWindow`){ intField -e -v 50 IF_svWindow3;}>
+->
+[Playblast]>
+global int $global_Playblast[];>
+global string $global_svStrings[];>
+$global_Playblast[0] = 958;>
+if (`window -exists SVPrefWindow`){ intField -e -v 958 IF_svWindow4;}>
+$global_Playblast[1] = 559;>
+if (`window -exists SVPrefWindow`){ intField -e -v 559 IF_svWindow5;}>
+$global_Playblast[2] = 100;>
+if (`window -exists SVPrefWindow`){ intField -e -v 100 IF_svWindow6;}>
+$global_Playblast[3] = 0;>
+if (`window -exists SVPrefWindow`){ intField -e -v 0 IF_svWindow7;}>
+$global_Playblast[4] = 0;>
+if (`window -exists SVPrefWindow`){ intField -e -v 0 IF_svWindow8;}>
+$global_Playblast[5] = 1;>
+if (`window -exists SVPrefWindow`){ checkBox -e -v 1 CB_svSaveBlasts;}>
+$global_svStrings[0] = "s3_250_v";>
+if (`window -exists SVPrefWindow`){ textField -e -text "s3_250_v" TF_svPBName;}>
+$global_svStrings[1] = "N:/STORY_PP09014/RENDER/playblast/chris";>
+if (`window -exists SVPrefWindow`){ textField -e -text "N:/STORY_PP09014/RENDER/playblast/chris" TF_svPBLocation;}>
+$global_svStrings[2] = "C:/Program Files (x86)/QuickTime/QuickTimePlayer.exe";>
+if (`window -exists SVPrefWindow`){ textField -e -text "C:/Program Files (x86)/QuickTime/QuickTimePlayer.exe" TF_svPBPlayer;}>
+$global_Playblast[6] = 1;>
+if (`window -exists SVPrefWindow`){ checkBox -e -v 1 CB_svPBIncSave;}>
+$global_Playblast[7] = 1;>
+if (`window -exists SVPrefWindow`){ checkBox -e -v 1 CB_svPBIncStamp;}>
+$global_Playblast[8] = 0;>
+if (`window -exists SVPrefWindow`){ checkBox -e -v 0 CB_svPBUseSceneName;}>
+$global_Playblast[9] = 1;>
+if (`window -exists SVPrefWindow`){ checkBox -e -v 1 CB_fcheckCheck;}>
+->
+[ControlCamera]>
+global int $global_ControlCamera[];>
+global string $global_svStrings[];>
+$global_ControlCamera[0] = 300;>
+if (`window -exists SVPrefWindow`){ intField -e -v 300 IF_svWindowWzz;}>
+$global_ControlCamera[1] = 30;>
+if (`window -exists SVPrefWindow`){ intField -e -v 30 IF_svWindowWzzbs;}>
+->
+[Playback]>
+global int $global_Playback[];>
+global string $global_svStrings[];>
+$global_Playback[0] = 0;>
+if (`window -exists SVPrefWindow`){ checkBox -e -v 0 CB_svp41;}>
+->
+[Misc]>
+global int $global_Misc[];>
+global string $global_svStrings[];>
+$global_Misc[0] = 0;>
+if (`window -exists SVPrefWindow`){ checkBox -e -v 0 CB_svOrthossFilter;}>
+->

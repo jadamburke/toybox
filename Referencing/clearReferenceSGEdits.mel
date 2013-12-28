@@ -1,0 +1,48 @@
+// clearReferenceSGEdits
+
+global proc clearReferenceSGEdits() {
+
+
+	$sel = `ls -sl`;
+	select -clear;
+	for ($referenceNode in $sel){
+
+
+	int $initialRefLoadState = `file -rfn $referenceNode -q -deferReference`;
+
+	if ($initialRefLoadState == 0){
+		file -unloadReference $referenceNode;
+	}
+
+	string $editCommands[] = `referenceQuery -editStrings $referenceNode`;
+	
+
+	for ($each in $editCommands){
+		//`gmatch $each "*ShadingGroup*"` `gmatch $each "*SG*"`
+		// if it is a SG edit then...
+		if (`gmatch $each "*SG*"`){
+			// parse out strings to get edit destination
+			string $tokenBuffer[];
+			tokenize $each "\"" $tokenBuffer;
+			if (size($tokenBuffer) > 1){
+				string $editCmdTokenBuffer[];
+				tokenize $tokenBuffer[0] " " $editCmdTokenBuffer;
+				string $editCommand = $editCmdTokenBuffer[0];
+				string $destination = $tokenBuffer[1];
+				if ($destination !=""){
+					print ("referenceEdit -failedEdits true -successfulEdits true -editCommand "+$editCommand+" -removeEdits "+$destination+"\n");
+					referenceEdit -failedEdits true -successfulEdits true -editCommand $editCommand -removeEdits $destination;
+				}
+			}
+		
+		}
+	}
+
+	//referenceEdit -failedEdits true -successfulEdits true -editCommand disconnectAttr -removeEdits "SG" $referenceNode;
+
+	//referenceEdit -failedEdits true -successfulEdits true -editCommand disconnectAttr -removeEdits "|plantFiddleHeadFrond10_GOD|plantFiddleHeadFrond10_DIRECTION|plantFiddleHeadFrond10_BODY|plantFiddleHeadFrond10_fern5Ctrl|plantFiddleHeadFrond10_fernSingle1MeshGroup5|plantFiddleHeadFrond10_fernMesh5_static1|plantFiddleHeadFrond10_fernSingle1Leaf8|plantFiddleHeadFrond10_fernSingle1Leaf5Shape8.instObjGroups";
+	if ($initialRefLoadState == 0){	
+		file -loadReference $referenceNode;
+	}
+	}
+}

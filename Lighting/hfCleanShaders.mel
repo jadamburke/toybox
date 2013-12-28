@@ -1,0 +1,94 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: hfCleanShaders
+''    Author:  
+''    Last Updated: Jul 25, 2008
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/rendering/misc/5327.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+// hfCleanShaders.mel v0.2
+//
+// ---usage notes---
+// this script is for merging lots of namespaced shaders in your scene,
+// in case you have many instances of the same object with shaders included.
+// you should import your objects from the instances before running this, otherwise you'll still have
+// all of those old shading networks floating around.
+// select any materials that you want to exclude from this process, then run hfCleanShaders.
+//
+// for this script to work correctly, your shaders should all have unique names (not counting duplicates, of course.)
+//
+// there is a bug caused by node sharing between references that will cause the 
+// MLdeleteUnused function to break your mental ray materials. if you are going to use this function
+// in your scene, make sure that node sharing is off.
+
+
+global proc hfCleanShaders() {
+
+if(`window -exists hfCleanShdProg`) {
+	deleteUI hfCleanShdProg;
+}
+scriptEditorInfo -e -se true;
+string $excludeList[] = `ls -sl`;
+
+string $shaderList[] = `listConnections defaultShaderList1`;
+string $progWindow = `window -widthHeight 250 100 -title "get psyched" hfCleanShdProg`;
+formLayout -numberOfDivisions 100 hfProgForm;
+	text -label "finding duplicates..." hfProgTxt;
+	int $maxValue = size($shaderList);
+	progressBar -max $maxValue -width 220 hfProgBar;
+formLayout -e
+	-attachForm hfProgTxt "top" 10
+	-attachForm hfProgTxt "left" 10
+	-attachForm hfProgBar "top" 40
+	-attachForm hfProgBar "left" 10
+hfProgForm;
+showWindow $progWindow;
+
+for($i=0;$i<size($shaderList);$i++) {
+	progressBar -e -pr $i hfProgBar;
+	string $originalShader = $shaderList[$i];
+	int $excludeFlag = 0;
+	for($m=0;$m<size($excludeList);$m++) {
+		if($originalShader == $excludeList[$m]) {
+			$excludeFlag = 1;
+		}
+	}
+	if($excludeFlag == 0) {
+		string $labelStr = "checking " + $originalShader;
+		text -e -label $labelStr hfProgTxt;
+		string $buffer[];
+		$numTokens = `tokenize $originalShader ":" $buffer`;
+		$origString = $buffer[$numTokens-1];
+		for($k=0;$k<size($shaderList);$k++) {
+			// test all SGs to match against $originalShader
+			string $testShader = $shaderList[$k];
+			string $buffer2[];
+			$num2Tokens = `tokenize $testShader ":" $buffer2`;
+			$testString = $buffer2[$num2Tokens-1];
+			if($origString == $testString) {
+				if(!isSameObject($testShader, $originalShader)) {
+					//print($testShader + " is a duplicate of " + $originalShader + "\n");
+					hyperShade -objects $testShader;
+					string $numSel[] = `ls -sl`;
+					if(size($numSel) > 0) {
+						hyperShade -assign $originalShader;
+					} // end if
+				} // end if isSameObject
+			} // end if origString
+		} // end for $k in $shaderList
+	} // end if $excludeFlag
+} // end for $i in $shaderList
+text -e -label "deleting duplicates..." hfProgTxt;
+clear $shaderList;
+clear $excludeList;
+MLdeleteUnused;
+deleteUI hfCleanShdProg;
+print("Shaders cleaned!");
+scriptEditorInfo -e -se false;
+} // end proc

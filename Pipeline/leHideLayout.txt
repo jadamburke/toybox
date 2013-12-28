@@ -1,0 +1,1 @@
+Prevents Background Image Planes from Rendering

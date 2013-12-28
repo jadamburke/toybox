@@ -1,0 +1,24 @@
+//
+//	geoUpdateShaders.mel
+//
+//	Clay Budin
+//	clay_budin@hotmail.com
+//	PandaPanther
+//	Apr 05 2012
+//
+//	Called when a scene is loaded, searches all models and determines if shaders
+//	 need to be updated, prompts user and performs update.
+//
+
+string gusVersionStr = "0.1b";
+
+
+
+
+
+
+
+
+
+
+

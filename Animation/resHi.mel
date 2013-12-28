@@ -1,0 +1,40 @@
+// resHi
+
+global proc resHi () {
+
+	
+	string $toShowSets[] = `ls -r 1 "*HI"`;
+	string $toHideSets[] = `ls -r 1 "*MD"`;
+	string $toHideAlsoSets[] = `ls -r 1 "*LO"`;
+
+	string $prevSelected[] = `ls -sl`;	
+
+	select $toHideSets;
+	select -add $toHideAlsoSets;
+	$sel = `ls -sl`;
+	for ($each in $sel)
+		setAttr ($each+".visibility") 0;
+
+	//HideSelectedObjects;
+	select $toShowSets;
+	$sel = `ls -sl`;
+	for ($each in $sel)
+		setAttr ($each+".visibility") 1;
+	//ShowSelectedObjects;
+
+	select $prevSelected;
+
+	/*
+	for ($each in $toHide)
+		setAttr($each+".visibility") 0;
+
+	for ($each in $toHideAlso)
+		setAttr($each+".visibility") 0;
+
+	for ($each in $toShow)
+		setAttr ($each+".visibility") 1;
+	
+	*/
+
+
+}

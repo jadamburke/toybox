@@ -1,0 +1,52 @@
+// setWildFlowerStartTime
+global proc setWildFlowerStartTime() {
+
+	// constants
+	float $groundYValue = 0.0;
+	float $frameRate = 24;
+
+	//get selected strokes
+	$selStrokes = `ls -sl`;
+
+	// get frame range
+	$startFrame = `playbackOptions -q -min`;
+	$endFrame = `playbackOptions -q -max`;
+
+	// create triggered array
+	int $isTriggered[];
+	int $index = 0;
+	
+	currentTime -e $startFrame;
+
+	// for each frame in a range
+	for ($i=$startFrame;$i<=$endFrame;$i++){
+		
+		$index = 0;
+
+		// for each selected stroke
+		for ($each in $selStrokes){
+
+			// get strokes first cv coord
+			float $strokeYPoint = `getAttr ($each+".opt[0].oy")`;
+
+			// if coord is above a constant and if it isn't already triggered
+			if ($strokeYPoint > $groundYValue && $isTriggered[$index] != 1){	
+
+				// get strokes connected brush
+				string $connectedBrush[] = `listConnections ($each+".brush")`;
+
+				float $randOffset = rand(-.2,0.1);
+				float $stTime = float($i / $frameRate)+$randOffset;
+
+				// set brush start time to current frame
+				setAttr ($connectedBrush[0]+".startTime") $stTime;
+
+				// mark stroke as triggered
+				$isTriggered[$index] = 1;
+			}
+			$index++;
+		}
+		currentTime -e $i;
+	}
+			
+}

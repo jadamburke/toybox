@@ -1,0 +1,24 @@
+// clusterCurve
+global proc clusterCurve () {
+	$selCurves = `ls -sl`;
+	for ($each in $selCurves) {
+		$shapeNames = `listRelatives -shapes -noIntermediate $each`;
+		int $cvCount = `getAttr ($shapeNames[0]+".spans")`;
+		$cvCount = $cvCount + `getAttr ($shapeNames[0]+".degree")`;
+		int $i = 0;
+		for ($i=0;$i<$cvCount;$i++){
+			select -clear;
+			$newControlCurve = `duplicate indvCurveCtrl`;
+			float $pointPos[] = `pointPosition -w ($each+".cv["+$i+"]")`;
+			move -a -ws $pointPos[0] $pointPos[1] $pointPos[2] $newControlCurve ;
+			makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $newControlCurve;
+			select ($each+".cv["+$i+"]");
+			cluster -wn $newControlCurve $newControlCurve;
+		}
+		setAttr ($each+".inheritsTransform") 0;
+
+	}
+
+	select $selCurves;
+
+}

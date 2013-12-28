@@ -1,0 +1,17 @@
+// printPose
+// Created by: adam
+// Date: 2012/07/26 13:53:50
+
+//prints the necessary setAttr commands to run on other objects
+
+global proc printPose(){
+
+	$sel = `ls -sl`;
+	for ($each in $sel){
+		$animAttr = `listAttr -keyable $each`;
+		for ($every in $animAttr){
+			$val = `getAttr ($each+"."+$every)`;
+			print ("setAttr "+$each+"."+$every+" "+$val+";\n");
+		}
+	}
+}

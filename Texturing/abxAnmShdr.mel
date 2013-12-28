@@ -1,0 +1,69 @@
+// abxAnmShdr
+// Created by: adam
+// Date: 2012/04/04 12:55:00
+
+// select a 2d texture node and a shader and it will apply a plug connection and then set the hardwareshader attribute to the plug so that it shows that in openGL
+global proc abxAnmShdr(){
+
+
+
+
+addAttr -ln "anmShdr"  -at double3  eyeRig_03:eye_inner_mtl;
+addAttr -ln "anmShdrX"  -at double -p anmShdr  eyeRig_03:eye_inner_mtl;
+addAttr -ln "anmShdrY"  -at double -p anmShdr  eyeRig_03:eye_inner_mtl;
+addAttr -ln "anmShdrZ"  -at double -p anmShdr  eyeRig_03:eye_inner_mtl;
+setAttr -type double3 eyeRig_03:eye_inner_mtl.anmShdr 0 0 0;
+setAttr -e-keyable true eyeRig_03:eye_inner_mtl.anmShdr;
+setAttr -e-keyable true eyeRig_03:eye_inner_mtl.anmShdrX;
+setAttr -e-keyable true eyeRig_03:eye_inner_mtl.anmShdrY;
+setAttr -e-keyable true eyeRig_03:eye_inner_mtl.anmShdrZ;
+
+connectAttr -f eyeRig_03:eye_inner_sclera_sss_ramp.outColor eyeRig_03:eye_inner_mtl.anmShdr;
+}
+
+
+global proc abxAnmShdrTextureWindowSelectImage(int $i, string $whichPanel)
+{
+	string $menuNames[] = `textureWindow -q -imageNames $whichPanel`;
+	
+	if (size($menuNames) == 0) return;
+
+	string $buffer[];
+	tokenize $menuNames[$i] " " $buffer;
+	if (size($buffer) == 0) return;
+
+	// gets the shader name to apply to
+	string $thisShader = $buffer[2];
+	//string $thisObject = $buffer[0];
+	if ($thisShader == "") return;
+
+	// list incoming connections to shader with plugs
+	string $objGroups[] = `listConnections -p on ($thisShader+".dsm")`; 
+	// list incoming connections to shader without plugs with shapes
+	string $shapes[] = `listConnections -sh on ($thisShader+".dsm")`;
+	//string $objects[] = `listConnections ($thisShader+".dsm")`;
+
+	int $j;
+	for ($j=0; $j<size($shapes); $j++) {
+		string $objGroup = $objGroups[$j];
+		int $gid = -99;
+		if (`objExists ($objGroup+".gid")`) {
+			if( catchQuiet( "$gid = `getAttr ($objGroup+\".gid\")`"))
+			{
+				int $gids[] = `getAttr ($objGroup+".gid")`;
+				if( size( $gids) > 0)
+					$gid = $gids[0];
+			}
+		} else {
+			//$gid = `getAttr ($objGroup+".cgid")`;
+			continue;
+		}
+		if (`nodeType $shapes[$j]` != "mesh") {
+			continue;
+		}
+		if( $gid != -99)
+			setAttr ($shapes[$j]+".dfgi") $gid;
+	}
+	
+	//textureWindow -e -imageNumber $i $whichPanel;
+}

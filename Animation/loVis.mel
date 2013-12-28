@@ -1,0 +1,12 @@
+// loVis
+global proc loVis() {
+	string $selected2[] = `ls -sl`;
+	string $tokenBuffer[];
+	$numTokens = `tokenize $selected2[0] "_" $tokenBuffer`;
+	select ($tokenBuffer[0]+"_HIRES");
+	select -add ($tokenBuffer[0]+"_MEDRES");
+	hide `ls -sl`;
+	select ($tokenBuffer[0]+"_LORES");
+	showHidden `ls -sl`;
+
+}

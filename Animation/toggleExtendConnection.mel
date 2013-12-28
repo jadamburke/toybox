@@ -1,0 +1,12 @@
+// toggleExtendConnection.mel  
+global proc toggleExtendConnections () {
+	int $status = `outlinerEditor -q -xc graphEditor1OutlineEd`;
+	if ($status == 1){
+		outlinerEditor -edit -xc 0 graphEditor1OutlineEd;
+		//animCurveEditor -edit -displayTangents false -displayActiveKeyTangents false graphEditor1GraphEd;
+	}
+	else{
+		outlinerEditor -edit -xc 1 graphEditor1OutlineEd;
+	}
+
+}

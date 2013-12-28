@@ -1,0 +1,52 @@
+ // create a basic mover
+  global proc string smCreateBasicMover ()
+   {
+
+   circle -n TEMPCIRCLE -c 0 0 0 -nr 0 1 0 -sw 360 -r 4 -d 3 -ut 0 -tol 0.01 -s 8 -ch 0;
+
+        curve -n tmpCRV -d 1 -p -4 0.540376 0 -p -4 -0.540376 0 -k 0 -k 1 ;
+              pickWalk -d down;
+              select -add TEMPCIRCLE ;
+              parent -r -shape;
+              select -cl;
+              delete tmpCRV;
+        curve -n tmpCRV -d 1 -p 0 0.540376 4 -p 0 -0.540376 4 -k 0 -k 1 ;
+              pickWalk -d down;
+              select -add TEMPCIRCLE ;
+              parent -r -shape;
+              select -cl;
+              delete tmpCRV;
+        curve -n tmpCRV -d 1 -p 4 0.540376 0 -p 4 -0.540376 0 -k 0 -k 1 ;
+              pickWalk -d down;
+              select -add TEMPCIRCLE ;
+              parent -r -shape;
+              select -cl;
+              delete tmpCRV;
+        curve -n tmpCRV -d 1 -p 0 0.540376 -4 -p 0 -0.540376 -4 -k 0 -k 1 ;
+              pickWalk -d down;
+              select -add TEMPCIRCLE ;
+              parent -r -shape;
+              select -cl;
+              delete tmpCRV;
+        curve -n tmpCRV -d 1 -p 0 0.451539 0 -p 0 -0.451539 0 -k 0 -k 1 ;
+              pickWalk -d down;
+              select -add TEMPCIRCLE ;
+              parent -r -shape;
+              select -cl;
+              delete tmpCRV;
+        curve -n tmpCRV -d 1 -p 0.451539 0 0 -p -0.451539 0 0 -k 0 -k 1 ;
+              pickWalk -d down;
+              select -add TEMPCIRCLE ;
+              parent -r -shape;
+              select -cl;
+              delete tmpCRV;
+        curve -n tmpCRV  -d 1 -p 0 0 0.451539 -p 0 0 -0.451539 -k 0 -k 1 ;
+              pickWalk -d down;
+              select -add TEMPCIRCLE ;
+              parent -r -shape;
+              delete tmpCRV;
+              select -cl;
+        string $newName = `rename TEMPCIRCLE basicMover`;
+        
+        return $newName;
+   }

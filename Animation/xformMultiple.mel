@@ -1,0 +1,20 @@
+// xformMultiple
+global proc xformMultiple () {
+	
+	
+
+
+}
+
+global proc xformMultipleDoIt(string $pivotObj, float $xformMatrix[], string $objects[] ) {
+
+	
+	for ($each in $objects){
+		$objPivot = `xform -q -a -piv $each`;
+		$newPivPos = `pointMatrixMult $objPivot $xformMatrix`
+		xform -a 
+
+	}
+	
+
+}

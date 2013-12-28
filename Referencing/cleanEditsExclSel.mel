@@ -1,0 +1,69 @@
+// cleanEditsExclSel
+
+global proc cleanEditsExclSel () {
+		
+
+	string $selectedNodes[] = `ls -sl`;
+	string $referenceNodes[] = `getSelectedObjRefNode`;
+	string $allValidEdits[];
+	
+	for ($each in $selectedNodes){
+		
+		// gets a list of edits on the selected object
+		string $editCommands[] = `referenceQuery -failedEdits true -successfulEdits true -editStrings $each`;
+		
+		// adds those edits to the allValidEdits array
+		appendStringArray($allValidEdits,$editCommands,size($editCommands));
+		
+	}
+
+	for ($each in $referenceNodes){
+
+		// get the inital reference state so that it can be restored when finished
+		int $initialRefLoadState = `file -rfn $each -q -deferReference`;
+
+		// unload reference if it is loaded
+		if ($initialRefLoadState == 0){
+			file -unloadReference $each;
+		}
+				
+		// clear the reference of all edits
+		file -cleanReference $each;	
+
+		// load the cleaned reference
+		file -loadReference $each;
+
+		// reapply the valid edits
+		for ($every in $allValidEdits){
+			if (catch(eval($every))){
+				//warning("Failed Command:"+$every+"\;");
+			}
+			else{
+				print($every+"\;\n");
+			}
+		}
+
+	}
+
+}
+
+
+
+
+global proc string[] getSelectedObjRefNode() {
+
+
+	string $referenceList[];
+
+	string $sel[] = `ls -l -sl`;
+	for ($each in $sel){
+
+		$referenceNode = `referenceQuery -rfn $each`;
+		// if ref node is not in mail list array already
+		if (stringArrayContains($referenceNode, $referenceList) == 0)
+			// add reference node to main list array
+			$referenceList[size($referenceList)] = $referenceNode;
+	}
+	return $referenceList;
+
+}

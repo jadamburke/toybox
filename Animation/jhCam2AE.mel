@@ -1,0 +1,47 @@
+global proc jhCam2AE(){
+     //Query Camera Selection
+     string $selection[] = `ls -sl`;
+     string $cameraT = $selection[0];
+
+     //Query Camera Shape
+     pickWalk -d down;     
+     string $selection[] = `ls -sl`;
+     string $cameraShape = $selection[0];
+
+     //Define AfterFX clipboard string
+     string $aeStartKeyData = "Adobe After Effects 6.5 Keyframe Data\n\n\tUnits Per Second\t24\n\tSource Width\t720\n\tSource Height\t405\n\tSource Pixel Aspect Ratio\t1\n\tComp Pixel Aspect Ratio\t1\nZoom\n\tFrame\tpixels";
+     string $aeKeyData = "";
+     string $aeEndKeyData = "\n\nEnd of Keyframe Data";
+     
+     //Query frame range for output
+     int $minFrame = `playbackOptions -q -min`;
+     int $maxFrame = `playbackOptions -q -max`;
+     
+     //Per frame loop for gathering information
+     int $i;
+     for($i = $minFrame; $i<=$maxFrame; $i++){
+     
+          currentTime -e $i;
+          
+          //Calculate Pixel Zoom
+          float $resWidth = (`getAttr defaultResolution.width`)/2;
+          float $angView = (`camera -q -hfv $cameraShape`)/2;
+          float $zoom = ($resWidth/tand($angView));
+          
+          //Add current frame's value
+          $aeKeyData = ($aeKeyData+"\n\t"+$i+"\t"+$zoom);
+     
+     }
+     
+     //Build final AfterFX clipboard string
+     string $output = ("\n\n"+$aeStartKeyData+$aeKeyData+$aeEndKeyData+"\n\n");
+     //Print a string to copy from the Maya interface
+     print("\n\n\n\nSTART COPY HERE"+$output+"END COPY HERE\n\n\n");
+
+     //Write a text file from the given string
+ 	string $fileName = (`file -q -sn`);
+     string $fileName = `substitute ".ma" $fileName ".txt"`;
+ 	int $fileId = `fopen $fileName "w"`;
+ 	fwrite $fileId $output;
+ 	fclose $fileId;
+}

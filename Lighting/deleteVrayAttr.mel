@@ -1,0 +1,19 @@
+// deleteVrayAttr.mel
+// Created by: raphe
+// Date: 2012/05/11 14:20:08
+
+global proc deleteVrayAttr(){
+	string $attr;
+	string $surface;
+	string $ud[] = `listAttr -ud`;
+	string $surfaces[] = `ls -sl`;
+	for($attr in $ud){
+		if(`gmatch $attr "*vray*"`){
+			for ($surface in $surfaces){
+				if(attributeExists($attr, $surface)){
+					vrayDeleteAttr $surface $attr;
+				}
+			}
+		}
+	}
+}

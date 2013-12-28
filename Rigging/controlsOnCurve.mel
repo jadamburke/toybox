@@ -1,0 +1,47 @@
+global proc controlsOnCurve(){
+    $sel = `ls -sl`;
+    int $index = 0;
+    $nearestPOC = `createNode nearestPointOnCurve`;
+    string $curveObj = $sel[0];
+    string $curveShapes[] = `listRelatives -s $curveObj`;
+    string $newObjects[];
+    
+    
+    
+    if (`objectType $curveShapes[0]` ==  "nurbsCurve"){
+    connectAttr ($curveShapes[0]+".worldSpace") ($nearestPOC+".inputCurve") ;
+    	for ($i=1;$i<size($sel);$i++){
+        //for ($each in $sel){
+        	$each = $sel[$i];
+		$objPos = `xform -ws -a -q -piv $each`;
+		$index++;
+
+		// constrain the object to the new curve point
+		$newPOSNode = `createNode -ss -name ($each+"_POC") pointOnCurveInfo`;
+		connectAttr ($curveShapes[0]+".worldSpace") ($newPOSNode+".inputCurve") ;
+		
+		setAttr ($nearestPOC+".ipx") $objPos[0];
+		setAttr ($nearestPOC+".ipy") $objPos[1];
+		setAttr ($nearestPOC+".ipz") $objPos[2];
+		$nearestParam = `getAttr ($nearestPOC+".pr")`;
+		setAttr ($newPOSNode+".pr") $nearestParam ;// ((1.0/24.0)*$index);
+		
+		$newLoc = `createNode -ss -n ($each+"_offsetXform") transform`;
+		$newObjects[size($newObjects)] = $newLoc;
+		connectAttr ($newPOSNode+".px") ($newLoc+".tx");
+		connectAttr ($newPOSNode+".py") ($newLoc+".ty");
+		connectAttr ($newPOSNode+".pz") ($newLoc+".tz");
+		
+		pointConstraint $newLoc $each;
+		}
+		delete $nearestPOC;
+		
+	}
+	else {
+		error ("Please select a nurbsCurve first. Then the objects you want to constrain");
+		return;
+	}
+	string $offsetGroup = ($curveObj+"_offsetXform_GRP"); 
+	group -n $offsetGroup $newObjects;
+	
+}

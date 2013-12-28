@@ -1,0 +1,21 @@
+// printJointXform
+// Created by: adam
+// Date: 2012/02/15 13:49:53
+
+global proc printJointXform(){
+
+
+string $sel[] = `ls -sl -type joint`;
+for ($each in $sel){
+    float $tran[] = `getAttr ($each+".translate")`;
+    float $rot[] = `getAttr ($each+".rotate")`;
+    float $scale[] = `getAttr ($each+".scale")`;
+    float $jorient[] = `getAttr ($each+".jointOrient")`;
+    
+    print ("setAttr "+$each+".translate "+$tran[0]+" "+$tran[1]+" "+$tran[2]+";\n");
+    //print ("setAttr "+$each+".rotate "+$rot[0]+" "+$rot[1]+" "+$rot[2]+";\n");
+    //print ("setAttr "+$each+".scale "+$scale[0]+" "+$scale[1]+" "+$scale[2]+";\n");
+    print ("setAttr "+$each+".jointOrient "+$jorient[0]+" "+$jorient[1]+" "+$jorient[2]+";\n");
+    
+}
+}

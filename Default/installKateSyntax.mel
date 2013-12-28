@@ -1,0 +1,17 @@
+// installKateSyntax
+global proc installKateSyntax () {
+
+	// if the system is linux
+	if (`about -os` == "linux" || `about -os` == "linux64"){
+		// get user home folder location
+		$homeFolder = `getenv HOME`;
+		$kateSyntaxFile = ($homeFolder+"/.kde/share/apps/katepart/syntax/");
+		
+		// make the directory
+		sysFile -makeDir $kateSyntaxFile;
+		
+		// copy the file 
+		evalEcho ("sysFile -copy \""+$kateSyntaxFile+"mel.xml\" \"/Volumes/logan_homes/logan/maya/Toybox/Default/kateSyntax/mel.xml\"");
+	}
+	
+}

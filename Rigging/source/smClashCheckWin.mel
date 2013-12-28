@@ -1,0 +1,24 @@
+// finding a bunch of probs with clashes, keeps other checks from running
+// this is a band-aid till i can update those scripts
+global proc smClashCheckWin ()
+{
+// run the clasher to check for clashing names of transforms
+if (`clasherNum` >=1)
+	{
+	if (`confirmDialog -title "Confirm" -message ("you have clashes in this scene, are you going to fix them?")
+  		-button "Yes"	-button "No"
+		-defaultButton "Yes" -cancelButton "No"
+		-dismissString "No"` == "Yes")
+			error "mastering cancelled so you can fix the names";
+	else
+	       {
+                if (`window -q -exists geoMasterClasherError` == 1){deleteUI geoMasterClasherError;}
+		string $window = `window -bgc 1 1 1 -w 250 -h 325 -title "error" geoMasterClasherError`;
+		columnLayout -bgc 1 1 1
+                        -columnWidth 250 -co "both" 10 -cal "center";
+	        text -bgc 1 1 1 -w 225 -fn "boldLabelFont" -label "dude, you have to fix the clashes!";
+	        showWindow $window;
+	         	error "mastering cancelled so you can fix the names";
+	       }
+	}
+}

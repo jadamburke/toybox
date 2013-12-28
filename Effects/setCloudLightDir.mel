@@ -1,0 +1,60 @@
+// setCloudLightDir.mel
+// Created by: raphe
+// Date: 2013/04/11 17:53:57
+// Purpose: So Naomi can quickly match all the light directions for clouds
+
+global proc setCloudLightDir(){
+
+	string $object[] = `ls -type "fluidShape"`;
+	
+	string $lgtDirA[] = `ls -sl`;
+	string $lgtDirB = $lgtDirA[0];
+
+	string $current;
+
+	for ($current in $object){
+	    select -r $current;
+	    pickWalk -d up;
+	    $bla = `ls -sl`;
+	    $current = $bla[0];
+
+	    // light dir
+		$dirRotX = `getAttr ($lgtDirB + ".rotateX")`;
+		$dirRotY = `getAttr ($lgtDirB + ".rotateY")`;
+		$dirRotZ = `getAttr ($lgtDirB + ".rotateZ")`;
+
+		// fluid container rotation
+	    $curRotX = `getAttr ($current + ".rotateX")`;
+	    $curRotY = `getAttr ($current + ".rotateY")`;
+	    $curRotZ = `getAttr ($current + ".rotateZ")`;
+
+	    $newRotX = 1;
+	    $newRotY = 1;
+		$newRotZ = 1;
+
+
+	    $newRotX = $dirRotX - $curRotX;
+		$newRotY = $dirRotY - $curRotY;
+	    $newRotZ = $dirRotZ - $curRotZ;
+
+	    // setting sphere to combination
+	    setAttr ($lgtDirB + ".rotateX") $newRotX;
+	    setAttr ($lgtDirB + ".rotateY") $newRotY;
+	    setAttr ($lgtDirB + ".rotateZ") $newRotZ;
+
+		float $TM[] = `xform -q -ws -matrix $lgtDirB`;
+		float $zVec[] = {$TM[8], $TM[9], $TM[10]};
+		float $zVecInverse[] = {-$zVec[0], -$zVec[1], -$zVec[2]};
+
+		setAttr ($current + ".directionalLightX") $zVecInverse[0] (!`getAttr ($current + ".directionalLightX")`);
+		setAttr ($current + ".directionalLightY") $zVecInverse[1] (!`getAttr ($current + ".directionalLightY")`);
+		setAttr ($current + ".directionalLightZ") $zVecInverse[2] (!`getAttr ($current + ".directionalLightZ")`);
+
+		setAttr ($lgtDirB + ".rotateX") $dirRotX;
+	    setAttr ($lgtDirB + ".rotateY") $dirRotY;
+	    setAttr ($lgtDirB + ".rotateZ") $dirRotZ;
+	}
+
+	select $lgtDirB;
+
+}

@@ -1,0 +1,568 @@
+//###### Snow Maker v1.0 for Maya 5 ########
+// Copyright (C) 2003 Stephen DeLuca
+// www.stevedeluca.com
+// steve@stevedeluca.com
+//
+// Creation Date:	( Nov/Dec 2003)
+// Last Update:		( )
+//
+// Description:
+// This script generates different types of snow storms using particles that you can then modify
+// You can create only one snow plane, not multiple ones, later versions may allow multiple generators
+//
+// Installation: 
+// - Copy snowMaker.mel and snowMakerSetup.mel into your Maya script directory
+// - Copy snowMaker.bmp into the Maya icon folder
+// - Copy the snow flake image sequence to any directory you choose, most likely in your 'sourceimages' folder for your current project
+// - In Maya type in the command line: snowMakerSetup
+//   This only needs to be done once then you can create snow in any project and continue to modify it with this button
+// - Once snow is created, click the `Image Source Location` button and select the first image in the sequence from your source directory
+//
+// Known Bugs: 
+// - When selecting image sequence for snow if the sequence is < or > 8 images 
+//   you have to manually change the frame extensions in the texture file
+// - Not so much a bug, but there is currently a problem w/ the color of the sprite particles
+//   The script compensates for this by making their default color white. You can change it with sliders or
+//   comment out everything in this script with: //SPRITE COLORING after the line of code. This will be fixed!
+//
+// Thank You:
+// Jeff Bernstein, Melscripting.com, and everyone in online forums that helped me out!
+// 
+
+
+
+///////////////////////////////////////////////
+
+global proc snowCheck()
+{
+	global string $snowShape[];
+	if (`particleExists $snowShape[0]` == 1)
+	{
+		getSnowAttr();
+	}
+	else if (`particleExists $snowShape[0]` == 0)
+	{
+		snow();
+	}
+}
+
+global proc string[] getSnowAttr()
+{
+	string $fileS;
+	string $snowShape[];
+	global string $snowEmit[];
+	string $snowPlane[];
+	getAttr ($snowEmit[0] + ".rate");
+	getAttr ($snowShape[0] + ".minLife");
+	getAttr ($snowShape[0] + ".maxLife");
+	getAttr ($snowShape[0] + ".visibility");
+	getAttr ($snowPlane[0] + ".visibility");
+	getAttr ($snowShape[0] + ".minOp");
+	getAttr ($snowShape[0] + ".maxOp");
+	getAttr ($snowShape[0] + ".minScale");
+	getAttr ($snowShape[0] + ".maxScale");
+	getAttr ($snowShape[0] + ".snowR"); //SPRITE COLORING
+	getAttr ($snowShape[0] + ".snowG"); //SPRITE COLORING
+	getAttr ($snowShape[0] + ".snowB"); //SPRITE COLORING
+	//getAttr ($fileS + ".colorOffset");
+
+return { $snowShape[0], $snowPlane[0], $snowEmit[0] };
+}
+
+global proc string[] snow()
+{
+	global string $snowEmit[];
+	global string $snowPlane[];
+	global string $snowShape[];
+	global string $snow[];
+	string $snowPlane[] = `nurbsPlane -name snowEmitter -ax 0 1 0 -u 5 -v 5`;
+	setAttr ($snowPlane[0] + ".scaleX") 100;
+	setAttr ($snowPlane[0] + ".scaleY") 100;
+	setAttr ($snowPlane[0] + ".scaleZ") 100;
+	setAttr ($snowPlane[0] + ".translateY") 30;
+	setAttr ($snowPlane[0] + ".rotateZ") -180;
+		
+	select -r $snowPlane[0] ;
+	string $snowEmitter[] = `emitter -type surface -r 100 -sro 0 -nuv 0 -cye none -cyi 1 -spd 0 -srn 0 -nsp 1 -tsp 0 -mxd 0 -mnd 0 -dx 1 -dy 0 -dz 0 -sp 0` ;
+	string $snowEmit[] = `listRelatives -type pointEmitter $snowEmitter[0]`;
+
+
+	string $snow[] = `particle -n snowParticles1`;
+	string $snowShape[]  = `listRelatives -s $snow[0]`;
+	
+	connectDynamic -em $snowEmit[0] $snow[0] ;
+	setAttr ($snowShape[0] + ".particleRenderType") 5;
+	setAttr ($snowShape[0] + ".depthSort") 1;
+	setAttr ($snowShape[0] + ".lifespanMode") 3;
+
+//##ADDING SHADER##
+	string $lambertS = `shadingNode -asShader lambert`;
+	sets -renderable true -noSurfaceShader true -empty -name lambert2SG;  
+	connectAttr -f ($lambertS + ".outColor") lambert2SG.surfaceShader;
+	select -r $snowShape[0];
+	sets -e -forceElement lambert2SG $snowShape[0];			
+	string $fileS = `shadingNode -asTexture file`;
+	connectAttr -f ($fileS + ".outColor") ($lambertS + ".color");
+
+//##SETTING FRAME EXTENSTIONS## 
+	setAttr ($fileS + ".useFrameExtension") 1;
+	currentTime -e 1;
+	setKeyframe ($fileS + ".frameExtension");
+	currentTime -e 8;
+	setAttr ($fileS + ".frameExtension") 8;
+	setKeyframe ($fileS + ".frameExtension");
+	setAttr ($fileS + ".useHardwareTextureCycling") 1;
+	setAttr ($fileS + ".startCycleExtension") 1;
+	setAttr ($fileS + ".endCycleExtension") 8;
+	
+	//changes variable file name so texture can be assigned, hopefully user doesn't rename the file texture
+	rename $fileS "snowFile";	
+
+//##ADDING PP ATTRIBUTES##
+	select -r $snowShape[0] ;
+	addAttr -ln "rgbPP" -dt vectorArray $snowShape[0]; //SPRITE COLORING
+	addAttr -ln "rbgPPO" -dt vectorArray $snowShape[0]; //SPRITE COLORING
+	addAttr -ln spriteTwistPP -dt doubleArray $snowShape[0];
+	addAttr -ln spriteTwistPP0 -dt doubleArray $snowShape[0];
+	addAttr -ln spriteNumPP -dt doubleArray $snowShape[0];
+	addAttr -ln spriteNumPP0 -dt doubleArray $snowShape[0];
+	addAttr -ln "opacityPP" -dt doubleArray $snowShape[0];
+	addAttr -ln "opacityPP0" -dt doubleArray $snowShape[0];
+	addAttr -ln spriteScaleXPP -dt doubleArray $snowShape[0];
+	addAttr -ln spriteScaleXPP0 -dt doubleArray $snowShape[0];
+	addAttr -ln spriteScaleYPP -dt doubleArray $snowShape[0];
+	addAttr -ln spriteScaleYPP0 -dt doubleArray $snowShape[0];
+	addAttr -ln randTwist -dt doubleArray  $snowShape[0];
+	setAttr -e -keyable true ($snowShape[0] + ".randTwist");
+	
+//##ADDING CUSTOM ATTRIBUTES##
+	
+	//Keyable is commented out so user can not animate values
+	
+	addAttr -ln snowR -at double  -min 0 -max 1 -dv 1 $snowShape[0]; //SPRITE COLORING
+	//setAttr -e -keyable true ($snowShape[0] + ".snowR");  		 	 //SPRITE COLORING
+	addAttr -ln snowG -at double  -min 0 -max 1 -dv 1 $snowShape[0]; //SPRITE COLORING
+	//setAttr -e -keyable true ($snowShape[0] + ".snowG");		 	 //SPRITE COLORING
+	addAttr -ln snowB -at double  -min 0 -max 1 -dv 1 $snowShape[0]; //SPRITE COLORING
+	//setAttr -e -keyable true ($snowShape[0] + ".snowB");		 	 //SPRITE COLORING
+
+	addAttr -ln minOp -at double  -min 0 -max 1 -dv .3 $snowShape[0];
+	//setAttr -e -keyable true ($snowShape[0] + ".minOp");
+	addAttr -ln maxOp -at double  -min 0 -max 1 -dv .7 $snowShape[0];
+	//setAttr -e -keyable true ($snowShape[0] + ".maxOp");
+	
+	addAttr -ln maxScale -at double  -min 0 -max 1 -dv .6 $snowShape[0];
+	//setAttr -e -keyable true ($snowShape[0] + ".maxScale");
+	addAttr -ln minScale -at double  -min 0 -max 1 -dv .3 $snowShape[0];
+	//setAttr -e -keyable true ($snowShape[0] + ".minScale");
+	
+	addAttr -ln minLife -at double  -min 0 -max 100 -dv 10 $snowShape[0];
+	//setAttr -e -keyable true ($snowShape[0] + ".minLife");
+	addAttr -ln maxLife -at double  -min 0 -max 100 -dv 20 $snowShape[0];
+	//setAttr -e -keyable true ($snowShape[0] + ".maxLife");
+	
+	addAttr -ln snowAY -at double  -min -20 -max 0 -dv -9.8 $snowShape[0];
+	setAttr -e -keyable true ($snowShape[0] + ".snowAY");
+	addAttr -ln snowAX -at double  -min -20 -max 20 -dv 0 $snowShape[0];
+	setAttr -e -keyable true ($snowShape[0] + ".snowAX");
+	addAttr -ln snowAZ -at double  -min -20 -max 20 -dv 0 $snowShape[0];
+	setAttr -e -keyable true ($snowShape[0] + ".snowAZ");
+	
+	addAttr -ln freqDrift -at double  -min -10 -max 0 -dv -2 $snowShape[0];
+	setAttr -e -keyable true ($snowShape[0] + ".freqDrift");
+	addAttr -ln ampDrift -at double  -min -10 -max 0 -dv -2 $snowShape[0];
+	setAttr -e -keyable true ($snowShape[0] + ".ampDrift");
+
+//##CREATING EXPRESSIONS##
+	string $expressionC;
+	string $expressionR;
+	
+	$expressionR = $snowShape[0] + ".spriteTwistPP += "+ $snowShape[0] + ".randTwist;\n";	
+	
+	$expressionR += $snowShape[0] + ".velocity = velocity + rand(sin(frame*("+ $snowShape[0] + ".freqDrift)*("+ $snowShape[0] + ".ampDrift)));\n";;
+	$expressionR += $snowShape[0] + ".acceleration = <<("+ $snowShape[0] + ".snowAX),("+ $snowShape[0] + ".snowAY),("+ $snowShape[0] + ".snowAZ)>>;\n";
+	
+	dynExpression -s $expressionR -r $snowShape[0];
+
+	$expressionC = $snowShape[0] + ".spriteNumPP = rand(1,9);\n";
+	$expressionC += $snowShape[0] + ".opacityPP = rand("+ $snowShape[0] + ".minOp, "+ $snowShape[0] + ".maxOp);\n";
+	$expressionC += "float $randScale = rand("+ $snowShape[0] + ".minScale, "+ $snowShape[0] + ".maxScale);\n";
+	$expressionC += $snowShape[0] + ".spriteScaleYPP = $randScale;\n";
+	$expressionC += $snowShape[0] + ".spriteScaleXPP = $randScale;\n";
+	$expressionC += $snowShape[0] + ".spriteTwistPP = rand(360);\n";
+	$expressionC += $snowShape[0] + ".randTwist = rand(-2,2);\n";
+	$expressionC += $snowShape[0] + ".lifespanPP = rand("+ $snowShape[0] + ".minLife, "+ $snowShape[0] + ".maxLife);\n";
+	$expressionC += $snowShape[0] + ".rgbPP = <<("+ $snowShape[0] + ".snowR),("+ $snowShape[0] + ".snowG),("+ $snowShape[0] + ".snowB)>>;\n"; //SPRITE COLORING
+
+	dynExpression -s $expressionC -c $snowShape[0];
+	
+return { $snowShape[0], $snowPlane[0], $snowEmit[0] };
+	
+}
+
+
+////////////////OPTION MENU//////////////////////////////////////////////
+global proc presetSnow()
+{
+	global string $snowEmit[];
+	string $geometry[] = `getSnowAttr`;
+	string $getV = `optionMenu -q -v snowType`;
+	switch($getV)
+	{
+        	case "Default":
+			setAttr ($snowEmit[0] + ".rate") 100;
+			setAttr ($geometry[0] + ".minLife") 5;
+			setAttr ($geometry[0] + ".maxLife") 10;
+			setAttr ($geometry[0] + ".minScale") .4;
+			setAttr ($geometry[0] + ".maxScale") .7;
+			setAttr ($geometry[0] + ".minOp") .3;
+			setAttr ($geometry[0] + ".maxOp") .6;
+			setAttr ($geometry[0] + ".snowAY") -9.8;
+			setAttr ($geometry[0] + ".snowAX") 0;
+			setAttr ($geometry[0] + ".snowAZ") 0;
+			setAttr ($geometry[0] + ".freqDrift") -2;
+			setAttr ($geometry[0] + ".ampDrift") -2;
+			setAttr ($geometry[0] + ".snowR") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowG") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowB") 1; //SPRITE COLORING
+			textField -edit -text "Basic Flakes" StatusLine;
+                	break;
+        	case "Flurries":
+			setAttr ($snowEmit[0] + ".rate") 30;
+			setAttr ($geometry[0] + ".minLife") 5;
+			setAttr ($geometry[0] + ".maxLife") 10;
+			setAttr ($geometry[0] + ".minScale") .1;
+			setAttr ($geometry[0] + ".maxScale") .3;
+			setAttr ($geometry[0] + ".minOp") .1;
+			setAttr ($geometry[0] + ".maxOp") .4;
+			setAttr ($geometry[0] + ".snowAY") -5;
+			setAttr ($geometry[0] + ".snowAX") 0;
+			setAttr ($geometry[0] + ".snowAZ") 0;
+			setAttr ($geometry[0] + ".freqDrift") -6;
+			setAttr ($geometry[0] + ".ampDrift") -5;
+			setAttr ($geometry[0] + ".snowR") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowG") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowB") 1; //SPRITE COLORING
+			textField -edit -text "Woo Hoo Flurries!" StatusLine;
+                	break;
+         	case "White Christmas":
+                 	setAttr ($snowEmit[0] + ".rate") 100;
+			setAttr ($geometry[0] + ".minLife") 5;
+			setAttr ($geometry[0] + ".maxLife") 10;
+			setAttr ($geometry[0] + ".minScale") .1;
+			setAttr ($geometry[0] + ".maxScale") .4;
+			setAttr ($geometry[0] + ".minOp") .2;
+			setAttr ($geometry[0] + ".maxOp") .4;
+			setAttr ($geometry[0] + ".snowAY") -6;
+			setAttr ($geometry[0] + ".snowAX") 0;
+			setAttr ($geometry[0] + ".snowAZ") 0;
+			setAttr ($geometry[0] + ".freqDrift") -4;
+			setAttr ($geometry[0] + ".ampDrift") -2;
+			setAttr ($geometry[0] + ".snowR") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowG") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowB") 1; //SPRITE COLORING
+			textField -edit -text "It's SO Beautiful!" StatusLine;
+	               	break;
+		case "Blizzard":
+	       	setAttr ($snowEmit[0] + ".rate") 500;
+			setAttr ($geometry[0] + ".minLife") 5;
+			setAttr ($geometry[0] + ".maxLife") 10;
+			setAttr ($geometry[0] + ".minScale") .1;
+			setAttr ($geometry[0] + ".maxScale") .4;
+			setAttr ($geometry[0] + ".minOp") .3;
+			setAttr ($geometry[0] + ".maxOp") .8;
+			setAttr ($geometry[0] + ".snowAY") -9.8;
+			setAttr ($geometry[0] + ".snowAX") -3.0;
+			setAttr ($geometry[0] + ".snowAZ") -1.0;
+			setAttr ($geometry[0] + ".freqDrift") -8;
+			setAttr ($geometry[0] + ".ampDrift") -7;
+			setAttr ($geometry[0] + ".snowR") 1; //SPRITE COLORING 
+			setAttr ($geometry[0] + ".snowG") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowB") 1; //SPRITE COLORING
+			textField -edit -text "Now we're talking" StatusLine;
+        	        break;
+		case "ICE AGE":
+	       	setAttr ($snowEmit[0] + ".rate") 1000;
+			setAttr ($geometry[0] + ".minLife") 3;
+			setAttr ($geometry[0] + ".maxLife") 6;
+			setAttr ($geometry[0] + ".minScale") .2;
+			setAttr ($geometry[0] + ".maxScale") .4;
+			setAttr ($geometry[0] + ".minOp") .4;
+			setAttr ($geometry[0] + ".maxOp") .9;
+			setAttr ($geometry[0] + ".snowAY") -10.5;
+			setAttr ($geometry[0] + ".snowAX") 4;
+			setAttr ($geometry[0] + ".snowAZ") -2;
+			setAttr ($geometry[0] + ".freqDrift") -8;
+			setAttr ($geometry[0] + ".ampDrift") -6;
+			setAttr ($geometry[0] + ".snowR") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowG") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowB") 1; //SPRITE COLORING
+			textField -edit -text "What have you Done!?" StatusLine;
+        	        break;
+		case "Cartoon Snow":
+	       	setAttr ($snowEmit[0] + ".rate") 100;
+			setAttr ($geometry[0] + ".minLife") 5;
+			setAttr ($geometry[0] + ".maxLife") 10;
+			setAttr ($geometry[0] + ".minScale") .5;
+			setAttr ($geometry[0] + ".maxScale") .9;
+			setAttr ($geometry[0] + ".minOp") .3;
+			setAttr ($geometry[0] + ".maxOp") .7;
+			setAttr ($geometry[0] + ".snowAY") -5;
+			setAttr ($geometry[0] + ".snowAX") 0;
+			setAttr ($geometry[0] + ".snowAZ") 0;
+			setAttr ($geometry[0] + ".freqDrift") -2;
+			setAttr ($geometry[0] + ".ampDrift") -2;
+			setAttr ($geometry[0] + ".snowR") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowG") 1; //SPRITE COLORING
+			setAttr ($geometry[0] + ".snowB") 1; //SPRITE COLORING
+			textField -edit -text "MASSIVE FLAKES!" StatusLine;
+        	        break;
+	}// end switch
+}
+//////////////////////////////////////////////////////	
+	
+//######## UI CREATION ########
+
+global proc snowMaker()
+{
+	
+	
+//runs snowCheck() first
+	global string $snowEmit[];
+	string $geometry[] = `snowCheck`;
+	global string $snowPlane[];
+	string $fileS;
+	source "AEfileTemplate.mel";
+	source "generateChannelMenu.mel";
+
+	//CREATING WINDOW
+	string $win = "SnowMaker";
+	if ( `window -ex $win` ){deleteUI -window $win;}
+
+	window -t "Snow Maker" -minimizeButton true -maximizeButton false -rtf true -wh 450 300 $win;
+
+	//CREATING UI
+
+	columnLayout -adjustableColumn true -cal "left";
+
+		columnLayout;
+
+			frameLayout -l "Presets" -w 378 -cll 1 -bs "etchedIn" -mh 2 -mw 2;
+
+					optionMenu -label "-------Snow Storm Presets-------" snowType;
+					menuItem -l "Default" ;
+					menuItem -l "Flurries" ;
+					menuItem -l "White Christmas";
+					menuItem -l "Blizzard";
+					menuItem -l "ICE AGE";
+					menuItem -l "Cartoon Snow";
+			
+			setParent ..;
+			
+			frameLayout -l "Snow Creation" -w 378 -cll 1 -bs "etchedIn" -mh 2 -mw 2;
+
+				rowColumnLayout -nc 1 -cw 1 370;
+					
+					separator -height 5 -st none;
+					floatSliderGrp
+						-label "Snow Rate" -field true -cw 1 115
+						-value 100 -minValue 0 -maxValue 500 -step 3.576
+						-fieldMinValue 0 -fieldMaxValue 10000
+						snowRate;
+						connectControl snowRate ($snowEmit[0] + ".rate");
+					floatSliderGrp
+						-label "Min Snow Lifespan" -field true -cw 1 115
+						-value 10 -minValue 0 -maxValue 100 -step 2
+						snowLifespanMin;
+						connectControl snowLifespanMin ($geometry[0] + ".minLife");
+					floatSliderGrp
+						-label "Max Snow Lifespan" -field true -cw 1 115
+						-value 20 -minValue 0 -maxValue 100 -step 2
+						snowLifespanMax;
+						connectControl snowLifespanMax ($geometry[0] + ".maxLife");
+				separator -height 5 -st none;
+				text -label "Snow Visibility" -align "center";
+				separator -height 5 -st none;
+				rowColumnLayout -nc 2 -cw 1 180 -cw 2 180;
+						checkBox -label "Snow Visibility" snowVis;
+						checkBox -label "Emitter Visibility" emitVis;
+						connectControl snowVis ($geometry[0] + ".visibility");
+						connectControl emitVis ($snowPlane[0] + ".visibility");
+				setParent ..;
+
+					separator -height 5 -st none;
+			
+			rowColumnLayout -nc 1 -cw 1 370;
+				textField -text "Select \"snowEmitter\" to translate,scale,and rotate the snow source" -editable false StatusLine;
+			setParent ..;
+				
+				setParent ..;
+
+			setParent ..;
+			
+			frameLayout -l "Snow Appearance" -w 378 -cll 1 -bs "etchedIn" -mh 2 -mw 2;
+
+				rowColumnLayout -nc 1 -cw 1 370;
+					
+					separator -height 10 -st none;
+					button -l "Image Source Selection" -h 25 -c  "AEfileTextureBrowser \"AEassignTextureCB  snowFile.fileTextureName\";";
+					separator -height 20 -st none;
+					floatSliderGrp
+						-label "Min Flake Opacity" -field true -cw 1 115
+						-value .4 -minValue 0 -maxValue 1 -step .1
+						snowOpacityMin;
+						connectControl snowOpacityMin ($geometry[0] + ".minOp");
+					floatSliderGrp
+						-label "Max Flake Opacity" -field true -cw 1 115
+						-value .7 -minValue 0 -maxValue 1 -step .1
+						snowOpacityMax;
+						connectControl snowOpacityMax ($geometry[0] + ".maxOp");
+					floatSliderGrp
+						-label "Min Flake Size" -field true -cw 1 115
+						-value .3 -minValue 0 -maxValue 1 -step .1
+						snowSizeMin;
+						connectControl snowSizeMin ($geometry[0] + ".minScale");
+					floatSliderGrp
+						-label "Max Flake Size" -field true -cw 1 115
+						-value .6 -minValue 0 -maxValue 1 -step .1
+						snowSizeMax;
+						connectControl snowSizeMax ($geometry[0] + ".maxScale");
+					floatSliderGrp
+						-label "Snow Color Red" -field true -cw 1 115		//SPRITE COLORING
+						-value 1 -minValue 0 -maxValue 1 -step .01		//SPRITE COLORING
+						snowRed;								//SPRITE COLORING
+						connectControl snowRed ($geometry[0] + ".snowR"); 	//SPRITE COLORING
+					floatSliderGrp
+						-label "Snow Color Green" -field true -cw 1 115		//SPRITE COLORING
+						-value 1 -minValue 0 -maxValue 1 -step .01		//SPRITE COLORING
+						snowGreen;								//SPRITE COLORING
+						connectControl snowGreen ($geometry[0] + ".snowG"); 	//SPRITE COLORING
+					floatSliderGrp
+						-label "Snow Color Blue" -field true -cw 1 115		//SPRITE COLORING
+						-value 1 -minValue 0 -maxValue 1 -step .01		//SPRITE COLORING
+						snowBlue;								//SPRITE COLORING
+						connectControl snowBlue ($geometry[0] + ".snowB"); 	//SPRITE COLORING
+					/*floatSliderGrp
+						-label "Flake Brightness" -field true -cw 1 115
+						-value 0 -minValue 0 -maxValue 1 -step .01
+						snowBrightness;
+						connectControl snowBrightness ($fileS + ".colorOffset");*/
+				
+				setParent ..;
+
+			setParent ..;
+
+			frameLayout -l "Snow Behavior" -w 378 -cll 1 -bs "etchedIn" -mh 2 -mw 2;
+
+				rowColumnLayout -nc 1 -cw 1 370;
+					
+					separator -height 5 -st none;
+					text -label "----------------GRAVITY----------------" -align "center";
+					floatSliderGrp
+						-label "Gravity" -field true -cw 1 115
+						-value -9.8 -minValue -20 -maxValue 0 -step .1
+						gravityY;
+						connectControl gravityY ($geometry[0] + ".snowAY");
+					
+					separator -height 5 -st none;
+					text -label "----------------WIND----------------" -align "center";
+					floatSliderGrp
+						-label "Wind Speed X" -field true -cw 1 115
+						-value 0 -minValue -20 -maxValue 20 -step .1
+						windSpeedX;
+						connectControl windSpeedX ($geometry[0] + ".snowAX");
+					floatSliderGrp
+						-label "Wind Speed Z" -field true -cw 1 115
+						-value 0 -minValue -20 -maxValue 20 -step .1
+						windSpeedZ;
+						connectControl windSpeedZ ($geometry[0] + ".snowAZ");
+					
+					separator -height 10 -st none;
+					text -label "----------------DRIFT----------------" -align "center";
+					floatSliderGrp
+						-label "Drift Frequency" -field true -cw 1 115
+						-value -2 -minValue -10 -maxValue 0 -step .1
+						driftFreq;
+						connectControl driftFreq ($geometry[0] + ".freqDrift");
+					floatSliderGrp
+						-label "Drift Amplitude" -field true -cw 1 115
+						-value -2 -minValue -10 -maxValue 0 -step .1
+						driftAmp;
+						connectControl driftAmp ($geometry[0] + ".ampDrift");
+				
+				setParent ..;
+
+			setParent ..;
+			
+			rowColumnLayout -nc 1 -cw 1 378;
+				textField -text "Snow Maker v.1 - 2003" -editable false StatusLine;
+			setParent ..;
+			
+			rowColumnLayout -numberOfRows 1 -rowHeight 1 30;
+
+				button -label "Set Snow State" -w 126 -c "saveInitialState snowParticles1";
+				button -l "Delete Snow" -w 126 -c "delete $snowPlane[0]; delete $snowShape[0]; delete $snow[0]; delete lambert2; delete snowFile; delete lambert2SG";
+				button -label "Close" -w 126 -c ("window -e -vis 0 "+$win) closeBtn;	
+				setParent SnowMaker;
+				
+			setParent ..;
+			
+			frameLayout -l "Help" -w 378 -cll 1 -bs "etchedIn" -mh 2 -mw 2 help;
+
+				rowColumnLayout -nc 1 -cw 1 370;
+
+					string $help;
+
+					$help = "This script is for Snow Storm creation.\n";
+					$help += "\n";
+					$help += "SNOW MODIFICATION\n";
+					$help += "-----------------\n";
+					$help += "\n";
+					$help += "After Snow is created click the Image Source button\n";
+					$help += "browse and find the first image in the sequence and select it\n";
+					$help += "Then you can choose a preset storm or create your own\n";
+					$help += "\n";
+					$help += "NOTES\n";
+					$help += "-------------------------\n";
+					$help += "\n";
+					$help += "Everything in this bad boy is expression driven,\n";
+					$help += "add some Fields to the particles for extra control\n";
+					$help += "The snow rate goes above 200 particle/sec\n";
+					$help += "Enter a higher value in the field or hold \n";
+					$help += "control and drag - max value is 10000\n";
+					$help += "\n";
+					$help += "=========================================\n";
+					$help += "For bugs and problems -> steve@stevedeluca.com \n";
+					$help += "My website -> www.stevedeluca.com";
+					
+					scrollField -w 382 -h 160 -ed 0 -tx $help;
+
+				setParent ..;
+
+			setParent ..;
+			
+		setParent ..;
+
+	setParent ..;
+
+	frameLayout -e -cl 1 help;
+	
+	//alert callbacks:
+	optionMenu -edit -cc "presetSnow()" snowType;
+	
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Maximum Snowflake Opacity\"StatusLine" snowOpacityMax;
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Minimum Snowflake Opacity\"StatusLine" snowOpacityMin;
+	//floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Snowflake Brightness - helps to match back plates\"StatusLine" snowBrightness;
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Maximum Snowflake Size\"StatusLine" snowSizeMax;
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Minimum Snowflake Size\"StatusLine" snowSizeMin;
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Wind Speed in X Direction\"StatusLine" windSpeedX;
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Gravity in Negative Y Direction Only\"StatusLine" gravityY;
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Wind Speed in Z Direction\"StatusLine" windSpeedZ;
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Timing of Drift Pattern\"StatusLine" driftFreq;
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Size of Drift Pattern\"StatusLine" driftAmp;
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Amount of Red Saturation of Snow\"StatusLine" snowRed;		//SPRITE COLORING
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Amount of Green Saturation of Snow\"StatusLine" snowGreen;	//SPRITE COLORING
+	floatSliderGrp -edit -changeCommand "textField -edit -text \"Sets Amount of Blue Saturation of Snow\"StatusLine" snowBlue;	//SPRITE COLORING
+	
+	showWindow $win;
+}

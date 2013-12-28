@@ -1,0 +1,15 @@
+// selectPercentage
+// Created by: freelanceny18
+// Date: 2013/12/10 21:58:57
+
+global proc selectPercentage(){
+
+	$sel = `ls -sl`;
+	string $newSel[];
+	for ($each in $sel){
+		$r = rand(0,100);
+		if ($r >75) $newSel[size($newSel)] = $each;
+	}
+	select $newSel;
+
+}

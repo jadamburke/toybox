@@ -1,0 +1,11 @@
+global proc selectGeoShapesOnly(){		
+	$sel = `ls -sl`;
+	select -clear;
+	for ($each in $sel){
+		$children = `listRelatives -ad $each`;
+		for ($every in $children){
+			$shapes = `ls -type mesh -type nurbsSurface -noIntermediate $every`;
+			select -add $shapes;
+		}
+	} 		
+}

@@ -1,0 +1,1983 @@
+// abx Render Layers 
+// abxRenderLayers.mel
+//
+// Version 1.3.0 
+// Created by J. Adam Burke adam@adamburke.net
+// Modified : Sep 4 2011
+
+
+// DESCRIPTION:
+// abxRenderLayers extends Mayas render layer menus to include function to list, edit
+// and remove overrides as well as import, export and automatically rebuild render layers.
+// These tools help improve the usefulness and stability of using render layers with maya.
+
+// USAGE:
+// Source script and call "abxRenderLayers;"
+// assign to shelf or hotkey as preferred
+
+// NEW IN 1.2:
+// fixed bug that wouldn't export override command on compound attributes
+// handles rotation values overrides being stored as radians not degrees
+// added support for more data type overrides including strings attributes
+// added commit all Overrides to masterLayer
+// added commit individual overrides to masterLayer
+
+// NEW IN 1.2.1
+// FIXED: fixed bug that prevented connection overrides on attributes other than shader overrides
+// FIXED: cleans connection errors on default renderLayer when rebuilding
+// ADDED: added a menu Item to clear render layer connections that cause connection warnings when switching layers
+
+// NEW IN 1.3
+// FIXED: Compatible with Maya 2012+
+
+
+
+
+// ©2011 J. Adam Burke 
+// http://www.adamburke.net
+
+global proc abxRenderLayers() {
+
+
+	string $renderLayerMenuPath = "";
+	string $mayaVersion  = `about -v`;
+	if (`gmatch $mayaVersion "2010*"`)
+		$renderLayerMenuPath = "MayaWindow|mayaMainWindowForm|formLayout3|formLayout11|formLayout32|formLayout33|ChannelsLayersPaneLayout|formLayout37|DisplayLayerUITabLayout|RenderLayerTab|menu7";
+	else
+		$renderLayerMenuPath = "MayaWindow|MainChannelsLayersLayout|ChannelsLayersPaneLayout|LayerEditorForm|DisplayLayerUITabLayout|RenderLayerTab|menu8";
+		
+		
+	layerEditorBuildRenderLayerMenu $renderLayerMenuPath RenderLayerTab;
+
+}
+
+
+global proc float fpsNumeric () {
+
+	string $frameRateUnit = `currentUnit -q -f -t`;
+	switch ($frameRateUnit){
+		case "film":
+			return 24;
+			break;
+		case "ntsc":
+			return 30;
+			break;
+		case "ntscf":
+			return 60;
+			break;
+		case "game":
+			return 15;
+			break;
+		case "show":
+			return 48;
+			break;
+		case "pal":
+			return 24;
+			break;
+		case "palf":
+			return 50;
+			break;
+		case "hour":
+			return (1/3600);
+			break;
+		case "min":
+			retrun (1/60);
+			break;
+		case "sec":
+			return 1;
+			break;
+		case "millisec":
+			return 1000;
+			break;
+
+		default:
+			return 0;
+			break;
+	}
+	
+
+}
+
+global proc string[] getOverrideCommands(string $renderLayerName, string $nodeAttr, int $mode) {
+
+		string $editCommands[];
+
+		print ("override="+$nodeAttr+"\n");
+		int $index = 0;
+
+		// check for connections
+		string $destination[] = `listConnections -destination 1 -plugs 1 $nodeAttr`;
+		string $destinationNode[] = `listConnections -destination 1 -plugs 0 $nodeAttr`;
+		if (size($destination)>1 ){
+			for ($every in $destination){
+
+				print ("Layer="+$renderLayerName+"    destination="+$every+"\n");
+
+				// check adjustment connections to determine what type of override is happening
+
+				string $overrideType = "unknown";
+				if (`gmatch $every ($renderLayerName+".adjustments*")`){
+					string $tokenBuffer[];
+					tokenize $every "." $tokenBuffer;
+					string $adjValueAttr = ($tokenBuffer[0]+"."+$tokenBuffer[1]+".value");
+					print ("adjValueAttr = "+$adjValueAttr+"\n");
+					string $adjValueConnections[] = `listConnections -destination 1 -plugs 1 $adjValueAttr`;
+					if (size($adjValueConnections) == 0){
+						// this requires a possible disconnectAttr if connection exists before a setAttr
+						$overrideType = "inAttrAdjust";
+					}
+					else {
+						// this type requires a simple connectAttr from the input to adjustments[#].value
+						$overrideType = "inputConnectionAdjust";
+					}
+				}
+				else if (`gmatch $every ($renderLayerName+".outAdjustments*")`) {
+					string $tokenBuffer[];
+					tokenize $every "." $tokenBuffer;
+					string $adjOutValueAttr = ($tokenBuffer[0]+"."+$tokenBuffer[1]+".outValue");
+					print ("adjOutValueAttr = "+$adjOutValueAttr+"\n");
+					string $adjOutValueConnections[] = `listConnections -destination 1 -plugs 1 $adjOutValueAttr`;
+					if (size($adjOutValueConnections) == 0){
+						$overrideType = "outAttrAdjust"; // this isn't possible but its defined just incase
+					}
+					else {
+						$overrideType = "outputConnectionAdjust";
+					}
+
+				}
+
+				print ("overrideType = "+$overrideType+"\n");
+
+					
+				// its an override setAttr
+				if ($overrideType == "inAttrAdjust"){
+					print ("Found setAttr\n");
+					string $tokenBuffer[];
+					// format: layerName.adjustments[#].plug
+					tokenize $every "." $tokenBuffer;
+					//string $attrType = `getAttr -type ($tokenBuffer[0]+"."+$tokenBuffer[1]+".value")`;
+					print ("getAttr -type "+$nodeAttr+"\n");
+					string $attrType = `getAttr -type ($nodeAttr)`;
+
+					if ($mode == 1)
+						$editCommands[size($editCommands)] = ("editRenderLayerAdjustment -layer "+$renderLayerName+" "+$nodeAttr+"\;");
+
+					if ($attrType == "float3" || $attrType == "double3" ||  $attrType == "float2" ||  $attrType == "double2" ){
+						$attrValue = `getAttr ($tokenBuffer[0]+"."+$tokenBuffer[1]+".value")`;
+						print ("getAttr "+$tokenBuffer[0]+"."+$tokenBuffer[1]+".value\n");
+						
+						string $commandBuilder = ("setAttr "+$nodeAttr);
+						for ($item in $attrValue){
+							// if its a rotation value its in radians even though setAttr uses degrees (whY?)
+							string $tokenBuffer[];
+							tokenize $nodeAttr "." $tokenBuffer;
+							if ($tokenBuffer[1] == "rotate"){
+								//print ($item+"\n");
+								float $itemAsFloat = $item;
+								$item = rad_to_deg($itemAsFloat);
+							}
+							$commandBuilder  = ($commandBuilder +" "+$item);
+						}
+						$editCommands[size($editCommands)] = ($commandBuilder+"\;");
+					}
+					else if ($attrType == "string"){
+						$attrValue = `getAttr ($tokenBuffer[0]+"."+$tokenBuffer[1]+".value")`;
+						//print ("getAttr "+$tokenBuffer[0]+"."+$tokenBuffer[1]+".value\n");
+						$editCommands[size($editCommands)] = ("setAttr -type \"string\" "+$nodeAttr+" \""+$attrValue+"\"\;");
+
+					}
+					else if ($attrType == "time"){
+						$attrValue = `getAttr ($tokenBuffer[0]+"."+$tokenBuffer[1]+".value")`;
+						print ("getAttr "+$tokenBuffer[0]+"."+$tokenBuffer[1]+".value\n");
+						// convert from seconds to frames
+						$timeMult = fpsNumeric();
+						$attrValue = $attrValue * $timeMult;
+						
+						$editCommands[size($editCommands)] = ("setAttr "+$nodeAttr+" \""+$attrValue+"\"\;");
+					}
+					else if ($attrType == "doubleAngle"){
+						$attrValue = `getAttr ($tokenBuffer[0]+"."+$tokenBuffer[1]+".value")`;
+						print ("getAttr "+$tokenBuffer[0]+"."+$tokenBuffer[1]+".value\n");
+						// convert from radians to degrees
+						$attrValue = rad_to_deg($attrValue);
+						$editCommands[size($editCommands)] = ("setAttr "+$nodeAttr+" \""+$attrValue+"\"\;");
+					}
+					else{
+						$attrValue = `getAttr ($tokenBuffer[0]+"."+$tokenBuffer[1]+".value")`;
+							// if its a rotation value its in radians even though setAttr uses degrees (whY?)
+							string $tokenBuffer[];
+							tokenize $nodeAttr "." $tokenBuffer;
+						
+						$editCommands[size($editCommands)] = ("setAttr "+$nodeAttr+" "+$attrValue+"\;");
+					}
+					$index++;
+
+				}
+
+
+				// its an override connectAttr
+				else if ($overrideType == "inputConnectionAdjust" || $overrideType == "outputConnectionAdjust"){
+
+					print ("Found ConnectAttr\n");
+					string $plugAttrName = "value";
+					int $sourceFlag = 1;
+					int $destFlag = 0;
+					if ($overrideType == "outputConnectionAdjust"){
+						$plugAttrName = "outValue";
+						$sourceFlag = 0;
+						$destFlag = 1;
+					}
+					// format layerName.outAdjustments[#].outPlug
+					string $tokenBuffer[];
+					tokenize $every "." $tokenBuffer;
+					string $sourceNodeAttr[] = `listConnections -d $destFlag -s $sourceFlag -plugs 1 ($tokenBuffer[0]+"."+$tokenBuffer[1]+"."+$plugAttrName)`;
+					print ("sourceNode="+$tokenBuffer[0]+"."+$tokenBuffer[1]+".outPlug\n");
+					string $sourceNode[] = `listConnections -d $destFlag -s $sourceFlag -plugs 0 ($tokenBuffer[0]+"."+$tokenBuffer[1]+"."+$plugAttrName)`;
+					//string $attrType = `getAttr -type ($tokenBuffer[0]+"."+$tokenBuffer[1]+"."+$plugAttrName)`;
+					//$destVal = `getAttr ($tokenBuffer[0]+"."+$tokenBuffer[1]+".value")`;
+
+
+					// if it is not a set membership connection
+					if (!`gmatch $nodeAttr "*.instObjGroups*"`){
+						if ($mode == 1)
+							$editCommands[size($editCommands)] = ("editRenderLayerAdjustment -layer "+$renderLayerName+" "+$nodeAttr+"\;");
+						$editCommands[size($editCommands)] = ("connectAttr -f "+$sourceNodeAttr[0]+" "+$nodeAttr+"\;");
+						$index++;
+					}
+					// if it IS a set membership connection (including shader assignments)
+					else{
+						// probably a missing reference node
+						if (`objectType $sourceNode` == "reference"){
+							$sourceNode[0] = "abxLayersLostShaderSG";
+						}
+						string $tokenBuffer2[];
+						tokenize $nodeAttr "." $tokenBuffer2;
+						string $shapeNode = $tokenBuffer2[0];
+						$editCommands[size($editCommands)] = ("sets -forceElement "+$sourceNode[0]+" "+$shapeNode+"\;");
+					}
+				}	
+				
+				else {
+					//print ("unknown override type on "+ $every+" Skipping Export of this override:"+$nodeAttr+"\n");
+
+				}			
+			}
+		}
+		return $editCommands;
+}
+
+
+global proc exportRenderLayerEdits2(string $renderLayerName, string $filePath) {
+
+	if ($filePath == "" || $renderLayerName == "")
+		return;
+
+	string $editCommands[];
+	string $shadingGroups[];
+	int $index = 0;
+
+
+	print ($filePath+"\n");
+
+	// add abxRenderLayerHeader for file identification:
+	$editCommands[size($editCommands)] = "// abxRenderLayer Export File";
+	$editCommands[size($editCommands)] = "// Generated by abxRenderLayerTools.mel Version 1.2";
+	$editCommands[size($editCommands)] = ("// Exported from File: "+`file -q -sn`+"\n");
+
+	$editCommands[size($editCommands)] = ("createRenderLayer -empty -name "+$renderLayerName+"\;");
+	$index++;
+	
+	// get members of render layer
+	string $renderLayerMembers[] = `editRenderLayerMembers -q -fullNames $renderLayerName`;
+	for ($each in $renderLayerMembers){
+		$editCommands[size($editCommands)] = ("editRenderLayerMembers "+$renderLayerName+" "+$each+"\;");
+		$index++;
+	}
+
+
+
+	// create command to make the new layer current
+	string $overrideAttrs[] = `editRenderLayerAdjustment -q -layer $renderLayerName`;
+	$editCommands[size($editCommands)] = ("editRenderLayerGlobals -currentRenderLayer "+$renderLayerName+"\;");
+		
+	// get overrides of render layer
+	for ($each in $overrideAttrs){
+		if (size(`ls $each`) > 1){
+			print ($each+" skippped. Clashing Node name overrides will be lost\n");
+		}
+		else {
+			string $overrideCommands[] = getOverrideCommands($renderLayerName, $each, 1);
+			$editCommands = stringArrayCatenate ($editCommands,$overrideCommands);
+		}
+		
+	}
+
+	// output layer attributes
+
+	$val = `getAttr ($renderLayerName+".renderable")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".renderable "+$val+";");
+
+	$val2 = `getAttr ($renderLayerName+".global")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".global "+$val2+";");
+
+	//$val3
+
+	string $val4 = `getAttr ($renderLayerName+".attributeOverrideScript")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName+".attributeOverrideScript -type \"string\" \""+$val4+"\";");
+
+	$val5 = `getAttr ($renderLayerName+".beauty")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".beauty "+$val5+";");
+
+	$val6 = `getAttr ($renderLayerName+".color")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".color "+$val6+";");
+
+	$val7 = `getAttr ($renderLayerName+".shadow")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".shadow "+$val7+";");
+
+	$val8 = `getAttr ($renderLayerName+".diffuse")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".diffuse "+$val8+";");
+
+	$val9 = `getAttr ($renderLayerName+".specular")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".specular "+$val9+";");
+
+	$val10 = `getAttr ($renderLayerName+".globalIllum")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".globalIllum "+$val10+";");
+
+	string $sgOverride[] = `listConnections -d 0 -s 1 -plugs 1 ($renderLayerName+".shadingGroupOverride")`;
+	if (size($sgOverride) > 0)
+		$editCommands[size($editCommands)] = ("connectAttr -f "+$sgOverride[0] + " "+$renderLayerName+".shadingGroupOverride;");
+
+	string $renderPassConnections[] = `listConnections -d 0 -s 1 -plugs 1 ($renderLayerName+".renderPass")`;
+	for ($each in $renderPassConnections){
+		$editCommands[size($editCommands)] = ("connectAttr -f "+$each + " "+$renderLayerName+".renderPass;");
+	}
+
+	string $passContribMap[] = `listConnections -d 0 -s 1 -plugs 1 ($renderLayerName+".passContributionMap")`;
+	for ($each in $passContribMap){
+		$editCommands[size($editCommands)] = ("connectAttr -f "+$each + " "+$renderLayerName+".passContributionMap;");
+	}
+
+	$val11 = `getAttr ($renderLayerName+".imageRendered")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".imageRendered "+$val11+";");
+
+	$val12 = `getAttr ($renderLayerName+".recycleImage")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".recycleImage "+$val12+";");
+
+	$val13 = `getAttr ($renderLayerName+".imageName")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".imageName -type \"string\" \""+$val13+"\";");
+
+	$val14 = `getAttr ($renderLayerName+".displayOrder")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".displayOrder "+$val14+";");
+
+	$val15 = `getAttr ($renderLayerName+".psdBlendMode")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".psdBlendMode "+$val15+";");
+
+	$val16 = `getAttr ($renderLayerName+".psdAlphaChannel")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".psdAlphaChannel "+$val16+";");
+
+	$val17 = `getAttr ($renderLayerName+".precompTemplate")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".precompTemplate -type \"string\" "+$val17+";");
+
+	$val18 = `getAttr ($renderLayerName+".isDefaultPrecompTemplateOverride")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".isDefaultPrecompTemplateOverride "+$val18+";");
+
+	$val15 = `getAttr ($renderLayerName+".psdBlendMode")`;
+	$editCommands[size($editCommands)] = ("setAttr "+$renderLayerName + ".psdBlendMode "+$val15+";");
+
+
+
+	// open file for writing
+	//int $fileId = fopen($filePath,"w");
+	int $fileId = fopen(fromNativePath($filePath),"w");
+
+	//write commands to file
+	for ($each in $editCommands){
+		fprint $fileId ($each+"\n");
+	}
+	fclose $fileId;
+
+}
+
+global proc importRenderLayer (string $filename) {
+
+	if ($filename == "")
+		return;
+
+	print ($filename + "\n");
+
+
+	// open file
+	$fileId=`fopen $filename "r"`;
+
+	string $nextLine = `fgetline $fileId`;
+	string $layerName = "";
+	string $layerRename = "";
+	int $renameFlag = 0;
+
+	// check to see if it is an abxRenderLayer file
+	if (!`gmatch $nextLine "// abxRenderLayer Export File*"`){
+		error ("Not a recognized abxRenderLayer Export File\n");
+		return;
+	}
+
+	// check to see if the renderLayer already exists
+	// if it exists prompt the user
+		// would you like to replace, merge, or rename
+
+	// run each line with error suppression
+
+	
+	while ( size( $nextLine ) > 0 ) {
+	
+		// if the line is the create layer command
+		if (`gmatch $nextLine "createRenderLayer -empty -name*"`) {
+			// get layer name by tokenize spacees
+			string $tokenBuffer[];
+			tokenize $nextLine " " $tokenBuffer;
+
+			print (size($tokenBuffer)+":"+$tokenBuffer[3]+"\n");
+
+			// if its a typical create layer command the layer name is fourth
+			if (size($tokenBuffer)==4){
+				$layerName = substring($tokenBuffer[3],1,(size($tokenBuffer[3])-2));
+				$layerRename = $layerName;
+				int $it = 1;
+				while (`objExists $layerRename`){
+					$layerRename = ($layerName+"Copy"+$it);
+					$it++;
+				}
+			
+
+				// if the object already exists
+				if (`objExists $layerName`){
+					// prompt user that layer already exists
+					string $result = `promptDialog 
+							-title "Layer Already Exists" 
+							-message "Import Rename:"  
+							-button "Rename" -button "Replace" -button "Cancel"
+    							-defaultButton "Rename" -cancelButton "Cancel"
+    							-dismissString "Cancel" -text $layerRename`;
+
+					if ($result == "Rename"){
+						string $text = `promptDialog -query -text`;
+						$layerRename = `match "[A-Za-z0-9]+" $text`;
+						$it=0;
+						while (`objExists $layerRename`){
+							$layerRename = ($layerRename+"Copy"+$it);
+							$it++;
+						}
+						$renameFlag = 1;
+					}
+					else if ($result == "Replace"){
+						$layerRename = $layerName;
+						// delete existing layer
+						if (`objExists $layerName`){
+							renderLayerEditorDeleteLayer RenderLayerTab $layerName;	
+						}
+					}
+					else if ($result == "Cancel" || $result == "dismiss"){
+						return;
+					}
+				}
+			}
+		}
+
+		// if layer needs renaming then substitute it in each line before executing
+		if ($renameFlag == 1){
+			$nextLine = `substitute (" "+$layerName+"\\\;") $nextLine (" "+$layerRename+";")`;
+			$nextLine = `substitute (" "+$layerName+" ") $nextLine (" "+$layerRename+" ")`;
+			$nextLine = `substitute (" "+$layerName+"\\\.") $nextLine (" "+$layerRename+".")`;
+		}
+
+		// if the edit is a lost shader then create it if necessary
+		if (`gmatch $nextLine "*abxLayersLostShaderSG*"`){
+			if (!`objExists "abxLayersLostShader"`){
+				shadingNode -asShader surfaceShader -name abxLayersLostShader;
+				if (!`objExists "abxLayersLostShaderSG"`){
+					sets -renderable true -noSurfaceShader true -empty -name abxLayersLostShaderSG;
+				}
+				connectAttr -f abxLayersLostShader.outColor abxLayersLostShaderSG.surfaceShader;
+				setAttr "abxLayersLostShader.outColor" -type double3 0 1 0 ;
+			}
+
+		}
+		if ( catch( eval($nextLine)) && $nextLine != "\n"){
+			print ($nextLine);
+			print ("Render Layer Override Command Failed: ");
+		}
+    		print ( $nextLine );
+    		$nextLine = `fgetline $fileId`;
+	}
+	fclose $fileId;
+
+
+}
+
+global proc exportAllRenderLayers () {
+
+	// get a list of all render layers
+	string $allRenderLayers[] = `ls -type "renderLayer"`;
+	// pick a save location prefix
+	$filePathPrefix = `fileDialog -title "Save Render Layer MEL" -mode 1 -directoryMask "*.mel"`;
+	if ($filePathPrefix == "")
+		return;
+	// export each render layer
+	for ($each in $allRenderLayers){
+		if (!`gmatch $each "*defaultRenderLayer*"`){
+			exportRenderLayerEdits2 $each ($filePathPrefix+"_"+$each+".mel");
+		}
+	}
+}
+
+global proc rebuildRenderLayer(string $renderLayer){
+
+	// export to temp file
+	string $tempPath = `getenv TMPDIR`;
+	//string $renderLayer = `editRenderLayerGlobals -q -currentRenderLayer`;
+	string $sceneName = `file -q -sn -shn`;
+	string $tokenBuffer[];
+	tokenize $sceneName "." $tokenBuffer;
+	string $filename = ($tokenBuffer[0]+"_"+$renderLayer+".mel");
+	
+
+	exportRenderLayerEdits2($renderLayer,($tempPath+"/"+$filename));
+
+	// delete layer
+	//delete $renderLayer;
+	renderLayerEditorDeleteLayer RenderLayerTab $renderLayer;
+	
+	// import temp layer
+	importRenderLayer ($tempPath+"/"+$filename);
+
+}
+
+global proc rebuildAllLayers() {
+
+	// get a list of all render layers
+	string $allRenderLayers[] = `ls -type "renderLayer"`;	
+
+	$mLRenderFlag = `getAttr ("defaultRenderLayer.renderable")`;
+
+	// export to temp file
+	string $tempPath = `getenv TMPDIR`;
+	//string $renderLayer = `editRenderLayerGlobals -q -currentRenderLayer`;
+	string $sceneName = `file -q -sn -shn`;
+	string $tokenBuffer[];
+	tokenize $sceneName "." $tokenBuffer;
+
+
+	// export each render layer
+	for ($each in $allRenderLayers){
+		if (!`gmatch $each "*defaultRenderLayer*"`){
+			string $filename = ($tokenBuffer[0]+"_"+$each+".mel");
+			exportRenderLayerEdits2 $each ($tempPath+"/"+$filename);
+			print ("Exporting to "+$tempPath+$filename+"\n");
+
+			//print ("Deleting "+$each+"\n");
+		}
+	}
+
+	// 
+	string $referenceNodes[] = `ls -type reference`;
+	string $clearCommand = "";
+
+	// if not already on the masterLayer
+	if (`editRenderLayerGlobals -q -currentRenderLayer` != "defaultRenderLayer"){
+
+	
+		for ($each in $referenceNodes){
+			if ($each != "sharedReferenceNode"){
+				referenceEdit -failedEdits true -successfulEdits false -removeEdits $each;
+			}
+		}
+
+		editRenderLayerGlobals -currentRenderLayer defaultRenderLayer;
+	}
+	
+	// delete each renderLayer
+	for ($each in $allRenderLayers){
+		if (!`gmatch $each "*defaultRenderLayer*"`){
+			renderLayerEditorDeleteLayer RenderLayerTab $each;
+			//delete $each;
+			updateEditorRenderLayer RenderLayerTab;
+			print ("Deleting Render Layer "+$each+"\n");
+		}
+	}
+
+	string $drlConnections[] = `listConnections -c 1-plugs 1 defaultRenderLayer`;
+	for ($i=0;$i<size($drlConnections);$i+=2){
+		if (`gmatch $drlConnections[$i] "defaultRenderLayer.*.outPlug"`){
+			disconnectAttr $drlConnections[$i+1] $drlConnections[$i];}
+		else if (`gmatch $drlConnections[$i] "defaultRenderLayer.*.outValue"`){
+			disconnectAttr $drlConnections[$i] $drlConnections[$i+1];}
+		else if (`gmatch $drlConnections[$i] "defaultRenderLayer.*.plug"`){
+			disconnectAttr $drlConnections[$i] $drlConnections[$i+1];}
+	    	else if (`gmatch $drlConnections[$i] "defaultRenderLayer.*.value"`){
+			disconnectAttr $drlConnections[$i+1] $drlConnections[$i];}
+
+	}
+
+	
+	// import temp files of each render layer
+	for ($each in $allRenderLayers){
+		if (!`gmatch $each "*defaultRenderLayer*"`){
+			string $filename = ($tokenBuffer[0]+"_"+$each+".mel");
+			importRenderLayer ($tempPath+"/"+$filename);
+			print ("Importing from "+$tempPath+$filename+"\n");
+			sysFile -del ($tempPath+"/"+$filename);
+		}
+	}	
+
+	// set masterLayer render flag to what it was before rebuilding
+
+	setAttr "defaultRenderLayer.renderable" $mLRenderFlag;
+
+	
+}
+
+// creates and populates a UI with render Layer information. Options to remove edits like with referencing
+global proc showRenderLayerEdits (string $mode, string $layerName) {
+
+
+	// create window UI
+
+	string $window = ("renderLyrEditsWin_" + $layerName);
+
+	if (`window -exists $window`) {
+		deleteUI -window $window;
+	}
+
+	window -title ($layerName+ " Overrides List") $window;
+
+	string $mainForm = `formLayout -numberOfDivisions 100 ($window + "_formLayout")`;
+
+	
+
+	string $textScrollList = `iconTextScrollList ($window + "_textScrollList")`;
+    	iconTextScrollList -edit -height 300 -width 250 -allowMultiSelection true $textScrollList;
+	
+
+	string $layerEdits[] = `getLayerEditsList "all" $layerName`;
+	for ($each in $layerEdits){
+		iconTextScrollList -edit -append $each $textScrollList;
+	}
+
+	string $buttonForm = `formLayout -numberOfDivisions 100`;
+
+		string $refreshButton = `button -label "Refresh Layer Override List" ($window + "_refreshButton")`;
+
+		string $commitButton = `button -label "Commit Override To Master" -command ("commitSelectedLayerEdits "+$layerName) ($window + "_commitButton")`;
+
+
+		string $removeButton = `button -label "Remove Selected Overrides" ($window + "_removeButton")`;
+
+		button -edit -command ("refreshLayerEditsWindow "+$layerName) $refreshButton;
+
+		button -edit -command ("removeSelectedLayerEdits "+$layerName+";"+"refreshLayerEditsWindow "+$layerName) $removeButton;
+
+		formLayout -edit
+			-attachForm		$refreshButton     "top"		0
+			-attachForm		$refreshButton     "left"		0
+			-attachForm		$refreshButton     "bottom"		0
+			-attachPosition $refreshButton     "right"		0 33
+
+			-attachForm		$commitButton     "top"		0
+			-attachForm		$commitButton     "bottom"		0
+			-attachPosition $commitButton     "left"		0 33
+			-attachPosition $commitButton     "right"		0 66
+
+			-attachForm		$removeButton		"top"		0
+			-attachPosition $removeButton		"left"		0 66
+			-attachForm     $removeButton		"bottom"	0
+			-attachForm     $removeButton		"right"		0
+
+			$buttonForm;
+
+		setParent $mainForm;
+
+	formLayout -edit
+
+
+		-attachForm $textScrollList     "top"	5	
+		-attachForm $textScrollList     "left" 5
+		-attachForm $textScrollList     "bottom" 35
+		-attachForm $textScrollList     "right" 5 
+
+		-attachControl	$buttonForm		    "top"		5	$textScrollList
+		-attachForm     $buttonForm			"left"		5
+		-attachForm     $buttonForm			"bottom"	5
+		-attachForm     $buttonForm			"right"		5
+
+		$mainForm;
+
+
+
+	showWindow $window;
+	
+
+
+}
+
+
+global proc string[] getLayerEditsList (string $mode, string $layerName){
+
+	string $result[];
+
+	if ($mode == "members" || $mode == "all"){
+		string $memberList[] = `editRenderLayerMembers -q -fn $layerName`;
+		if (size($memberList) > 0){
+			$result[size($result)] = "----------------------------";
+			$result[size($result)] = "--------Members-------";
+			$result[size($result)] = "----------------------------";
+		}
+		for ($each in  $memberList){
+			$result[size($result)] = $each;
+		}
+	}
+
+	if ($mode == "attrs" || $mode == "all"){
+		string $adjList[] = `editRenderLayerAdjustment -q -layer $layerName`;
+		int $showTitle = 0;
+
+		for ($each in $adjList){
+			if (!`gmatch $each "*.instObjGroups*"`){
+				$showTitle = 1;
+			}
+		}
+
+		if ($showTitle==1){
+			$result[size($result)] = "----------------------------";
+			$result[size($result)] = "----Attr Overrides----";
+			$result[size($result)] = "----------------------------";
+		}
+
+		for ($each in $adjList){
+			if (!`gmatch $each "*.instObjGroups*"`){
+				if (`checkRefLostConnection $each $layerName`){
+					$result[size($result)] = ("BROKEN "+$each);
+				}
+				else{
+					$result[size($result)] = $each;
+				}
+				$showTitle = 1;
+			}
+		}
+
+	}
+
+	
+	if ($mode == "shaders" || $mode == "all"){
+		string $adjList[] = `editRenderLayerAdjustment -q -layer $layerName`;
+		int $showTitle = 0;
+
+		for ($each in $adjList){
+			if (`gmatch $each "*.instObjGroups*"`){
+				$showTitle = 1;
+			}
+		}
+		if ($showTitle==1){
+			$result[size($result)] = "----------------------------";
+			$result[size($result)] = "---Shader Overrides---";
+			$result[size($result)] = "----------------------------";
+		}
+
+		for ($each in $adjList){
+			if (`gmatch $each "*.instObjGroups*"`){
+				if (`checkRefLostConnection $each $layerName`){
+					$result[size($result)] = ("BROKEN "+$each);
+				}
+				else {
+					$result[size($result)] = $each;
+				}
+				$showTitle = 1;
+			}
+		}
+
+	}
+
+	
+	return $result;
+}
+
+global proc removeSelectedLayerEdits (string $layerName) {
+	
+	$window = ("renderLyrEditsWin_" + $layerName);
+
+	// if it contains a "." then its an attr override otherwise its an member edit
+
+	if (`window -exists $window`) {
+		// find selected edits and remove them from layer
+
+		string $textScrollList = ($window + "_textScrollList");
+		string $selectedList[] = `iconTextScrollList -q -selectItem $textScrollList`;
+		for ($each in $selectedList){
+			// if it is not a comment label line
+			if (!`gmatch $each "---*"`){
+				// if it contains a period it must be an attribute override
+				if (`gmatch $each "*.*"`){
+					if (!`gmatch $each "BROKEN*"`){
+						editRenderLayerAdjustment -layer $layerName -remove $each;
+					}
+					else {
+						string $parsedEdit = substring($each, 8,size($each));
+						editRenderLayerAdjustment -layer $layerName -remove $parsedEdit;
+
+					}
+				
+				}
+				else {
+					editRenderLayerMembers -remove $layerName $each;
+				}
+			}
+		}
+	}
+
+	
+
+}
+
+global proc commitSelectedLayerEdits (string $layerName) {
+	
+	$window = ("renderLyrEditsWin_" + $layerName);
+	
+	string $editCommands[];
+
+	// if it contains a "." then its an attr override otherwise its an member edit
+
+	if (`window -exists $window`) {
+		// find selected edits and commit them to master layer
+
+		string $textScrollList = ($window + "_textScrollList");
+		string $selectedList[] = `iconTextScrollList -q -selectItem $textScrollList`;
+		for ($each in $selectedList){
+			// if it is not a comment label line
+			if (!`gmatch $each "---*"`){
+				// if it contains a period it must be an attribute override
+				if (`gmatch $each "*.*"`){
+					if (!`gmatch $each "BROKEN*"`){
+						//string $parsedEdit = substring($each, 8,size($each));
+						
+						string $newCommands[] = getOverrideCommands($layerName, $each, 0);
+
+						$editCommands = stringArrayCatenate($editCommands,$newCommands);
+						//editRenderLayerAdjustment -layer $layerName -remove $each;
+					}
+					else {
+						//string $parsedEdit = substring($each, 8,size($each));
+						//string $newCommands[] = getOverrideCommands($layerName, $parsedEdit, 0);
+
+
+						//$editCommands = stringArrayCatenate($editCommands,$newCommands);
+						//editRenderLayerAdjustment -layer $layerName -remove $parsedEdit;
+						
+
+					}
+				
+				}
+			}
+		}
+	}
+	// set it to master layer
+	editRenderLayerGlobals -currentRenderLayer defaultRenderLayer;
+
+	// apply overrides to master layer
+	print ("Commiting Overrides to Master Layer\n");
+	for ($each in $editCommands){
+		evalEcho ($each);
+	}
+	
+
+}
+
+global proc commitAllOverridesToMaster (string $renderLayerName){
+
+	// create command to make the new layer current
+	string $overrideAttrs[] = `editRenderLayerAdjustment -q -layer $renderLayerName`;
+	string $editCommands[];
+		
+	// get overrides of render layer
+	for ($each in $overrideAttrs){
+		string $newCommands[] = getOverrideCommands($renderLayerName, $each, 0);
+		$editCommands = stringArrayCatenate($editCommands,$newCommands);
+		
+	}
+	// set it to master layer
+	editRenderLayerGlobals -currentRenderLayer defaultRenderLayer;
+
+	// apply overrides to master layer
+	print ("Commiting Overrides to Master Layer\n");
+	for ($each in $editCommands){
+		evalEcho ($each);
+	}
+
+}
+
+global proc refreshLayerEditsWindow (string $layerName) {
+
+	$window = ("renderLyrEditsWin_" + $layerName);
+	string $textScrollList = ($window + "_textScrollList");
+	
+	// clear text scroll list
+	iconTextScrollList -edit -ra $textScrollList;
+
+	if (`window -exists $window`) {
+
+		string $layerEdits[] = `getLayerEditsList "all" $layerName`;
+		for ($each in $layerEdits){
+			iconTextScrollList -edit -append $each $textScrollList;
+		}
+
+
+	}
+
+
+
+}
+
+// checks the given attribute to see if it is still connecting to a lost referenced object
+global proc int checkRefLostConnection (string $source, string $layerName){
+
+	// get the destination of the source attribute if any
+	string $destinations[] = `listConnections -d on -s off -plugs 1 $source`;
+	for ($each in $destinations){
+		//if the connection is to the layer specified
+		if (`gmatch $each ($layerName+"\.*")`){
+			// parse the name for the adjustment plug index
+			string $indexString = `match "\\[+[0-9]+\\]+" $each`;
+
+			string $tokenBuffer[];
+			tokenize $each "." $tokenBuffer;
+			string $adjNode = $tokenBuffer[0];
+			
+			// get the destination of the out value
+			string $outValDests[] = `listConnections -d 1 -s 0 -plugs 1 ($adjNode+".outAdjustments"+$indexString+".outValue")`;
+			// if the destination of the out value is a reference node then return 1
+			for ($every in $outValDests){
+				if (`objectType $every` == "reference"){
+					return 1;
+				}
+				else{
+					return 0;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+global proc showFailedRefEdits () {
+	// parses render layer edits looking for missing nodes and reports their name
+		// create window UI
+
+	string $window = ("failedRefEditsWindow");
+
+	if (`window -exists $window`) {
+		deleteUI -window $window;
+	}
+
+	window -title ("Failed Reference Edits") $window;
+
+	string $mainForm = `formLayout -numberOfDivisions 100 ($window + "_formLayout")`;
+
+	
+
+	string $textScrollList = `iconTextScrollList ($window + "_textScrollList")`;
+    	iconTextScrollList -edit -height 300 -width 250 -allowMultiSelection false $textScrollList;
+	
+	// get failed reference edits
+
+	string $referenceNodes[] = `ls -type reference`;
+	string $clearCommand = "";
+	
+	for ($each in $referenceNodes){
+		if ($each != "sharedReferenceNode"){
+			string $failedEdits[]  = `referenceQuery -failedEdits true -successfulEdits false -editStrings $each`;
+			$clearCommand = ($clearCommand+"referenceEdit -failedEdits true -successfulEdits false -removeEdits "+$each+";");
+		
+			iconTextScrollList -edit -append "-------------------------------" $textScrollList;
+			iconTextScrollList -edit -append ("----"+$each+" Failed Edits-----") $textScrollList;
+			iconTextScrollList -edit -append "-------------------------------" $textScrollList;
+			for ($every in $failedEdits){
+				iconTextScrollList -edit -append $every $textScrollList;
+			}
+		}
+	}
+
+	$clearCommand = ($clearCommand+"deleteUI -window "+$window+";");
+
+	string $buttonForm = `formLayout -numberOfDivisions 100`;
+
+		string $refreshButton = `button -label "Refresh Layer Edit List" ($window + "_refreshButton")`;
+
+		string $removeButton = `button -label "Clear All Failed Edits" ($window + "_removeButton")`;
+
+		button -edit -command "" $refreshButton;
+
+		button -edit -command $clearCommand $removeButton;
+
+		formLayout -edit
+			-attachForm		$refreshButton     "top"		0
+			-attachForm		$refreshButton     "left"		0
+			-attachForm		$refreshButton     "bottom"		0
+			-attachPosition $refreshButton     "right"		0 50
+
+			-attachForm		$removeButton		"top"		0
+			-attachPosition $removeButton		"left"		0 50
+			-attachForm     $removeButton		"bottom"	0
+			-attachForm     $removeButton		"right"		0
+
+			$buttonForm;
+
+		setParent $mainForm;
+
+	formLayout -edit
+
+
+		-attachForm $textScrollList     "top"	5	
+		-attachForm $textScrollList     "left" 5
+		-attachForm $textScrollList     "bottom" 35
+		-attachForm $textScrollList     "right" 5 
+
+		-attachControl	$buttonForm		    "top"		5	$textScrollList
+		-attachForm     $buttonForm			"left"		5
+		-attachForm     $buttonForm			"bottom"	5
+		-attachForm     $buttonForm			"right"		5
+
+		$mainForm;
+
+
+
+	showWindow $window;
+
+}
+
+global proc showMissingRefNodes () {
+	// parses render layer edits looking for missing nodes and reports their name
+		// create window UI
+
+	string $window = ("missingRefNodeWindow");
+
+	if (`window -exists $window`) {
+		deleteUI -window $window;
+	}
+
+	window -title ("Missing Reference Nodes") $window;
+
+	string $mainForm = `formLayout -numberOfDivisions 100 ($window + "_formLayout")`;
+
+	
+
+	string $textScrollList = `iconTextScrollList ($window + "_textScrollList")`;
+    	iconTextScrollList -edit -height 300 -width 250 -allowMultiSelection false $textScrollList;
+	
+	// get missing referenced nodes
+
+	string $missingRefedNodes[] = `getMissingRefNodes`;
+	string $clearCommand = "";
+
+	string $lastRefNode = "";
+	
+	for ($each in $missingRefedNodes){
+		string $tokenBuffer[];
+		tokenize $each ":" $tokenBuffer;
+		string $refNode = $tokenBuffer[0];
+		string $missingNode = $tokenBuffer[1];
+		if ($refNode != $lastRefNode || $refNode == ""){
+			iconTextScrollList -edit -append ("-------------------------------") $textScrollList;
+			iconTextScrollList -edit -append ("---------"+$refNode+"----------") $textScrollList;
+			iconTextScrollList -edit -append ("-------------------------------") $textScrollList;
+			$lastRefNode = $refNode;
+
+		}
+		iconTextScrollList -edit -append ($missingNode) $textScrollList;
+		
+	}
+
+	$clearCommand = ($clearCommand+"deleteUI -window "+$window+";");
+
+	string $buttonForm = `formLayout -numberOfDivisions 100`;
+
+		string $refreshButton = `button -label "Refresh Layer Edit List" ($window + "_refreshButton")`;
+
+		string $removeButton = `button -label "Clear All Failed Edits" ($window + "_removeButton")`;
+
+		button -edit -command "" $refreshButton;
+
+		button -edit -command $clearCommand $removeButton;
+
+		formLayout -edit
+			-attachForm		$refreshButton     "top"		0
+			-attachForm		$refreshButton     "left"		0
+			-attachForm		$refreshButton     "bottom"		0
+			-attachPosition $refreshButton     "right"		0 50
+
+			-attachForm		$removeButton		"top"		0
+			-attachPosition $removeButton		"left"		0 50
+			-attachForm     $removeButton		"bottom"	0
+			-attachForm     $removeButton		"right"		0
+
+			$buttonForm;
+
+		setParent $mainForm;
+
+	formLayout -edit
+
+
+		-attachForm $textScrollList     "top"	5	
+		-attachForm $textScrollList     "left" 5
+		-attachForm $textScrollList     "bottom" 35
+		-attachForm $textScrollList     "right" 5 
+
+		-attachControl	$buttonForm		    "top"		5	$textScrollList
+		-attachForm     $buttonForm			"left"		5
+		-attachForm     $buttonForm			"bottom"	5
+		-attachForm     $buttonForm			"right"		5
+
+		$mainForm;
+
+
+
+	showWindow $window;
+
+}
+
+global proc string[] getMissingRefNodes () {
+
+	string $referenceNodes[] = `ls -type reference`;
+	string $result[];
+	
+	for ($each in $referenceNodes){
+		//print ("\n// FAILED EDITS ON REFERENCE NODE: "+$each+" //\n");
+		if ($each != "sharedReferenceNode"){
+
+		string $objectsToTest[];
+		string $failedEdits[]  = `referenceQuery -failedEdits true -successfulEdits false -editStrings $each`;
+		for ($every in $failedEdits){
+			
+			// tokenize the reference edit by space characters
+			string $tokenBuffer[];
+			tokenize $every " " $tokenBuffer;
+
+	
+			if (size($tokenBuffer) > 1){
+				if ($tokenBuffer[0] == "setAttr"){
+					$target = $tokenBuffer[1];
+
+					// remove quotes
+					$target = substring($target,2,(size($target)-1));
+
+					string $tokenBuffer2[];
+					tokenize $target "." $tokenBuffer2;
+					$objectsToTest[size($objectsToTest)] = $tokenBuffer2[0];
+				}
+				else if ($tokenBuffer[0] == "connectAttr"){
+					$source = $tokenBuffer[1];
+					$target = $tokenBuffer[2];
+
+					$source = substring($source,2,(size($source)-1));
+					$target = substring($target,2,(size($target)-1));
+
+					string $tokenBuffer2[];
+					tokenize $source "." $tokenBuffer2;
+					$objectsToTest[size($objectsToTest)] = $tokenBuffer2[0];
+
+					clear($tokenBuffer2);
+
+					tokenize $target "." $tokenBuffer2;
+					$objectsToTest[size($objectsToTest)] = $tokenBuffer2[0];
+
+				}
+				else if ($tokenBuffer[0] == "disconnectAttr"){
+					string $source;
+					string $target;
+					if ($tokenBuffer[1] == "-na"){
+						$source = $tokenBuffer[2];
+						$target = $tokenBuffer[3];
+					}
+					else {
+						$source = $tokenBuffer[1];
+						$target = $tokenBuffer[2];
+					}
+
+					$source = substring($source,2,(size($source)-1));
+					$target = substring($target,2,(size($target)-1));
+
+					string $tokenBuffer2[];
+					tokenize $source "." $tokenBuffer2;
+					$objectsToTest[size($objectsToTest)] = $tokenBuffer2[0];
+
+					clear($tokenBuffer2);
+
+					tokenize $target "." $tokenBuffer2;
+					$objectsToTest[size($objectsToTest)] = $tokenBuffer2[0];
+
+				}
+				else if ($tokenBuffer[0] == "addAttr"){
+					$target = $tokenBuffer[size($tokenBuffer)-1];
+					$target = substring($target,2,(size($target)-1));
+
+					string $tokenBuffer2[];
+					tokenize $target "." $tokenBuffer2;
+					$objectsToTest[size($objectsToTest)] = $tokenBuffer2[0];
+
+				}
+				else if ($tokenBuffer[0] == "parent"){
+					$source = $tokenBuffer[size($tokenBuffer)-1];
+					$target = $tokenBuffer[size($tokenBuffer)-2];
+
+					$source = substring($source,2,(size($source)-1));
+					$target = substring($target,2,(size($target)-1));
+
+					string $tokenBuffer2[];
+					tokenize $source "." $tokenBuffer2;
+					$objectsToTest[size($objectsToTest)] = $tokenBuffer2[0];
+
+					clear($tokenBuffer2);
+
+					tokenize $target "." $tokenBuffer2;
+					$objectsToTest[size($objectsToTest)] = $tokenBuffer2[0];
+				}
+		
+			}
+			
+		}	// exit parsing reference edits
+		
+		string $missingNodesAlreadyFound[];
+		print ("Size of Nodes to Test Array:"+size($objectsToTest)+"\n");
+		
+		if (size($objectsToTest) > 0){
+
+			for ($every in $objectsToTest){
+				// if object does not exist
+				//print ("Testing Object "+$each+"\n");
+				if (`objExists $every` == 0){
+					// check to see if it already has been identified
+					if (stringArrayContains($every, $missingNodesAlreadyFound) == 0){
+						$missingNodesAlreadyFound[size($missingNodesAlreadyFound)] = $every;
+						$result[size($result)] = ($each+":"+$every);
+						//print ("Missing Ref:"+$each+" Node:"+$every+"\n");
+					}	
+				}
+			}
+		}
+		else {
+			//print ("No Missing Nodes Found in reference node: "+$each+"\n");
+
+		}	
+		}
+			
+	} //  exit parsing reference nodes	
+
+	return $result;
+// exit procedure block
+}
+
+
+
+
+/////////// RE-DEFINITION OF AUTODESK PROCEDURES TO ALLOW FOR CUSTOM RENDER LAYER MENUS//////////////////////
+/*
+global proc int renderLayerEditorBuildPopupMenu(string $toolName, string $parentMenu, string $item)
+//
+//	Description
+//		Build context menus for layers and pass contribution maps
+//
+{
+	popupMenu -edit -deleteAllItems $parentMenu;
+
+	if (`objExists $item`) {
+		if (`nodeType $item` == "renderLayer") {
+			// Build layer context menu
+
+			setParent -menu $parentMenu;
+
+			menuItem -label ($item + "...")
+				-command ("createLayerEditorQuickEditWindow {\"" + $item + "\"}");
+			menuItem -divider true;
+			menuItem -divider true;
+			menuItem -divider true;
+			
+			string $selection[] = `ls -selection`;
+			int $enable = (size($selection) > 0);
+			menuItem -label (uiRes("m_layerEditor.kAddSelectedObjects"))
+				-enable $enable
+				-command ("renderLayerEditorAddObjects " + $toolName + " " + $item);
+			menuItem -label (uiRes("m_layerEditor.kRemoveSelectedObjects"))
+				-enable $enable
+				-command ("renderLayerEditorRemoveObjects " + $toolName + " " + $item);
+
+			string $layerContents[] = `editRenderLayerMembers -query -fn $item`;
+			$enable = (size($layerContents) > 0);
+			menuItem -label (uiRes("m_layerEditor.kSelectObjsInLayer"))
+				-enable $enable
+				-command ("renderLayerEditorSelectObjects " + $toolName + " " + $item);
+
+			menuItem -divider true;
+			
+			$enable = (size($layerContents) > 0);
+			menuItem -label (uiRes("m_layerEditor.kEmptyRenderLayer"))
+				-enable $enable
+				-command ("renderLayerEditorEmptyLayer " + $toolName + " " + $item);
+
+			menuItem -label (uiRes("m_layerEditor.kCopyLayer"))
+				-command ("renderLayerEditorCopyLayer " + $toolName + " " + $item);
+
+			// CUSTOM MENU ITEM
+			menuItem -label "Export Layer" -command ("exportRenderLayerEdits2 "+$item+" `fileDialog -title \"Save Render Layer MEL\" -mode 1 -directoryMask \"*.mel\"`");
+
+			menuItem -label (uiRes("m_layerEditor.kDeleteLayer"))
+				-command ("renderLayerEditorDeleteLayer " + $toolName + " " + $item);
+
+			menuItem -divider true;
+
+				menuItem -label "Commit to masterLayer" -command ("commitAllOverridesToMaster "+$item);
+
+			menuItem -divider true;
+
+			menuItem -label (uiRes("m_layerEditor.kOverrides")) -subMenu true;
+				menuItem -label (uiRes("m_layerEditor.kRemoveRenderSettingOverrides"))
+					-command ("deleteAllRenderSettingOverrides(\""+$item+"\")");
+
+				menuItem -label (uiRes("m_layerEditor.kRemoveRenderFlagOverrides"))
+					-command ("setAttr "+$item+".attributeOverrideScript -type \"string\" \"\"");
+
+				string $connections[] = `listConnections -source true -destination false ($item+".shadingGroupOverride")`;
+				menuItem -label (uiRes("m_layerEditor.kRemoveMaterialOverride"))
+					-command ("disconnectAttr "+$connections[0]+".message "+ $item+".shadingGroupOverride");
+
+				menuItem -divider true;
+
+				if (!`exists nodeTypeNiceName`) {
+					source "nodeTypeNiceName.mel";
+				}
+
+				menuItem -label (uiRes("m_layerEditor.kCreateNewMaterialOverride")) -subMenu true;
+				string $classification = "shader/surface";
+				string $types[] = `listNodeTypes -ex "rendernode/mentalray" $classification`;
+
+				for ($type in $types) {
+					// Check whether node should appear in this UI, based on
+					// certain variables
+					if (!shouldAppearInNodeCreateUI($type)) continue;
+					string $typeString = `nodeTypeNiceName $type`;
+					menuItem -label $typeString 
+						-command ("hookShaderOverride(\"" + $item + "\",\"" + $type + "\", \"\")");
+				}
+
+				if (`pluginInfo -query -loaded Mayatomr`) {
+					menuItem -divider true;
+					$types = `listNodeTypes "rendernode/mentalray:shader/surface"`;
+					for ($type in $types) {
+						string $typeString = `nodeTypeNiceName $type`;
+						menuItem -label $typeString 
+							-command ("hookShaderOverride(\"" + $item + "\",\"" + $type + "\", \"\")");
+					}
+				}
+
+				setParent -menu ..;
+
+				menuItem -label (uiRes("m_layerEditor.kAssignExistingMaterialOverride")) -subMenu true;
+				$types = `listNodeTypes $classification`;
+				for ($type in $types) {
+					// Get a list of all material nodes which have the current node type
+					string $material;
+					string $materialArray[] = `ls -exactType $type`;
+
+					for ( $material in $materialArray ) {
+						menuItem -l $material 
+							-command ("hookShaderOverride(\"" + $item + "\", \"\", \"" + $material + "\")");
+					}
+				}
+				setParent -menu ..;
+			setParent -menu ..;
+
+			menuItem -divider true;
+
+			menuItem -label (uiRes("m_layerEditor.kPassContMap")) -subMenu true;
+				menuItem -label (uiRes("m_layerEditor.kCreateEmptyPassContMap"))
+					-command ("renderLayerEditorCreateContMap " + $toolName + " " + $item + " 0");
+
+				menuItem -label (uiRes("m_layerEditor.kCreatePassContMapAss"))
+					-command ("renderLayerEditorCreateContMap " + $toolName + " " + $item + " 1");
+
+				$enable = (size(`ls -type passContributionMap`) > 0);
+				menuItem -label (uiRes("m_layerEditor.kAsscPassContMap")) -subMenu true
+					-enable $enable;
+				if ($enable) {
+					string $maps[] = getUnassociatedContMaps($item);
+					for ($map in $maps) {
+						menuItem -label $map
+							-command ("renderLayerEditorAssocContMap " + $toolName + " {\"" + $item + "\"} " + $map);
+					}
+				}
+				setParent -menu ..;
+			setParent -menu ..;
+
+			$enable = (size(`renderPassRegistry -supportedRenderPasses`) > 0);
+			menuItem -label (uiRes("m_layerEditor.kCreatePassMenu")) -subMenu true -enable $enable;
+				if ($enable) {
+					global string $gRenderPassPresetPath[];
+					
+					string $presetList[] = getRenderPassPresets();
+					int $numPresets = size($presetList);
+
+					for ($i=0; $i<$numPresets; $i++) {
+						string $presetPath = $gRenderPassPresetPath[$i];
+						string $name = $presetList[$i];
+						menuItem -label $name
+							-command ("renderLayerEditorCreateAndAssignPass " +
+								$item + " \"\" \"" + $name + "\" \"" + $presetPath + "\"");
+					}
+				}
+			setParent -menu ..;
+
+			menuItem -divider true;
+			
+			menuItem -label (uiRes("m_layerEditor.kMembership"))
+				-command ("renderLayerEditorMembership " + $toolName + " " + $item);
+			menuItem -label (uiRes("m_layerEditor.kAttributes"))
+				-command ("showEditor " + $item);
+			
+			// CUSTOM MENU ITEM
+			menuItem -label "List Overrides" -command ("showRenderLayerEdits \"all\"  "+$item);
+
+			return true;
+		}
+	} else {
+		string $layerCont[] = parseLayerContMapIdent($item);
+		string $layer = $layerCont[0];
+		string $contMap = $layerCont[1];
+
+		if (`objExists $layer` &&
+			`nodeType $layer` == "renderLayer" &&
+			`objExists $contMap` &&
+			`nodeType $contMap` == "passContributionMap")
+		{
+			// Build pass contribution map context menu
+
+			setParent -menu $parentMenu;
+
+			menuItem -label ($contMap + "...")
+				-command ("showEditor " + $contMap);
+			menuItem -divider true;
+			menuItem -divider true;
+			menuItem -divider true;
+
+			string $selection[] = `ls -selection`;
+			int $enable = (size($selection) > 0);
+			menuItem -label (uiRes("m_layerEditor.kAddSelectedObjects"))
+				-enable $enable
+				-command ("renderLayerEditorAlterObjectsInContMap " + $toolName + " " + $layer + " " + $contMap + " 1");
+
+			menuItem -label (uiRes("m_layerEditor.kRemoveSelectedObjects"))
+				-enable $enable
+				-command ("renderLayerEditorAlterObjectsInContMap " + $toolName + " \"\" " + $contMap + " 0");
+
+			$enable = ((size(`listConnections ($contMap + ".dagObjects")`) > 0) ||
+						(size(`listConnections ($contMap + ".light")`) > 0));
+			menuItem -label (uiRes("m_layerEditor.kSelectObjsInCompSet"))
+				-enable $enable
+				-command ("renderLayerEditorSelectObjectsInContMap " + $toolName + " " + $contMap);
+
+			menuItem -divider true;
+
+			menuItem -label (uiRes("m_layerEditor.kDeassociateCompSet"))
+				-command ("disconnectAttr -na " + $layer + ".passContributionMap "
+								+ $contMap + ".owner; updateEditorRenderLayer " + $toolName);
+
+			menuItem -label (uiRes("m_layerEditor.kEmptyCompSet"))
+				-command ("renderLayerEditorEmptyContMap " + $contMap);
+
+			menuItem -label (uiRes("m_layerEditor.kDeleteCompSet"))
+				-command ("renderLayerEditorDeleteContMap " + $toolName + " " + $contMap);
+
+			menuItem -divider true;
+
+			int $active = `getAttr ($contMap + ".active")`;
+			menuItem -label (uiRes("m_layerEditor.kActivePCM"))
+				-checkBox $active
+				-command ("setAttr " + $contMap + ".active " + (!$active));
+
+			menuItem -divider true;
+
+			$enable = (size(`renderPassRegistry -supportedRenderPasses`) > 0);
+			menuItem -label (uiRes("m_layerEditor.kCreatePassMenu")) -subMenu true -enable $enable;
+				if ($enable) {
+					global string $gRenderPassPresetPath[];
+					
+					string $presetList[] = getRenderPassPresets();
+					int $numPresets = size($presetList);
+
+					for ($i=0; $i<$numPresets; $i++) {
+						string $presetPath = $gRenderPassPresetPath[$i];
+						string $name = $presetList[$i];
+						menuItem -label $name
+							-command ("renderLayerEditorCreateAndAssignPass " +
+								$layer + " " + $contMap + " \"" + $name + "\" \"" + $presetPath + "\"");
+					}
+				}
+			setParent -menu ..;
+
+			menuItem -divider true;
+
+			menuItem -label (uiRes("m_layerEditor.kMembership"))
+				-enable false
+				-command ("renderLayerEditorContMapMembership " + $toolName + " " + $contMap);
+
+			return true;
+		}
+	}
+	return false;
+}
+
+
+global proc layerEditorBuildRenderLayerMenu(string $parent, string $toolName)
+{
+	
+	setParent -menu $parent;
+	print ($parent+"\n");
+
+	if( `menu -q -ni $parent` != 0 ) {
+		if (`menu -q -label $parent` == "abxLayers"){
+			//
+			//  Menu is built already - just return
+			//
+			return;
+		}
+		else {
+			menu -e -dai $parent;
+		}
+	}
+	menu -e -label "abxLayers" $parent;
+
+	menu -edit -postMenuCommand ("renderLayerEditorShowLayersMenu " + $toolName + " " + $parent) $parent;
+
+	string $createEmptyLayer          = uiRes("m_layerEditor.kCreateEmptyLayer");
+	string $createLayerFromSelected   = (uiRes("m_layerEditor.kCreateLayerFromSelected"));
+	string $copyLayer                 = (uiRes("m_layerEditor.kCopyLayer"));
+	string $selectObjects             = uiRes("m_layerEditor.kSelectObjectsInSelectedLayers");
+	string $removeSelectedObjects     = uiRes("m_layerEditor.kRemoveSelectedObjectsFromSelectedLayers");
+	string $membership                = uiRes("m_layerEditor.kMembership");
+	string $attributes                = uiRes("m_layerEditor.kAttributes");
+	string $deleteSelectedLayers      = uiRes("m_layerEditor.kDeleteSelectedLayers");
+	string $deleteUnusedLayers        = uiRes("m_layerEditor.kDeleteUnusedLayers");
+	string $floatingWindow            = (uiRes("m_layerEditor.kRenderFloating"));
+
+	$newEmptyMenuItemForRenLayers = `menuItem -label $createEmptyLayer`;
+	$newFromSelectedMenuItemForRenLayers = `menuItem -label $createLayerFromSelected`;
+
+	menuItem -divider true;
+
+	$copyLayerMenuItemForRenLayers = `menuItem -label $copyLayer`;
+	$copyLayerOptionBoxForRenLayers = `menuItem -optionBox true`;
+
+	// CUSTOM MENU
+	menuItem -label "Import Layers" -c "importRenderLayer `fileDialog`";
+
+	// CUSTOM MENU
+	menuItem -label "Export All Layers" -c "exportAllRenderLayers";
+	menuItem -label "Rebuild All Layers" -c "rebuildAllLayers";
+
+	menuItem -divider true;
+
+	$selectObjectsMenuItemForRenLayers = 
+		`menuItem -label $selectObjects
+		LayerEditorEditMenuSelectObjectsMenuItemForRenLayers`;
+	$removeObjectsMenuItemForRenLayers = 
+		`menuItem -label $removeSelectedObjects
+		LayerEditorEditMenuRemoveObjectsMenuItemForRenLayers`;
+
+	menuItem -divider true;
+
+	$membershipMenuItemForRenLayers = `menuItem -label $membership`;
+	$layerAttributesMenuItemForRenLayers = `menuItem -label $attributes
+		LayerEditorEditMenuLayerAttributesMenuItemRenLayers`;
+
+	// CUSTOM MENU
+	menuItem -divider true;
+	
+	//menuItem -label "List Overrides" -command ("showRenderLayerEdits \"all\"  "+$item);
+	menuItem -label "List Failed Reference Edits" -command "showFailedRefEdits";
+	menuItem -label "List Missing Referenced Nodes" -command "showMissingRefNodes";
+	menuItem -label "Clean Override Connections" -command "fixRenderLayerOutAdjustmentErrors;";
+
+	menuItem -divider true;
+
+
+
+	$deleteMenuItemForRenLayers = `menuItem -label $deleteSelectedLayers
+		LayerEditorEditMenuDeleteMenuItemForRenLayers`;
+	$deleteUnusedMenuItemForRenLayers = `menuItem -label $deleteUnusedLayers`;
+
+	menuItem -divider true;
+
+	$floatingWindowMenuItemForRenLayers = `menuItem -label $floatingWindow
+		LayerEditorEditMenuFloatingWindowMenuItemForRenLayers`;
+
+	menuItem -edit -command ("layerEditorCreateRenderLayer 1") $newEmptyMenuItemForRenLayers;
+	menuItem -edit -command ("layerEditorCreateRenderLayer 2") $newFromSelectedMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorCopyLayer " + $toolName + " \"\"") $copyLayerMenuItemForRenLayers; 
+	menuItem -edit -command ("renderLayerEditorCopyLayerOptions " + $toolName) $copyLayerOptionBoxForRenLayers; 
+	menuItem -edit -command ("renderLayerEditorSelectObjects " + $toolName + " \"\"") $selectObjectsMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorRemoveObjects " + $toolName + " \"\"") $removeObjectsMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorMembership " + $toolName + " \"\"") $membershipMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorLayerAttributes \"\"") $layerAttributesMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorDeleteLayer " + $toolName + " \"\"") $deleteMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorDeleteUnused " + $toolName) $deleteUnusedMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorFloatingWindow") $floatingWindowMenuItemForRenLayers;
+}
+*/
+
+// MAYA 2012 DEFINITIONS
+
+global proc int renderLayerEditorBuildPopupMenu(string $toolName, string $parentMenu, string $item)
+//
+//	Description
+//		Build context menus for layers and pass contribution maps
+//
+{
+	popupMenu -edit -deleteAllItems $parentMenu;
+
+	if (`objExists $item`) {
+		if (`nodeType $item` == "renderLayer") {
+			// Build layer context menu
+
+			setParent -menu $parentMenu;
+
+			menuItem -label ($item + "...")
+				-command ("createLayerEditorQuickEditWindow {\"" + $item + "\"}");
+			menuItem -divider true;
+			menuItem -divider true;
+			menuItem -divider true;
+			
+			string $selection[] = `ls -selection`;
+			int $enable = (size($selection) > 0);
+			menuItem -label (uiRes("m_layerEditor.kAddSelectedObjects"))
+				-enable $enable
+				-command ("renderLayerEditorAddObjects " + $toolName + " " + $item);
+			menuItem -label (uiRes("m_layerEditor.kRemoveSelectedObjects"))
+				-enable $enable
+				-command ("renderLayerEditorRemoveObjects " + $toolName + " " + $item);
+
+			string $layerContents[] = `editRenderLayerMembers -query $item`;
+			$enable = (size($layerContents) > 0);
+			menuItem -label (uiRes("m_layerEditor.kSelectObjsInLayer"))
+				-enable $enable
+				-command ("renderLayerEditorSelectObjects " + $toolName + " " + $item);
+
+			menuItem -divider true;
+			
+			$enable = (size($layerContents) > 0);
+			menuItem -label (uiRes("m_layerEditor.kEmptyRenderLayer"))
+				-enable $enable
+				-command ("renderLayerEditorEmptyLayer " + $toolName + " " + $item);
+
+			menuItem -label (uiRes("m_layerEditor.kCopyLayer"))
+				-command ("renderLayerEditorCopyLayer " + $toolName + " " + $item);
+
+			// CUSTOM MENU ITEM
+			menuItem -label "Export Layer" -command ("exportRenderLayerEdits2 "+$item+" `fileDialog -title \"Save Render Layer MEL\" -mode 1 -directoryMask \"*.mel\"`");
+
+			menuItem -label (uiRes("m_layerEditor.kDeleteLayer"))
+				-command ("renderLayerEditorDeleteLayer " + $toolName + " " + $item);
+
+			menuItem -divider true;
+
+			menuItem -label (uiRes("m_layerEditor.kOverrides")) -subMenu true;
+				menuItem -label (uiRes("m_layerEditor.kRemoveRenderSettingOverrides"))
+					-command ("deleteAllRenderSettingOverrides(\""+$item+"\")");
+
+				menuItem -label (uiRes("m_layerEditor.kRemoveRenderFlagOverrides"))
+					-command ("setAttr "+$item+".attributeOverrideScript -type \"string\" \"\"");
+
+				string $connections[] = `listConnections -source true -destination false ($item+".shadingGroupOverride")`;
+				menuItem -label (uiRes("m_layerEditor.kRemoveMaterialOverride"))
+					-command ("disconnectAttr "+$connections[0]+".message "+ $item+".shadingGroupOverride");
+
+				menuItem -divider true;
+
+				if (!`exists nodeTypeNiceName`) {
+					source "nodeTypeNiceName.mel";
+				}
+
+				menuItem -label (uiRes("m_layerEditor.kCreateNewMaterialOverride")) -subMenu true;
+				string $classification = "shader/surface";
+				string $types[] = `listNodeTypes -ex "rendernode/mentalray" $classification`;
+
+				for ($type in $types) {
+					// Check whether node should appear in this UI, based on
+					// certain variables
+					if (!shouldAppearInNodeCreateUI($type)) continue;
+					string $typeString = `nodeTypeNiceName $type`;
+					menuItem -label $typeString 
+						-command ("hookShaderOverride(\"" + $item + "\",\"" + $type + "\", \"\")");
+				}
+
+				if (`pluginInfo -query -loaded Mayatomr`) {
+					menuItem -divider true;
+					$types = `listNodeTypes "rendernode/mentalray:shader/surface"`;
+					for ($type in $types) {
+						string $typeString = `nodeTypeNiceName $type`;
+						menuItem -label $typeString 
+							-command ("hookShaderOverride(\"" + $item + "\",\"" + $type + "\", \"\")");
+					}
+				}
+
+				setParent -menu ..;
+
+				menuItem -label (uiRes("m_layerEditor.kAssignExistingMaterialOverride")) -subMenu true;
+				$types = `listNodeTypes $classification`;
+				for ($type in $types) {
+					// Get a list of all material nodes which have the current node type
+					string $material;
+					string $materialArray[] = `ls -exactType $type`;
+
+					for ( $material in $materialArray ) {
+						menuItem -l $material 
+							-command ("hookShaderOverride(\"" + $item + "\", \"\", \"" + $material + "\")");
+					}
+				}
+				setParent -menu ..;
+			setParent -menu ..;
+
+			menuItem -divider true;
+
+			menuItem -label (uiRes("m_layerEditor.kPassContMap")) -subMenu true;
+				menuItem -label (uiRes("m_layerEditor.kCreateEmptyPassContMap"))
+					-command ("renderLayerEditorCreateContMap " + $toolName + " " + $item + " 0");
+
+				menuItem -label (uiRes("m_layerEditor.kCreatePassContMapAss"))
+					-command ("renderLayerEditorCreateContMap " + $toolName + " " + $item + " 1");
+
+				$enable = (size(`ls -type passContributionMap`) > 0);
+				menuItem -label (uiRes("m_layerEditor.kAsscPassContMap")) -subMenu true
+					-enable $enable;
+				if ($enable) {
+					string $maps[] = getUnassociatedContMaps($item);
+					for ($map in $maps) {
+						menuItem -label $map
+							-command ("renderLayerEditorAssocContMap " + $toolName + " {\"" + $item + "\"} " + $map);
+					}
+				}
+				setParent -menu ..;
+			setParent -menu ..;
+
+			$enable = (size(`renderPassRegistry -supportedRenderPasses`) > 0);
+			menuItem -label (uiRes("m_layerEditor.kCreatePassMenu")) -subMenu true -enable $enable;
+				if ($enable) {
+					global string $gRenderPassPresetPath[];
+					
+					string $presetList[] = getRenderPassPresets();
+					int $numPresets = size($presetList);
+
+					for ($i=0; $i<$numPresets; $i++) {
+						string $presetPath = $gRenderPassPresetPath[$i];
+						string $name = $presetList[$i];
+						menuItem -label $name
+							-command ("renderLayerEditorCreateAndAssignPass " +
+								$item + " \"\" \"" + $name + "\" \"" + $presetPath + "\"");
+					}
+				}
+			setParent -menu ..;
+
+			menuItem -divider true;
+			
+			menuItem -label (uiRes("m_layerEditor.kMembership"))
+				-command ("renderLayerEditorMembership " + $toolName + " " + $item);
+			menuItem -label (uiRes("m_layerEditor.kAttributes"))
+				-command ("showEditor " + $item);
+
+			// CUSTOM MENU ITEM
+			menuItem -label "List Overrides" -command ("showRenderLayerEdits \"all\"  "+$item);
+
+			return true;
+		}
+	} else {
+		string $layerCont[] = parseLayerContMapIdent($item);
+		string $layer = $layerCont[0];
+		string $contMap = $layerCont[1];
+
+		if (`objExists $layer` &&
+			`nodeType $layer` == "renderLayer" &&
+			`objExists $contMap` &&
+			`nodeType $contMap` == "passContributionMap")
+		{
+			// Build pass contribution map context menu
+
+			setParent -menu $parentMenu;
+
+			menuItem -label ($contMap + "...")
+				-command ("showEditor " + $contMap);
+			menuItem -divider true;
+			menuItem -divider true;
+			menuItem -divider true;
+
+			string $selection[] = `ls -selection`;
+			int $enable = (size($selection) > 0);
+			menuItem -label (uiRes("m_layerEditor.kAddSelectedObjects"))
+				-enable $enable
+				-command ("renderLayerEditorAlterObjectsInContMap " + $toolName + " " + $layer + " " + $contMap + " 1");
+
+			menuItem -label (uiRes("m_layerEditor.kRemoveSelectedObjects"))
+				-enable $enable
+				-command ("renderLayerEditorAlterObjectsInContMap " + $toolName + " \"\" " + $contMap + " 0");
+
+			$enable = ((size(`listConnections ($contMap + ".dagObjects")`) > 0) ||
+						(size(`listConnections ($contMap + ".light")`) > 0));
+			menuItem -label (uiRes("m_layerEditor.kSelectObjsInCompSet"))
+				-enable $enable
+				-command ("renderLayerEditorSelectObjectsInContMap " + $toolName + " " + $contMap);
+
+			menuItem -divider true;
+
+			menuItem -label (uiRes("m_layerEditor.kDeassociateCompSet"))
+				-command ("disconnectAttr -na " + $layer + ".passContributionMap "
+								+ $contMap + ".owner; updateEditorRenderLayer " + $toolName);
+
+			menuItem -label (uiRes("m_layerEditor.kEmptyCompSet"))
+				-command ("renderLayerEditorEmptyContMap " + $contMap);
+
+			menuItem -label (uiRes("m_layerEditor.kDeleteCompSet"))
+				-command ("renderLayerEditorDeleteContMap " + $toolName + " " + $contMap);
+
+			menuItem -divider true;
+
+			int $active = `getAttr ($contMap + ".active")`;
+			menuItem -label (uiRes("m_layerEditor.kActivePCM"))
+				-checkBox $active
+				-command ("setAttr " + $contMap + ".active " + (!$active));
+
+			menuItem -divider true;
+
+			$enable = (size(`renderPassRegistry -supportedRenderPasses`) > 0);
+			menuItem -label (uiRes("m_layerEditor.kCreatePassMenu")) -subMenu true -enable $enable;
+				if ($enable) {
+					global string $gRenderPassPresetPath[];
+					
+					string $presetList[] = getRenderPassPresets();
+					int $numPresets = size($presetList);
+
+					for ($i=0; $i<$numPresets; $i++) {
+						string $presetPath = $gRenderPassPresetPath[$i];
+						string $name = $presetList[$i];
+						menuItem -label $name
+							-command ("renderLayerEditorCreateAndAssignPass " +
+								$layer + " " + $contMap + " \"" + $name + "\" \"" + $presetPath + "\"");
+					}
+				}
+			setParent -menu ..;
+
+			menuItem -divider true;
+
+			menuItem -label (uiRes("m_layerEditor.kMembership"))
+				-enable false
+				-command ("renderLayerEditorContMapMembership " + $toolName + " " + $contMap);
+
+
+
+			return true;
+		}
+	}
+	return false;
+}
+
+global proc layerEditorBuildRenderLayerMenu(string $parent, string $toolName)
+{
+	setParent -menu $parent;
+
+	if( `menu -q -ni $parent` != 0 ) {
+		if (`menu -q -label $parent` == "abxLayers"){
+			//
+			//  Menu is built already - just return
+			//
+			return;
+		}
+		else {
+			menu -e -dai $parent;
+		}
+	}
+	menu -e -label "abxLayers" $parent;
+
+	//if( `menu -q -ni $parent` != 0 ) {
+	//	//
+		//  Menu is built already - just return
+		//
+	//	return;
+	//}
+
+	menu -edit -postMenuCommand ("renderLayerEditorShowLayersMenu " + $toolName + " " + $parent) $parent;
+
+	string $createEmptyLayer          = uiRes("m_layerEditor.kCreateEmptyLayer");
+	string $createLayerFromSelected   = (uiRes("m_layerEditor.kCreateLayerFromSelected"));
+	string $copyLayer                 = (uiRes("m_layerEditor.kCopyLayer"));
+	string $selectObjects             = uiRes("m_layerEditor.kSelectObjectsInSelectedLayers");
+	string $removeSelectedObjects     = uiRes("m_layerEditor.kRemoveSelectedObjectsFromSelectedLayers");
+	string $membership                = uiRes("m_layerEditor.kMembership");
+	string $attributes                = uiRes("m_layerEditor.kAttributes");
+	string $deleteSelectedLayers      = uiRes("m_layerEditor.kDeleteSelectedLayers");
+	string $deleteUnusedLayers        = uiRes("m_layerEditor.kDeleteUnusedLayers");
+	string $floatingWindow            = (uiRes("m_layerEditor.kRenderFloating"));
+
+	$newEmptyMenuItemForRenLayers = `menuItem -label $createEmptyLayer`;
+	$newFromSelectedMenuItemForRenLayers = `menuItem -label $createLayerFromSelected`;
+
+	menuItem -divider true;
+
+	$copyLayerMenuItemForRenLayers = `menuItem -label $copyLayer`;
+	$copyLayerOptionBoxForRenLayers = `menuItem -optionBox true`;
+
+	// CUSTOM MENU
+	menuItem -label "Import Layers" -c "importRenderLayer `fileDialog`";
+
+	// CUSTOM MENU
+	menuItem -label "Export All Layers" -c "exportAllRenderLayers";
+	menuItem -label "Rebuild All Layers" -c "rebuildAllLayers";
+
+	menuItem -divider true;
+
+	$selectObjectsMenuItemForRenLayers = 
+		`menuItem -label $selectObjects
+		LayerEditorEditMenuSelectObjectsMenuItemForRenLayers`;
+	$removeObjectsMenuItemForRenLayers = 
+		`menuItem -label $removeSelectedObjects
+		LayerEditorEditMenuRemoveObjectsMenuItemForRenLayers`;
+
+	menuItem -divider true;
+
+	$membershipMenuItemForRenLayers = `menuItem -label $membership`;
+	$layerAttributesMenuItemForRenLayers = `menuItem -label $attributes
+		LayerEditorEditMenuLayerAttributesMenuItemRenLayers`;
+
+	// CUSTOM MENU
+	menuItem -divider true;
+	
+	//menuItem -label "List Overrides" -command ("showRenderLayerEdits \"all\"  "+$item);
+	menuItem -label "List Failed Reference Edits" -command "showFailedRefEdits";
+	menuItem -label "List Missing Referenced Nodes" -command "showMissingRefNodes";
+	menuItem -label "Clean Override Connections" -command "fixRenderLayerOutAdjustmentErrors;";
+	// END CUSTOM MENU
+
+	menuItem -divider true;
+
+	$deleteMenuItemForRenLayers = `menuItem -label $deleteSelectedLayers
+		LayerEditorEditMenuDeleteMenuItemForRenLayers`;
+	$deleteUnusedMenuItemForRenLayers = `menuItem -label $deleteUnusedLayers`;
+
+	menuItem -divider true;
+
+	$floatingWindowMenuItemForRenLayers = `menuItem -label $floatingWindow
+		LayerEditorEditMenuFloatingWindowMenuItemForRenLayers`;
+
+	menuItem -edit -command ("layerEditorCreateRenderLayer 1") $newEmptyMenuItemForRenLayers;
+	menuItem -edit -command ("layerEditorCreateRenderLayer 2") $newFromSelectedMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorCopyLayer " + $toolName + " \"\"") $copyLayerMenuItemForRenLayers; 
+	menuItem -edit -command ("renderLayerEditorCopyLayerOptions " + $toolName) $copyLayerOptionBoxForRenLayers; 
+	menuItem -edit -command ("renderLayerEditorSelectObjects " + $toolName + " \"\"") $selectObjectsMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorRemoveObjects " + $toolName + " \"\"") $removeObjectsMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorMembership " + $toolName + " \"\"") $membershipMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorLayerAttributes \"\"") $layerAttributesMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorDeleteLayer " + $toolName + " \"\"") $deleteMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorDeleteUnused " + $toolName) $deleteUnusedMenuItemForRenLayers;
+	menuItem -edit -command ("renderLayerEditorFloatingWindow") $floatingWindowMenuItemForRenLayers;
+}
+

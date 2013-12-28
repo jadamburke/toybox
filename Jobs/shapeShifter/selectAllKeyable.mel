@@ -1,0 +1,18 @@
+// selectAllKeyable
+global proc selectAllKeyable() {
+	$sel = `ls -sl`;
+	select -cl;
+	string $each2;
+	for ($each2 in $sel){
+		string $tokenbuffer[];
+		tokenize $each2 "_" $tokenbuffer;
+		if (`objExists ($tokenbuffer[0]+"_ALLKEYABLE")`)
+			select -add ($tokenbuffer[0]+"_ALLKEYABLE");
+		else
+			select -add $each2;
+
+	}
+
+
+
+}

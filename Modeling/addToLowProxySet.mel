@@ -1,0 +1,16 @@
+// addToLowProxySet
+// Created by: adam
+// Date: 2012/04/19 13:51:45
+
+// adds selected geometry to a set that identifies lowProxy geo
+global proc addToLowProxySet(){
+	$sel = `ls -sl`;
+	
+	select -clear;
+	
+	if (!`objExists lowProxySet`)
+		sets -name lowProxySet;
+		
+	select $sel;
+	sets -add lowProxySet;
+}

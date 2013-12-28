@@ -1,0 +1,236 @@
+string $batchRunMelVersionStr = "1.18b";
+
+float $batchRunMelData[];
+string $batchRunMelSceneNames[];
+string $batchRunMelWarnings[];
+
+string $batchRunMelTSSceneList;
+
+eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/ppPlayblast.mel\"");
+
+global proc batchRunMel ()  {
+	global string $batchRunMelVersionStr;
+	global string $batchRunMelTSSceneList;
+
+	if (`window -ex batchRunMelWindow` != true)  {
+		formLayout batchRunMelFrmLyt;
+		string $window = `window -w 800 -title ("batchRunMel Generator v" + $batchRunMelVersionStr) batchRunMelWindow`;
+		columnLayout;
+		$batchRunMelTSSceneList = `textScrollList -w 800 -numberOfRows 10 -allowMultiSelection true -dkc "batchRunMelDeleteSelected" batchRunMelTScrlList`;
+		rowLayout -nc 11;
+		button -label "Run batchRunMel" -command ("window -e -visible 0 " + $window + "; batchRunMelRun");
+		text -label "   ";
+		button -label "Add Scene(s)" -command "batchRunMelAddScene";
+		text -label "   ";
+		button -label "Delete Selected" -command "batchRunMelDeleteSelected";
+		button -label "Clear List" -command ("textScrollList -e -removeAll " + $batchRunMelTSSceneList);
+		text -label "   ";
+		button -label "Move Up" -command "batchRunMelMoveSelected -1";
+		button -label "Move Down" -command "batchRunMelMoveSelected 1";
+		text -label "   ";
+		button -label "Cancel" -command ("window -e -visible 0 " + $window);
+
+		formLayout -e batchRunMelFrmLyt;
+		showWindow $window;
+	} else
+		showWindow batchRunMelWindow;
+}
+
+global proc batchRunMelAddScene ()  {
+	global string $batchRunMelTSSceneList;
+
+	string $multipleFilters = "Maya Files (*.ma *.mb);;Maya ASCII (*.ma);;Maya Binary (*.mb);;All Files (*.*)";
+	string $result[] = `fileDialog2 -fileFilter $multipleFilters -selectFileFilter "Maya Files" -dialogStyle 2 -fm 4 -cap "Choose scene file(s)" -okc "Choose"`;
+	if (size($result) > 0)  {
+		string $sceneFile;
+		for ($sceneFile in $result)  {
+			string $sceneList[] = `textScrollList -q -allItems $batchRunMelTSSceneList`;
+			if (!stringArrayContains($sceneFile, $sceneList))
+				textScrollList -e -append $sceneFile $batchRunMelTSSceneList;
+			else
+				warning("Scene file is already in batchRunMel Scene List");
+		}
+	}
+}
+
+global proc batchRunMelDeleteSelected ()  {
+	global string $batchRunMelTSSceneList;
+	
+	int $delIdx[] = `textScrollList -q -sii $batchRunMelTSSceneList`;
+	for ($i = size($delIdx)-1; $i >= 0; --$i)
+		textScrollList -e -rii $delIdx[$i] $batchRunMelTSSceneList;
+}
+
+global proc batchRunMelMoveSelected (int $dir)  {
+	global string $batchRunMelTSSceneList;
+
+	int $numItems = `textScrollList -q -ni $batchRunMelTSSceneList`;
+	string $selItems[] = `textScrollList -q -si $batchRunMelTSSceneList`;
+	int $selItemsIdx[] = `textScrollList -q -sii $batchRunMelTSSceneList`;
+
+	string $newIdxStr = "";
+	int $numSel = size($selItemsIdx);
+	if ($dir == -1)  {
+		for ($i = 0; $i < $numSel; ++$i)  {
+			string $sel = $selItems[$i];
+			int $selIdx = $selItemsIdx[$i];
+			if ($selIdx > ($i+1))  {
+				textScrollList -e -rii $selIdx $batchRunMelTSSceneList;
+				textScrollList -e -ap ($selIdx-1) $sel $batchRunMelTSSceneList;
+				$newIdxStr += (" -sii " + ($selIdx-1));
+			}
+		}
+	} else  {
+		for ($i = 0; $i < $numSel; ++$i)  {
+			string $sel = $selItems[$numSel-$i-1];
+			int $selIdx = $selItemsIdx[$numSel-$i-1];
+			if ($selIdx < ($numItems-$i))  {
+				textScrollList -e -rii $selIdx $batchRunMelTSSceneList;
+				textScrollList -e -ap ($selIdx+1) $sel $batchRunMelTSSceneList;
+				$newIdxStr += (" -sii " + ($selIdx+1));
+			}
+		}
+	}
+	eval("textScrollList -e " + $newIdxStr + " " + $batchRunMelTSSceneList);
+}
+
+
+
+global proc batchRunMelGatherData ()  {
+	global float $batchRunMelData[];	// for each scene: startFrame endFrame nearClip farClip locatorScale per-frame:[tx ty tz rx ry rz focal]
+	global string $batchRunMelSceneNames[];
+	global string $batchRunMelWarnings[];
+
+	// remove any duplicates from scene list
+	global string $batchRunMelTSSceneList;
+	string $origSceneList[] = `textScrollList -q -allItems $batchRunMelTSSceneList`;
+	string $sceneList[] = stringArrayRemoveDuplicates($origSceneList);
+	if (size($origSceneList) != size($sceneList))
+		warning("Duplicate scene entries were detected in the list.  Only the first occurrance will be processed.");
+
+	if (size($sceneList) == 0)  {
+		warning("No scenes chosen to generate batchRunMel from");
+		return;
+	}
+
+	if (`file -q -mf`)  {
+		string $result = `confirmDialog -title "Scene Needs Saving" -message "The scene appears to need saving.  You can cancel batchRunMel and save it, or continue with batchRunMel and not save scene" -button "Cancel and Save" -button "Continue Without Saving" -defaultButton "Cancel and Save" -cancelButton "Cancel and Save" -dismissString "Cancel and Save"`;
+		if ($result == "Cancel and Save")  {
+			print("batchRunMel: Cancelled.\n");
+			return;
+		}
+	}
+
+	// set Maya so that it doesn't open extra windows on scene open
+	global int $gUseScenePanelConfig;
+	int $save_gUseScenePanelConfig = $gUseScenePanelConfig;
+	$gUseScenePanelConfig = false;
+
+	clear($batchRunMelData);
+	clear($batchRunMelSceneNames);
+	clear($batchRunMelWarnings);
+
+	string $camAttrsNoFL[] = {"tx", "ty", "tz", "rx", "ry", "rz"};
+
+	int $idx = 0;
+	string $scene;
+	for ($scene in $sceneList)  {
+		print("batchRunMel: Opening scene file " + $scene + "\n");
+		string $shortScene = basenameEx($scene); //basename($scene, ".m.");
+		$batchRunMelSceneNames[size($batchRunMelSceneNames)] = $shortScene;
+
+		// Bizzarely, it appears that the frame rate setting of the previous scene affects the frame range of
+		//  the newly-loaded scene, especially if the new scene was created from an Export Selected, like the
+		//  camera masters.  It looks like they don't get written out with the standard scriptNode expressions
+		//  to properly setup the time slider.
+		// So, we will always set the frame rate to 30 fps before loading a scene.  This may cause problems for
+		//  scenes which are (incorrectly) set to 24 fps.
+		//currentUnit -t ntsc;
+		//refresh -f;
+		file -mf false;
+		if (`exists ppDoNewSceneQuiet`) ppDoNewSceneQuiet "empty";
+		file -f -options "v=0" -prompt 0 -uc 0 -o $scene;
+
+		float $startT = `playbackOptions -q -min`;
+		float $endT = `playbackOptions -q -max`;
+
+		if ($startT != int($startT) || $endT != int($endT))  {
+			$batchRunMelWarnings[size($batchRunMelWarnings)] = ("Scene: " + $shortScene + "  Start and/or end frames are not integers");
+			$startT = int($startT);
+			$endT = int($endT);
+		}
+
+		if ($endT - $startT < 3)
+			$batchRunMelWarnings[size($batchRunMelWarnings)] = ("Scene: " + $shortScene + "  Scene length is less than 3 frames");
+
+		$batchRunMelData[$idx++] = $startT;
+		$batchRunMelData[$idx++] = $endT;
+
+		//if ($startT != 101)
+		//	$batchRunMelWarnings[size($batchRunMelWarnings)] = ("Scene: " + $shortScene + "  Does not start at frame 101");
+
+		string $camera = "renderCam";
+		if (! `objExists $camera`)  {
+			$camera = "master:renderCam";
+			if (! `objExists $camera`)  {
+				$batchRunMelWarnings[size($batchRunMelWarnings)] = ("Scene: " + $shortScene + "  Could not find renderCam");
+				$camera = "persp";
+			}
+		}
+
+
+
+		int $imgWidth = 1920;
+		int $imgHeight = 1080;
+		float $postScale = 0.91;
+		float $hA;
+		float $hV;
+		// check for project defaults file and get settings from there
+		if (`exists abxProjectGetShotDetails`){
+			string $prjDetails[] = abxProjectGetShotDetails(`workspace -q -rd`);
+			if (size($prjDetails)>7){
+				//print ("// startDetails\n");
+				//print $prjDetails;
+				$lock = $prjDetails[0];
+				$fps = $prjDetails[1];
+				$imgWidth = $prjDetails[2];
+				$imgHeight = $prjDetails[3];
+				$hA = $prjDetails[5];
+				$hV =  $prjDetails[6];
+				$aspect = $prjDetails[4];
+				$sceneScale = $prjDetails[7];
+				$renderer = $prjDetails[8];
+			}	
+			else{
+				warning("Project Defaults File Not Found. Reverting to 1920 X 1080");
+			}
+		}
+		else {
+			warning("abxProject.mel not sourced. Skipping project defaults check.");
+		}
+
+		
+
+	// set Maya setting back to original value
+	$gUseScenePanelConfig = $save_gUseScenePanelConfig;
+}
+
+
+global proc batchRunMelRun ()  {
+	print("batchRunMel: Begin.\n");
+
+	batchRunMelGatherData();
+	//batchRunMelCreate();
+
+	// if any warnings were generated, display them in a pop-up window at the end
+	global string $batchRunMelWarnings[];
+	if (size($batchRunMelWarnings) > 0)  {
+		confirmDialog -title "Scene Warning" -button "OK"
+			-message ("The following scene files reported problems:\n\n" + stringArrayToString($batchRunMelWarnings, "\n"));
+		clear($batchRunMelWarnings);
+	}
+
+	print("batchRunMel: Done.\n");
+}
+
+

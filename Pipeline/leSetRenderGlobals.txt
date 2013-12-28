@@ -1,0 +1,1 @@
+Sets mental ray render globals to default Little Einstein settings.

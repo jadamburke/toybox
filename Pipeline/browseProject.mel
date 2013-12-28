@@ -1,0 +1,14 @@
+// browseProject
+
+
+global proc browseProject
+ () {
+	$projPath = toNativePath(`workspace -q -rd`); 
+	
+	if (`about -os ` == "mac")
+		
+		exec ("open -a finder \""+$projPath+"\"");
+	
+	else 
+		system(("start explorer "+$projPath));
+}

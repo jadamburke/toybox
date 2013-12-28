@@ -1,0 +1,1550 @@
+// abxAssets
+
+// global component manager for managing the creation and management of assets in maya
+
+global proc abxAssets () {
+
+
+	if (!`window -exists abxAssetsWindow`){
+		window -t "Asset Manager" -width 500 -height 116 -menuBar true abxAssetsWindow;
+
+		menu -label "Create";
+			menuItem -label "New Character" -c "abxAssetsShowCreateUI \"assets\" \"characters\" \"\" \"model\"";
+			menuItem -label "New Prop"  -c "abxAssetsShowCreateUI \"assets\" \"props\" \"\" \"model\"";
+			menuItem -label "New Set"  -c "abxAssetsShowCreateUI \"assets\" \"sets\" \"\" \"model\"";
+			menuItem -label "New Shader" -c "abxAssetsShowCreateUI \"assets\" \"shaders\" \"\" \"model\"";
+			menuItem -label "New Light Rig" -c "abxAssetsShowCreateUI \"assets\" \"lights\" \"\" \"model\"";
+
+
+		formLayout abxAssetsWindowMainForm;
+
+		
+		paneLayout -configuration "vertical2" abxAssetMainPane;
+		formLayout abxAssetsLibForm;
+		
+		formLayout -p abxAssetMainPane abxAssetsDetailsForm;
+
+		
+
+		//print (`formLayout -q -p abxAssetsLibForm`);
+
+		setParent abxAssetsLibForm;
+		string $assetLister = `treeLister -w 250 abxAssetsTreeLister`;
+		abxAssetsBuildContextMenu $assetLister;
+
+		setParent abxAssetsDetailsForm;
+
+		print ("treeLister="+$assetLister);
+		menu -label "View";
+			menuItem -label "Refresh" -c ("treeLister -e -clearContents "+$assetLister+"; abxAssetsPopulateUIList "+$assetLister);
+
+
+
+
+		$pMenu = `popupMenu -parent $assetLister -pmc ("abxAssetsUpdateContextMenu \""+$assetLister+"\"") abxAssetsPopupMenu`;
+
+		abxAssetsBuildContextMenu $assetLister;
+    			
+
+		formLayout -e
+        		-af abxAssetMainPane top 0
+        		-af abxAssetMainPane left 0
+        		-af abxAssetMainPane bottom 0
+        		-af abxAssetMainPane right 0
+        		abxAssetsWindowMainForm;
+
+		formLayout -e 
+			-af $assetLister left 0
+			-af $assetLister top 20
+			-af $assetLister right 0
+			-af $assetLister bottom 0
+			abxAssetsLibForm;
+
+
+		
+		paneLayout -e -paneSize 1 30 100 abxAssetMainPane;
+		
+
+
+
+		showWindow abxAssetsWindow;
+	
+		abxAssetsPopulateUIList($assetLister);
+
+		abxAssetsCreateDetailUI;
+	}
+	else {
+		
+		showWindow abxAssetsWindow;
+	}
+
+
+}
+
+global proc abxAssetsClearUIList (string $treeLister) {
+
+	treeLister e -clearContents $treeLister;
+
+}
+
+global proc abxAssetsPopulateUIList (string $treeLister) {
+
+	// get a list of the directories inside assets folder for project
+	string $projectPath = `workspace -q -rd`;
+	string $backlotPath = "//MONKEY/resources/backlot";
+	//if (!`filetest -d ($projectPath+"/assets/characters/")`){
+	//	sysFile -md ($projectPath+"/assets/characters/");
+
+	//}
+	//treeLister -e -add "assets/characters/none" "" "" $treeLister;
+
+
+	string $assetFolders[] = `getFileList -folder ($projectPath+"/assets/")`;
+	string $backlotFolders[] = `getFileList -folder ($backlotPath+ "/assets/")`;
+
+	
+
+	string $assetList[];
+	string $assetLib[];
+	string $assetType[];
+	string $assetPath[];
+	string $index = 0;
+
+	for ($each in $assetFolders){
+
+		if (`filetest -d ($projectPath+"/assets/"+$each)`){
+		
+			string $subFolders[] = `getFileList -folder ($projectPath+"/assets/"+$each+"/")`;
+
+			string $sorted[] = sort($subFolders);
+
+			
+			for ($every in $sorted){
+				if (`filetest -d ($projectPath+"/assets/"+$each+"/"+$every)`){
+					if ($every != "old" && $every != "_OLD"){
+						$assetPath[size($assetList)] = ($projectPath+"/assets/"+$each+"/"+$every);
+						$assetLib[size($assetList)] = "assets";
+						$assetType[size($assetList)] = $each;
+						$assetList[size($assetList)] = $every;
+					}
+				}
+			}
+		}
+	}
+
+	// create a spacer between assets and the backlot
+	//$assetPath[size($assetList)] = "";
+	//$assetLib[size($assetList)] = "assets";
+	//$assetType[size($assetList)] = " ";
+	//$assetList[size($assetList)] =" ";
+
+	/*
+	for ($each in $backlotFolders){
+
+		if (`filetest -d ($backlotPath+"/assets/"+$each)`){
+		
+			string $subFolders[] = `getFileList -folder ($backlotPath+"/assets/"+$each+"/")`;
+
+			string $sorted[] = sort($subFolders);
+
+			
+			for ($every in $sorted){
+				if (`filetest -d ($backlotPath+"/assets/"+$each+"/"+$every)`){
+					if ($every != "old" && $every != "_OLD"){
+						$assetPath[size($assetList)] = ($backlotPath+"/assets/"+$each+"/"+$every);
+						$assetLib[size($assetList)] = "backlot";
+						$assetType[size($assetList)] = $each;
+						$assetList[size($assetList)] = $every;
+					}
+				}
+			}
+		}
+	}
+	*/
+	// 
+
+	for ($i=0;$i<size($assetList);$i++){
+		string $thumbIcon = "";
+		//string $thumbPath = ($projectPath+"assets/"+$assetType[$i]+"/"+$assetList[$i]+"/"+$assetList[$i]+".png");
+		string $thumbPath = ($assetPath[$i]+"/"+$assetList[$i]+".png");
+		if (`filetest -r $thumbPath`){
+			$thumbIcon = $thumbPath;
+		}
+		treeLister -e -add ($assetLib[$i]+"/"+$assetType[$i]+"/"+$assetList[$i]) $thumbIcon ("abxAssetsSetActiveAsset(\"assets/"+$assetType[$i]+"/"+$assetList[$i]+"\");") $treeLister;
+	}
+	
+	if (`filetest -d ($projectPath+"/assets/characters/")` && size ($assetList) != 0){
+		treeLister -e -selectPath "assets" $treeLister;
+		treeLister -e -expandPath "assets" $treeLister;
+	}
+}
+
+// rebuild the context menu to reflect the active asset
+global proc abxAssetsBuildContextMenu (string $treeLister){
+
+	// delete the current popup menu items
+	string $popupMenus[] = `treeLister -q -pma $treeLister`;
+	for ($each in $popupMenus){
+			menuItem -parent $each -label "Asset Label" abxAssetsPopupMenuItemTitle;
+
+			menuItem -parent $each -divider 1;
+			menuItem -parent $each -label "====Geo====";
+			menuItem -parent $each -divider 1;
+			menuItem -parent $each -label "  Open Geo Work Scene" -c "abxAssetsCtxMCmd(\"open geo work\");";
+			//menuItem -parent $each -label "  Open Geo Master" -c "abxAssetsCtxMCmd(\"open geo master\");";
+			menuItem -parent $each -label "  Save Geo Work Scene" -c "abxAssetsCtxMCmd(\"save geo work\")";
+			menuItem -parent $each -label "  Master Geo" -c "abxAssetsCtxMCmd(\"save geo master\")";
+			menuItem -parent $each -divider 1;
+			menuItem -parent $each -label "====Rig====";
+			menuItem -parent $each -divider 1;
+			menuItem -parent $each -label "  Ref Geo" -c "abxAssetsCtxMCmd(\"refgeo asset\")";
+			menuItem -parent $each -label "  Open Rig Work Scene" -c "abxAssetsCtxMCmd(\"open rig work\");";;
+			//menuItem -parent $each -label "  Open Rig Master Scene" -c "abxAssetsCtxMCmd(\"open rig master\");";;
+			menuItem -parent $each -label "  Save Rig Work Scene" -c "abxAssetsCtxMCmd(\"save rig work\")";
+			menuItem -parent $each -label "  Master Rig" -c "abxAssetsCtxMCmd(\"save rig master\")";
+			menuItem -parent $each -divider 1;
+			menuItem -parent $each -label "Publish Asset" -c "abxAssetsCtxMCmd(\"publish\")";
+			menuItem -parent $each -divider 1;
+			menuItem -parent $each -label "Reference Rig" -c "abxAssetsCtxMCmd(\"ref asset\")";
+			
+			menuItem -parent $each -label "Import";
+			menuItem -sm 1 -parent $each -label "Masters";
+				menuItem -label "  Open Geo Master" -c "abxAssetsCtxMCmd(\"open geo master\");";
+				menuItem -label "  Open Rig Master Scene" -c "abxAssetsCtxMCmd(\"open rig master\");";;
+				setParent ..;
+			menuItem -parent $each -divider 1;
+			
+
+			menuItem -parent $each -divider 1;
+			menuItem -parent $each -label "Capture Thumbnail" -c"abxAssetsCtxMCmd(\"thumb\")";
+
+	
+
+	}
+}
+
+global proc abxAssetsUpdateContextMenu (string $treeLister){
+	$selAsset = `treeLister -q -ruc $treeLister`;
+	menuItem -e -label $selAsset abxAssetsPopupMenuItemTitle;
+}
+
+// executes commands from the popup menu while making sure they are applied to the correct asset
+global proc abxAssetsCtxMCmd(string $command){
+	
+	$assetPath = `menuItem -q -label abxAssetsPopupMenuItemTitle`;
+
+	switch ($command){
+	case "open geo work":
+		abxAssetsOpenWorkScene(($assetPath+"/geo") , "latest");
+		break;
+	case "open geo master":
+		abxAssetsOpenMasterScene($assetPath+"/geo");
+		break;
+	case "open rig work":
+		abxAssetsOpenWorkScene(($assetPath+"/rig") , "latest");
+		break;
+	case "open rig master":
+		abxAssetsOpenMasterScene($assetPath+"/rig");
+		break;
+	case "save rig work":
+		abxAssetsIncrementalSave(($assetPath+"/rig"));
+		break;
+	case "save rig master":
+		abxAssetsMaster(($assetPath+"/rig"));
+		break;
+	case "save geo work":
+		abxAssetsIncrementalSave(($assetPath+"/geo"));
+		break;
+	case "save geo master":
+		abxAssetsMaster(($assetPath+"/geo"));
+		break;
+	case "publish":
+		abxAssetsPublish($assetPath);
+		break;
+	case "ref asset":
+		abxAssetsRefAsset($assetPath);
+		break;
+	case "refgeo asset":
+		abxAssetsRefGeo($assetPath);
+		break;
+	case "thumb":
+		abxAssetsCaptureThumbnail($assetPath);
+		break;
+
+	}
+	
+}
+
+global proc abxAssetsSetActiveAsset (string $assetPath) {
+	print ("set asset to "+$assetPath+"\n");
+
+}
+
+global proc abxAssetsCreateDetailUI (){
+	
+	setParent abxAssetsDetailsForm;
+
+	tabLayout -imw 0 -imh 0 abxAssetsDeptTabLyt;
+
+	formLayout -e 
+		-af abxAssetsDeptTabLyt "left" 0 
+		-af abxAssetsDeptTabLyt "top" 0 
+		-af abxAssetsDeptTabLyt "right" 0 
+		-af abxAssetsDeptTabLyt "bottom" 0 
+		abxAssetsDetailsForm;
+
+		
+	// commands
+
+		formLayout abxAssetsSrcFrmLyt;
+
+			columnLayout -w 150;
+				intFieldGrp -columnWidth2 25 25 -label "#:" -numberOfFields 1 -value1 1;
+				button -label "Ref   ->" -w 60;
+				button -label "Import->" -w 60;
+				setParent ..;
+	
+			setParent ..;
+
+
+		// geo
+		formLayout abxAssetsEditorFrmLyt;
+
+			// open latest work scene
+
+			// open latest master scene
+
+			// save work increment
+
+			// commit master
+			setParent ..;
+
+		// rig
+		
+
+			// open latest work scene
+
+			// open latest master scene
+
+			// save work increment
+
+			// commit master
+
+			// reference geo
+			
+		// shaders
+		formLayout abxAssetsLogFrmLyt;
+
+			scrollField -wordWrap false -text "Asset Log File" -editable false abxAssetsLogScrlFld;
+			
+			setParent ..;
+
+			formLayout -e 
+				-af abxAssetsLogScrlFld "left" 0 
+				-af abxAssetsLogScrlFld "top" 0 
+				-af abxAssetsLogScrlFld "right" 0 
+				-af abxAssetsLogScrlFld "bottom" 0 
+				abxAssetsLogFrmLyt;
+				
+
+		// sourceimages
+
+			// edit latest work in photoshop
+
+
+		tabLayout -e 
+			-tabLabel abxAssetsEditorFrmLyt "Modify"
+			-tabLabel abxAssetsSrcFrmLyt "Source"
+			-tabLabel abxAssetsLogFrmLyt "Log"
+			 abxAssetsDeptTabLyt;
+
+}
+
+global proc abxAssetsRefreshDetailsUI (string $assetPath){
+
+
+	
+	// load current details
+
+
+	// load previous log file
+
+}
+
+// new asset procedure
+global proc abxAssetsNew (){
+	
+	
+
+}
+
+// checks for the latest rig file and commits
+global proc abxAssetsPublish(string $assetPath){
+
+	// if the asset is of type "model"
+	string $assetLib;
+	string $assetType;
+	string $assetName;
+
+		string $tokenBuffer[];
+
+		// check for a rig master file for the specified asset
+		tokenize $assetPath "/" $tokenBuffer;
+		if (size($tokenBuffer) == 3){
+			$assetLib = $tokenBuffer[0];
+			$assetType = $tokenBuffer[1];
+			$assetName = $tokenBuffer[2];
+
+			$rigMasterFile = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/rig/"+$assetName+"_rig.mb");
+			if (!`filetest -r $rigMasterFile`){
+				$rigMasterFile = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/rig/"+$assetName+"_rig.ma");
+			}
+			$publishMasterFile = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/_publish/"+$assetName+".mb");
+			$publishMasterFileTemp = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/_publish/TMP"+$assetName+".mb");
+
+			if (`filetest -r $rigMasterFile`){
+				// if rig master exists then open it
+				$result = `confirmDialog -title "Confirm" -message "Must Open Rig Master to Continue" -button "OK" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancel"`;
+				if ($result == "OK"){
+					abxAssetsOpenMasterScene(($assetPath+"/rig"));
+				
+				}
+				else {
+					warning ("User Cancelled Publish");
+					return;
+				}
+			}
+	
+			
+	
+			// if it doesn't exist, prompt user and open the latest workshop and end proc
+			else {
+				error ("Rig Master File Not Found: "+$rigMasterFile);
+			}
+			// save the publish file
+			evalEcho("file -rename \""+$publishMasterFileTemp+"\"");
+			evalEcho("file -save");
+
+			if(`file -q -sn` == $publishMasterFileTemp){
+				if (`filetest -w $publishMasterFile`){
+					// Archive publish file
+				}
+				evalEcho("sysFile -move \""+$publishMasterFile+"\" \""+$publishMasterFileTemp+"\"");
+				evalEcho("file -rename \""+$publishMasterFile+"\"");
+			}
+		}
+
+
+	// if the asset is of type "render"
+		// open the latest master file 
+
+	$result = `confirmDialog -title "Confirm" -message ("Publish Successful.") -button "New Scene" -button "Open Work" -button "Inspect Publish" -defaultButton "New Scene" -cancelButton "New Scene" -dismissString "New Scene"`;
+	if ($result == "Open Work"){
+		abxAssetsOpenWorkScene($assetPath , "latest");
+	}
+	else if ($result == "New Scene"){
+		file -f -new;
+	}
+	else if ($result == "Inspect Publish"){
+	}
+
+}
+
+
+global proc abxAssetsNewModel(){
+
+}
+
+// interdepartmental proc for incrementally saving the file
+// file format is /assets/type/<name>/<dept>/work/<name>_<dept>_w<version>.ma
+global proc abxAssetsIncrementalSave(string $assetPath){
+
+	string $sceneFileName = "";
+	string $assetTypeGuess = "";
+	string $assetNameGuess = "";
+	string $deptGuess = "";
+	string $subDeptGuess = "";
+	string $assetLibGuess = "";
+
+	// get the scene name
+	string $currentScene = `file -q -sn`;
+
+	// tokenize the scene name for automatic incremental save
+	string $tokenBuffer[];
+	tokenize $currentScene "/" $tokenBuffer;
+
+	$sceneFileName = $tokenBuffer[size($tokenBuffer)-1];
+
+	int $latestFoundVersion = -1;
+
+	if (size($tokenBuffer) > 1){
+		$subDeptGuess = $tokenBuffer[size($tokenBuffer)-2];
+		if (size($tokenBuffer) > 2 ) {
+			$deptGuess = $tokenBuffer[size($tokenBuffer)-3];
+			if (size($tokenBuffer) > 3 ) {
+				$assetNameGuess = $tokenBuffer[size($tokenBuffer)-4];
+				if (size($tokenBuffer) > 4 ){
+					$assetTypeGuess = $tokenBuffer[size($tokenBuffer)-5];
+					if (size($tokenBuffer) > 5){
+						$assetLibGuess =  $tokenBuffer[size($tokenBuffer)-6];
+					}
+				}
+			}
+		}
+	}
+
+	// automatic incremental save, guesses based on your current scene where to incrementally save it
+	if ($assetPath != "auto"){
+
+		tokenize $assetPath "/" $tokenBuffer;
+		if (size($tokenBuffer)== 4){
+			$assetLib = $tokenBuffer[0];
+			$assetType = $tokenBuffer[1];
+			$assetName = $tokenBuffer[2];
+			$assetDept = $tokenBuffer[3];
+			string $result;
+			if ($assetLib != $assetLibGuess || $assetType != $assetTypeGuess || $assetName != $assetNameGuess){
+				$result = `confirmDialog -title "Confirm" -message "Save this file into the asset? Are you sure?" -button "Yes" -button "No" -defaultButton "Yes" -cancelButton "No" -dismissString "No"`;
+				
+			}
+			if ($result == "Yes"){
+				$assetLibGuess = $assetLib;
+				$assetTypeGuess = $assetType;
+				$assetNameGuess = $assetName;
+				$deptGuess = $assetDept;
+				$subDeptGuess = "work";
+			}
+		}
+		else {
+			error ("Unrecognized Asset Path:"+$assetPath);
+		}		
+	}
+
+	string $pathGuess = "";
+	print ($assetLibGuess+"\n");
+	if ($assetLibGuess == "assets"){
+		 $pathGuess = (`workspace -q -rd`+$assetLibGuess+"/"+$assetTypeGuess+"/"+$assetNameGuess+"/"+$deptGuess+"/"+$subDeptGuess+"/");
+		print ($pathGuess+"\n");
+	}
+
+	// test to see if we guessed the correct asset path
+	if (`filetest -d $pathGuess`){
+		string $workVersion = abxAssetsGetLatestWorkVersion($pathGuess);
+		print ($workVersion+"\n");
+		if($workVersion == ""){
+			$workVersion = "v000";
+		}
+
+		if ($workVersion != ""){
+			string $numOnly = substring($workVersion,2,size($workVersion));
+			int $wVersionInt = int($numOnly);
+			$wVersionInt = $wVersionInt + 1;
+			string $newWorkVersion = "";
+			if ($wVersionInt > 99){
+				$newWorkVersion = ("v"+$wVersionInt);
+			}
+			else if ($wVersionInt > 9){
+				$newWorkVersion = ("v0"+$wVersionInt);
+			}
+			else {
+				$newWorkVersion = ("v00"+$wVersionInt);
+			}
+
+			string $filePath = ($assetLibGuess+"/"+$assetTypeGuess+"/"+$assetNameGuess+"/"+$deptGuess+"/"+$subDeptGuess+"/"+$assetNameGuess+"_"+$deptGuess+"_"+$newWorkVersion+".ma");
+			if ($deptGuess == "geo"){
+				$filePath = ($assetLibGuess+"/"+$assetTypeGuess+"/"+$assetNameGuess+"/"+$deptGuess+"/"+$subDeptGuess+"/"+$assetNameGuess+"_"+$deptGuess+"_"+$newWorkVersion+".mb");
+			}
+			evalEcho("file -rn \""+$filePath+"\";");
+			if ($deptGuess == "geo"){
+				evalEcho("file -f -save  -options \"v=0\" -type \"mayaBinary\"");
+			}
+			else{
+				evalEcho("file -f -save  -options \"v=0\" -type \"mayaAscii\"");
+			}
+			
+		}
+		else {
+			warning ("Could not Guess where to save this. Please Save using Asset Manager");
+		}
+	}
+	else {
+		warning ("Could not Guess where to save this. Please Save using Asset Manager");
+	}
+}
+
+// opens the assets current work scene, either the latest or a specified version
+global proc abxAssetsOpenWorkScene(string $assetPath, string $which){
+	
+	string $tokenBuffer[];
+	string $assetLib = "";
+	string $assetType = "";
+	string $assetName = "";
+	string $dept = "";
+
+	tokenize $assetPath "/" $tokenBuffer;
+	if (size($tokenBuffer)== 4){
+		$assetLib = $tokenBuffer[0];
+		$assetType = $tokenBuffer[1];
+		$assetName = $tokenBuffer[2];
+		$dept = $tokenBuffer[3];
+		
+		string $workDirGuess = (`workspace -q -rd` + "/" + $assetLib + "/" + $assetType + "/" + $assetName + "/" + $dept + "/work/");
+
+		string $workVersion = abxAssetsGetLatestWorkVersion($workDirGuess); 
+
+		string $latestFoundVersion = ($assetName+"_"+$dept+"_"+$workVersion);
+
+		string $filePrefix = ($assetName+"_"+$dept);
+
+		if ($workVersion != ""){
+			string $filePath = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/"+$dept+"/work/"+$latestFoundVersion+".ma");
+			if (`filetest -r $filePath` == 0){
+				$filePath = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/"+$dept+"/work/"+$latestFoundVersion+".mb");
+			}			
+			//saveChanges("file -f -options \"v=0\"  -typ \"mayaAscii\" -o \""+$filePath+"\";");
+			saveChanges("file -f -options \"v=0\"  -o \""+$filePath+"\";");
+			evalEcho("addRecentFile(\""+$filePath+"\", \"mayaAscii\");");
+		}
+		else {
+			error ("No Work Scenes Found:"+$workDirGuess+$filePrefix+"_v###\n");
+		}
+	}
+	else {
+		error ("Unrecognized Asset Path:"+$assetPath+"\n");
+	}
+}
+
+global proc abxAssetsOpenMasterScene(string $assetPath){
+	string $tokenBuffer[];
+	string $assetLib = "";
+	string $assetType = "";
+	string $assetName = "";
+	string $assetDept = "";
+
+	tokenize $assetPath "/" $tokenBuffer;
+	if (size($tokenBuffer)== 4){
+		$assetLib = $tokenBuffer[0];
+		$assetType = $tokenBuffer[1];
+		$assetName = $tokenBuffer[2];
+		$assetDept = $tokenBuffer[3];
+		
+		string $masterFileGuess = (`workspace -q -rd`+$assetLib + "/" + $assetType + "/" + $assetName + "/" + $assetDept + "/"+$assetName+"_"+$assetDept+".mb");
+		if (!`filetest -r $masterFileGuess`){
+			$masterFileGuess = (`workspace -q -rd`+$assetLib + "/" + $assetType + "/" + $assetName + "/" + $assetDept + "/"+$assetName+"_"+$assetDept+".ma");
+			saveChanges("file -f -options \"v=0\"  -typ \"mayaAscii\" -o \""+ $masterFileGuess+"\";");
+			evalEcho("addRecentFile(\""+$assetType + "/" + $assetName + "/" + $assetDept + "/"+$assetName+"_"+$assetDept+".ma" +"\", \"mayaAscii\");");
+			
+		}
+		else {
+			saveChanges("file -f -options \"v=0\"  -typ \"mayaBinary\" -o \""+ $masterFileGuess+"\";");
+			evalEcho("addRecentFile(\""+$assetType + "/" + $assetName + "/" + $assetDept + "/"+$assetName+"_"+$assetDept+".ma" +"\", \"mayaBinary\");");
+		}
+		
+		
+		
+
+	}
+	else {
+		error ("Unrecognized Asset Path:"+$assetPath+"\n");
+	}
+
+}
+
+// interdepartmental proc for saving the latest master file
+global proc abxAssetsMaster(string $assetPath){
+
+	string $sceneFileName = "";
+	string $assetTypeGuess = "";
+	string $assetNameGuess = "";
+	string $deptGuess = "";
+	string $subDeptGuess = "";
+	string $assetLibGuess = "";
+
+	// get the scene name
+	string $currentScene = `file -q -sn`;
+
+	// tokenize the scene name for automatic incremental save
+	string $tokenBuffer[];
+	tokenize $currentScene "/" $tokenBuffer;
+
+	$sceneFileName = $tokenBuffer[size($tokenBuffer)-1];
+
+	int $latestFoundVersion = -1;
+	// if the assetPath is auto then try and guess what to master based on the file name
+	if (size($tokenBuffer) > 1){
+		$subDeptGuess = $tokenBuffer[size($tokenBuffer)-2];
+		if (size($tokenBuffer) > 2 ) {
+			$deptGuess = $tokenBuffer[size($tokenBuffer)-3];
+			if (size($tokenBuffer) > 3 ) {
+				$assetNameGuess = $tokenBuffer[size($tokenBuffer)-4];
+				if (size($tokenBuffer) > 4 ){
+					$assetTypeGuess = $tokenBuffer[size($tokenBuffer)-5];
+					if (size($tokenBuffer) > 5){
+						$assetLibGuess =  $tokenBuffer[size($tokenBuffer)-6];
+					}
+				}
+			}
+		}
+	}
+	
+
+
+	// else master based on the return asset
+	// automatic incremental save, guesses based on your current scene where to incrementally save it
+	if ($assetPath != "auto"){
+
+		tokenize $assetPath "/" $tokenBuffer;
+		if (size($tokenBuffer)== 4){
+			$assetLib = $tokenBuffer[0];
+			$assetType = $tokenBuffer[1];
+			$assetName = $tokenBuffer[2];
+			$assetDept = $tokenBuffer[3];
+			string $result;
+			if ($assetLib != $assetLibGuess || $assetType != $assetTypeGuess || $assetName != $assetNameGuess){
+				$result = "Yes";// `confirmDialog -title "Confirm" -message "Save this file into the asset? Are you sure?" -button "Yes" -button "No" -defaultButton "Yes" -cancelButton "No" -dismissString "No"`;
+			}
+			if ($result == "Yes"){
+				$assetLibGuess = $assetLib;
+				$assetTypeGuess = $assetType;
+				$assetNameGuess = $assetName;
+				$deptGuess = $assetDept;
+				$subDeptGuess = "work";
+			}
+		}
+		else {
+			error ("Unrecognized Asset Path:"+$assetPath);
+		}		
+	}
+
+	string $workDirGuess = (`workspace -q -rd`+$assetLibGuess + "/" + $assetTypeGuess + "/" + $assetNameGuess + "/" + $deptGuess + "/work/");
+
+	string $workVersion = abxAssetsGetLatestWorkVersion($workDirGuess); 
+	string $filePath = (`workspace -q -rd`+$assetLibGuess+"/"+$assetTypeGuess+"/"+$assetNameGuess+"/"+$deptGuess+"/"+$subDeptGuess+"/"+$assetNameGuess+"_"+$deptGuess+"_"+$workVersion+".mb");
+	if (!`filetest -r $filePath`){
+		$filePath = (`workspace -q -rd`+$assetLibGuess+"/"+$assetTypeGuess+"/"+$assetNameGuess+"/"+$deptGuess+"/"+$subDeptGuess+"/"+$assetNameGuess+"_"+$deptGuess+"_"+$workVersion+".ma");
+	}
+	string $masterFilePath = (`workspace -q -rd`+$assetLibGuess+"/"+$assetTypeGuess+"/"+$assetNameGuess+"/"+$deptGuess+"/"+$assetNameGuess+"_"+$deptGuess+".mb");
+		
+	string $tempMasterFilePath = (`workspace -q -rd`+$assetLibGuess+"/"+$assetTypeGuess+"/"+$assetNameGuess+"/"+$deptGuess+"/TMP"+$assetNameGuess+"_"+$deptGuess+".mb");
+	
+
+	// if the latest workshop is already open 
+	if ($currentScene == $filePath){
+		// if the file needs saving
+		if (`file -q -mf`){
+			// incrementally save the workshop
+			abxAssetsIncrementalSave("auto");
+			$currentScene = `file -q -sn`;
+			$sceneFileName = `file -q -shn -sn`;
+			$filePath = `file -q -sn`;
+		}
+			
+	}
+
+	// else if the open file is not the latest workshop
+	else {
+		// prompt the user to open the latest workshop
+		$result = `confirmDialog -title "Confirm" -message "Must Open Latest Workshop to Continue" -button "OK" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancle"`;
+		if ($result == "OK"){
+				// open latest workshop file
+				abxAssetsOpenWorkScene(($assetLibGuess+"/"+$assetTypeGuess+"/"+$assetNameGuess+"/"+$deptGuess), "");
+				$sceneFileName = $filePath;
+		}
+		else {
+			warning "User Cancelled Mastering Process";
+			return;
+
+		}
+	}
+
+
+	//////////////////////////////////////////////////////////////////
+	// MASTERING PROCEDURES //////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////
+		
+
+	// if dept is geo
+	if ($deptGuess == "geo"){
+
+		// delete any loaded or unloaded references
+		 abxAssetsRemoveAllReferences;
+
+		abxDeleteAllRN;
+
+		// remove items in the deleteSet
+		if (`objExists deleteSet`){
+			lockNode -l 0 deleteSet;
+			select deleteSet;
+			if (size(`ls -sl`)>0)
+				lockNode -l 0;
+			delete `ls -sl`;
+			if (`objExists deleteSet`){
+				delete deleteSet;
+			}
+		}
+		// delete history on geo
+		select `ls -type "mesh" -type "nurbsSurface" -type "nurbsCurve"`;
+		delete -ch;
+	
+		delete `ls -type unknown -type unknownDag -type unknownTransform`;
+
+
+		// remove unknown ref nodes
+		abxDeleteUnknownRefNodes;
+		abxDeleteSharedRefNodes;
+		
+
+		// flatten hierarchies		
+
+		// remove unused shaders
+		// remove all namespaces
+		abxAssetsRemoveAllNamespaces;
+
+		abxAssetsNoPolySmooth;
+		
+		// optionally export shading networks along with a shader map file
+
+		// delete render layers
+		abxAssetsDeleteAllRenderLayers;
+
+		// delete display layers
+		abxAssetsDeleteAllDisplayLayers;
+
+		// remove any isolateSelectedSets
+		delete `ls -type objectSet "modelPanel*ViewSelectedSet"`;
+		delete `ls -type objectSet "modelPanel*ViewSelectedSet*"`;
+
+		
+	}
+	// if dept is rig
+	else if ($deptGuess == "rig"){
+
+		abxAssetsImportAllReferences;
+
+		abxDeleteAllRN;
+
+		// remove items in deleteSet
+		if (`objExists deleteSet`){
+			lockNode -l 0 deleteSet;
+			select deleteSet;
+			if (size(`ls -sl`)>0)
+				lockNode -l 0;
+			delete `ls -sl`;
+			if (`objExists deleteSet`){
+				delete deleteSet;
+			}
+		}
+
+
+		// remove all namespaces
+		abxAssetsRemoveAllNamespaces;
+
+
+		// remove unknown ref nodes
+		abxDeleteUnknownRefNodes;
+		abxDeleteSharedRefNodes;
+
+		abxAssetsDeleteUnkownNodes;
+
+		abxDeleteExtraDefaultRenderLayers;
+
+		abxAssetsHideJointAxes;
+
+		abxAssetsNoPolySmooth;
+
+		abxAssetsRemoveUnusedInfluences;
+
+		// delete render layers
+		abxAssetsDeleteAllRenderLayers;
+
+		// delete display layers
+		abxAssetsDeleteAllDisplayLayers;
+
+		//HideKinematics;
+		//HideDeformers;
+
+		// remove any isolateSelectedSets
+		delete `ls -type objectSet "modelPanel*ViewSelectedSet"`;
+		delete `ls -type objectSet "modelPanel*ViewSelectedSet*"`;
+
+	}
+
+		
+
+	// archive the current master file
+	
+
+	// save the file as a temp file first
+	evalEcho("file -rename \""+$tempMasterFilePath+"\"");
+	
+	evalEcho("file -type \"mayaBinary\" -save");
+
+
+	// if the save was successful to the temp file
+	if (`filetest -r $tempMasterFilePath`){
+
+		if (`filetest -w $masterFilePath`){
+			// archive the older master file
+			
+			abxAssetsArchiveFile ($masterFilePath, "master");
+
+		}
+			
+		// rename the current temp master file
+		sysFile -rename $masterFilePath $tempMasterFilePath ;
+		evalEcho("file -rename \""+$masterFilePath+"\"");
+	}
+	else {
+		error ("mastering failed: Unable to Save:"+$tempMasterFilePath);
+	}	
+	
+	$result = `confirmDialog -title "Confirm" -message ($deptGuess+" Master Successful.") -button "Open Work" -button "New Scene" -button "Force Publish" -defaultButton "Open Work" -cancelButton "New Scene" -dismissString "New Scene"`;
+	if ($result == "Open Work"){
+		abxAssetsOpenWorkScene($assetPath , "latest");
+	}
+	else if ($result == "New Scene"){
+		file -f -new;
+	}
+	else if ($result == "Force Publish"){
+		// if a rig work file does not exist
+			// make a new auto rig
+
+		// else 
+			// open the latest rig work file
+
+			// master the rig file
+
+			// publish the rig master file
+	}
+}
+
+global proc string abxAssetsGetLatestWorkVersion (string $workPath) {
+
+
+	if (`filetest -d $workPath`){
+
+		string $tokenBuffer[];
+		tokenize $workPath "/" $tokenBuffer;
+		
+		string $assetName = $tokenBuffer[size($tokenBuffer)-3];
+		string $dept = $tokenBuffer[size($tokenBuffer)-2];
+		string $assetType = $tokenBuffer[size($tokenBuffer)-4];
+		string $assetLib = $tokenBuffer[size($tokenBuffer)-5];
+
+		// get the contents of the work directory
+		string $workFolderFiles[] = `getFileList -folder $workPath`;
+
+		string $filePrefix = ($assetName+"_"+$dept);
+		string $workScenes[];
+		string $latestFoundVersion = "v000";
+		int $highestVersion = 0;
+			
+		// iterate through the files to find the latest version number
+		for ($each in $workFolderFiles){
+			// match to the file naming structure
+			if (`gmatch $each ($filePrefix+"*")`){
+				$workScenes[size($workScenes)] = $each;
+				string $fileName = basenameEx($each);
+
+				string $tokenBuffer2[];
+				tokenize $fileName "_" $tokenBuffer2;
+				string $workVersion = $tokenBuffer2[2];
+				// cut off the 'w' from the string for conversion to integer
+				string $numOnly = substring($workVersion,2,size($workVersion));
+				int $wVersionInt = int($numOnly);
+				if ($wVersionInt > $highestVersion){
+					$highestVersion = $wVersionInt;
+					$latestFoundVersion = $workVersion;
+				}
+			}
+		}
+
+		if ($latestFoundVersion != ""){
+			string $filePath = ($assetLib+"/"+$assetType+"/"+$assetName+"/"+$dept+"/work/"+$latestFoundVersion);
+			return $latestFoundVersion;
+		}
+		else {
+			return "";
+		}
+	}
+	else {
+		return "";
+	}
+}
+
+global proc abxAssetsShowCreateUI (string $lib, string $type, string $name, string $template) {
+	if (!`window -exists abxAssetsCreateWindow`){
+		window -width 500 -height 200 abxAssetsCreateWindow;
+		columnLayout;
+		// asset library
+		optionMenuGrp -label "Library:"  -columnWidth 2 80 abxAssetsCreateOMLib;
+			menuItem -label "assets";
+		// asset type
+		optionMenuGrp -label "Type:"  -columnWidth 2 80  abxAssetsCreateOMType;
+			menuItem -label "characters";
+			menuItem -label "props";
+			menuItem -label "sets";
+			menuItem -label "shaders";
+			menuItem -label "lights";
+			menuItem -label "textures";
+		
+		// asset name
+		textFieldGrp -label "Name:" -text  "dontUseUnderscores"  abxAssetsCreateTFName;
+
+		// asset method
+		optionMenuGrp -label "Template:"  -columnWidth 2 80  abxAssetsCreateOMTmpl;	
+			menuItem -label "model";	
+		rowLayout -numberOfColumns 2 -columnWidth2 250 250 -columnAttach 1 "both" 0 -columnAttach 2 "both" 0;
+		button -label "Create" -c "abxAssetsCreateNew (`optionMenuGrp -q -value abxAssetsCreateOMLib`+\"/\"+`optionMenuGrp -q -value abxAssetsCreateOMType`+\"/\"+`textFieldGrp -q -text abxAssetsCreateTFName`) (`optionMenuGrp -q -value abxAssetsCreateOMTmpl`);window -e -vis 0 abxAssetsCreateWindow;" ;
+		button -label "Cancel" -c "window -e -vis 0 abxAssetsCreateWindow";
+
+		optionMenuGrp -e -value $lib abxAssetsCreateOMLib;
+		optionMenuGrp -e -value $type abxAssetsCreateOMType;
+		textFieldGrp -e -text $name abxAssetsCreateTFName;
+		optionMenuGrp -e -value $template abxAssetsCreateOMTmpl;
+		
+		showWindow abxAssetsCreateWindow;
+	}
+	else {
+		showWindow abxAssetsCreateWindow;
+	}
+}
+
+global proc abxAssetsCreateNew (string $assetPath, string $type){
+
+
+	string $tokenBuffer[];
+	tokenize $assetPath "/" $tokenBuffer;
+	string $assetLib = $tokenBuffer[0];
+	string $assetType = $tokenBuffer[1];
+	string $assetName = $tokenBuffer[2];
+
+	// vallidate the asset name
+	tokenize $assetName "_" $tokenBuffer;
+	if (size($tokenBuffer)> 1){
+		$assetName = $tokenBuffer[0];
+		int $i = 0;
+		for ($i=1;$i<size($tokenBuffer);$i++){
+			int $l = size($tokenBuffer[$i]);
+			string $capLetter = toupper(`substring $tokenBuffer[$i] 1 1`);
+			string $rest = `substring $tokenBuffer[$i] 2 $l`;
+			$assetName += ($capLetter+$rest);
+		}
+	}
+
+	// vallidate the asset name
+	tokenize $assetName " " $tokenBuffer;
+	if (size($tokenBuffer)> 1){
+		$assetName = $tokenBuffer[0];
+		int $i = 0;
+		for ($i=1;$i<size($tokenBuffer);$i++){
+			int $l = size($tokenBuffer[$i]);
+			string $capLetter = toupper(`substring $tokenBuffer[$i] 1 1`);
+			string $rest = `substring $tokenBuffer[$i] 2 $l`;
+			$assetName += ($capLetter+$rest);
+		}
+	}
+
+	// if type is a maya model asset, use the geo/rig/sourceimages structure
+	if ($type == "model"){
+		string $path = (`workspace -q -rd`+$assetLib+"/");
+		if (!`filetest -d $path`){
+			sysFile -makeDir $path;
+		}
+		$path = ($path+$assetType+"/");
+		if (!`filetest -d $path`){
+			sysFile -makeDir $path;
+		}
+		$path = ($path+$assetName+"/");
+		if (!`filetest -d $path`){
+			sysFile -makeDir $path;
+		}
+		string $deptPath = ($path+"_publish/");
+		if (!`filetest -d $deptPath`){
+			sysFile -makeDir $deptPath;
+			sysFile -makeDir ($deptPath+"sourceimages/");
+		}
+		$deptPath = ($path+"archive/");
+		if (!`filetest -d $deptPath`){
+			sysFile -makeDir $deptPath;
+		}
+		$deptPath = ($path+"geo/");
+		if (!`filetest -d $deptPath`){
+			sysFile -makeDir $deptPath;
+			sysFile -makeDir ($deptPath+"work/");
+			sysFile -makeDir ($deptPath+"archive/");
+		}
+		$deptPath = ($path+"rig/");
+		if (!`filetest -d $deptPath`){
+			sysFile -makeDir $deptPath;
+			sysFile -makeDir ($deptPath+"work/");
+			sysFile -makeDir ($deptPath+"archive/");
+		}
+		$deptPath = ($path+"sourceimages/");
+		if (!`filetest -d $deptPath`){
+			sysFile -makeDir $deptPath;
+			sysFile -makeDir ($deptPath+"work/");
+			sysFile -makeDir ($deptPath+"archive/");
+		}
+		$deptPath = ($path+"shaders/");
+		if (!`filetest -d $deptPath`){
+			sysFile -makeDir $deptPath;
+			sysFile -makeDir ($deptPath+"work/");
+			sysFile -makeDir ($deptPath+"archive/");
+		}
+		$deptPath = ($path+"data/");
+		if (!`filetest -d $deptPath`){
+			sysFile -makeDir $deptPath;
+			sysFile -makeDir ($deptPath+"clips/");
+			sysFile -makeDir ($deptPath+"reference/");
+		}
+	}
+
+	// else if the type is a fragment asset such as shaders or light rigs use a simple work/sourceimages structure
+	else if ($type == "render"){
+		string $path = (`workspace -q -rd`+$assetLib+"/");
+		if (!`filetest -d $path`){
+			sysFile -makeDir $path;
+		}
+		$path = ($path+"work/");
+		if (!`filetest -d $path`){
+			sysFile -makeDir $path;
+		}
+		$path = ($path+"archive/");
+		if (!`filetest -d $path`){
+			sysFile -makeDir $path;
+		}
+		$path = ($path+"sourceimages/");
+		if (!`filetest -d $path`){
+			sysFile -makeDir $path;
+			sysFile -makeDir ($path+"work/");
+			sysFile -makeDir ($path+"archive/");
+		}		
+	}
+	// else if the type is a 2d asset use a simple work/master struct
+	else if ($type == "texture"){
+		string $path = (`workspace -q -rd`+$assetLib+"/");
+		if (!`filetest -d $path`){
+			sysFile -makeDir $path;
+		}
+		$path = ($path+"work/");
+		if (!`filetest -d $path`){
+			sysFile -makeDir $path;
+		}
+		$path = ($path+"archive/");
+		if (!`filetest -d $path`){
+			sysFile -makeDir $path;
+		}
+	}
+	print ("Created: "+$assetLib+"/"+$assetType+"/"+$assetName+"  Template:"+$type+"\n");
+
+	string $thumbIcon = "out_character.png";
+	treeLister -e -add ($assetLib+"/"+$assetType+"/"+$assetName) $thumbIcon ("abxAssetsSetActiveAsset(\""+$assetLib+"/"+$assetType+"/"+$assetName+"\");") abxAssetsTreeLister;
+}
+
+
+global proc abxAssetsRefAsset (string $assetPath){
+	
+	string $tokenBuffer[];
+	tokenize $assetPath "/" $tokenBuffer;
+	string $assetLib = $tokenBuffer[0];
+	string $assetType = $tokenBuffer[1];
+	string $assetName = $tokenBuffer[2];
+
+	$refFile = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/_publish/"+$assetName+".mb");
+	if (!`filetest -r $refFile`){
+		$refFile = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/_publish/"+$assetName+".ma");
+	}
+
+	if (`filetest -r $refFile`){
+		abxAssetsCreateReference($refFile,$assetName,"namespace");
+	}
+	else {
+		error ("Asset not Published");
+	}
+}
+
+global proc abxAssetsRefGeo (string $assetPath){
+	
+	string $tokenBuffer[];
+	tokenize $assetPath "/" $tokenBuffer;
+	string $assetLib = $tokenBuffer[0];
+	string $assetType = $tokenBuffer[1];
+	string $assetName = $tokenBuffer[2];
+
+	$refFile = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/geo/"+$assetName+"_geo.mb");
+
+	if (!`filetest -r $refFile`){
+		$refFile = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/geo/"+$assetName+"_geo.ma");
+	}
+
+
+	if (`filetest -r $refFile`){
+		abxAssetsCreateReference($refFile,"geo","rename");
+	}
+	else {
+		error ($assetLib+"/"+$assetType+"/"+$assetName+" Geo Master Not Found");
+	}
+}
+
+
+
+global proc abxAssetsCreateReference (string $refFile, string $prefix, string $type){
+		
+
+	if ($type == "rename"){
+		namespace -set ":";
+		//evalEcho ("file -r -type \"mayaAscii\" -gl -loadReferenceDepth \"all\" -rpr \""+$prefix+"\" -options \"v=0\" \""+$refFile+"\"");
+		evalEcho ("file -r -gl -loadReferenceDepth \"all\" -rpr \""+$prefix+"\" -options \"v=0\" \""+$refFile+"\"");
+		namespace -set ":";
+	}
+	else if ($type == "namespace"){
+		namespace -set ":";
+		//evalEcho ("file -r -type \"mayaAscii\" -gl -loadReferenceDepth \"all\" -namespace \""+$prefix+"\" -options \"v=0\" \""+$refFile+"\"");
+		evalEcho ("file -r -gl -loadReferenceDepth \"all\" -namespace \""+$prefix+"\" -options \"v=0\" \""+$refFile+"\"");
+		namespace -set ":";
+	}
+}
+
+global proc abxAssetsImportAsset (string $impFile, string $prefix, string $type){
+	if ($type == "rename"){
+		//file -ir $impFile
+	}
+	else if ($type == "namespace"){
+		//evalEcho ("file -import -type \"mayaBinary\" -ra true -namespace \""+ $prefix+"\" -options "v=0;p=17"  -pr -loadReferenceDepth "all" "N:/STORY2012_PP10088/3D/story2012_maya/assets/sets/S1InsideHouse/_publish/S1InsideHouse.mb";
+
+
+	}
+	namespace -set ":";
+}
+
+
+global proc abxAssetsImportAllReferences () {
+	string $refNodes[] = `file -q -r`;
+	for ($each in $refNodes){
+		file -ir $each;
+	}
+}
+
+
+global proc abxAssetsRemoveAllNamespaces() {
+
+	int $iterations = 10;
+	for ($i=0;$i<$iterations;$i++){
+	// set namespace to root namespace
+	namespace -set ":";
+	string $foundNamespaces[] = `namespaceInfo -lon`;
+	for ($each in $foundNamespaces){	
+		// if its not an autodesk standard namespace remove the namesspace and move its children to the root namespace
+		if ($each != "UI" && $each != "shared"){
+			evalEcho("namespace -f -mv "+$each+" \":\"");
+			evalEcho("namespace -rm "+$each);
+		}
+	}	
+	}
+
+}
+
+global proc abxAssetsArchiveFile (string $filePath, string $type) {
+
+	string $pathOnly = dirname($filePath);
+	
+	string $extension = fileExtension($filePath);
+	string $sceneName= basename($filePath,("."+$extension));
+	
+
+
+	// create an archive of the current file
+
+	// if there is a log file, record its workshop version and append it to the file name
+
+	// 
+
+	if ($type == "publish"){
+		
+
+	}
+	else if ($type == "master") {
+		// check to see if there is an archive folder
+		string $archFolder = ($pathOnly+"/archive/");
+		if (!`filetest -d $archFolder`)
+			sysFile -md $archFolder;
+		if (`filetest -d $archFolder`){			
+			$archiveFiles = `getFileList -folder $archFolder`;
+			int $latestVersion = 0;
+			string $each;
+			for ($each in $archiveFiles){
+				string $tokenBuffer[];
+				tokenize $each "." $tokenBuffer;
+				if (size($tokenBuffer) == 2){
+					string $tokenBuffer2[];
+					tokenize $tokenBuffer[0] "_" $tokenBuffer2;
+					if (size($tokenBuffer2) == 3){
+						string $foundVersionStr =  $tokenBuffer2[size($tokenBuffer2)-1];
+						int $strSize = size($foundVersionStr);
+						int $foundVersion = int(`substring $foundVersionStr 2 $strSize`);
+						if ($latestVersion < $foundVersion){
+							$latestVersion = $foundVersion;
+						}
+					}
+				}
+			}
+			$latestVersion++;
+			string $latestVersionStr = "";
+			if ($latestVersion < 10)
+				$latestVesionStr = ("v00"+$latestVersion);
+			else if ($latestVersion < 100)
+				$latestVesionStr = ("v0"+$latestVersion);
+			else 
+				$latestVesionStr = ("v"+$latestVersion);
+
+			
+			string $archivePath = ($pathOnly+"/archive/"+$sceneName+"_"+$latestVesionStr+"."+$extension);
+			sysFile -move $archivePath $filePath ;
+		}
+	}
+	
+
+}
+
+global proc abxAssetsCaptureThumbnail (string $assetPath) {
+
+	string $tokenBuffer[];
+	tokenize $assetPath "/" $tokenBuffer;
+	string $assetLib = $tokenBuffer[0];
+	string $assetType = $tokenBuffer[1];
+	string $assetName = $tokenBuffer[2];
+
+	string $pbPath = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/"+$assetName+".png");
+
+	// set render globals
+	//setAttr "defaultRenderGlobals.animation" 1;
+	//setAttr defaultRenderGlobals.outFormatControl 0;
+	//setAttr "defaultRenderGlobals.extensionPadding" 4;
+
+	int $imgFormat = `getAttr defaultRenderGlobals.imageFormat`;
+
+	// PNG image format
+	setAttr defaultRenderGlobals.imageFormat 32;
+	float $curFrame = `currentTime -q`;
+	int $imgWidth = 128;
+	int $imgHeight = 128;
+	
+	print (`playblast -ae`+"\n");
+
+	// setup the playblast as a command string for deferred evaluation
+	string $cmd = ("playblast  -format iff -completeFilename \""+$pbPath+"\" -frame "+$curFrame+" -forceOverwrite -sequenceTime 0 -clearCache 1 -viewer 0 -showOrnaments 0 -offScreen -percent 100 -widthHeight "+$imgWidth+" "+$imgHeight);
+	if (`about -version` == "2012 x64" || `about -version` == "2012"){
+		$cmd = ("playblast  -format iff -filename \""+$pbPath+"\" -frame "+$curFrame+" -fp 0 -forceOverwrite -sequenceTime 0 -clearCache 1 -viewer 0 -showOrnaments 0 -percent 100 -compression \"png\" -widthHeight "+$imgWidth+" "+$imgHeight+";\nsysFile -rename \""+$pbPath+"\" \""+$pbPath+".0.png\";");
+	}
+	
+	// add to the deferred command to return the render global image format to sgi
+	$cmd += (";setAttr defaultRenderGlobals.imageFormat "+$imgFormat+";");
+
+	// run the playblast command as deferred evaluation
+	evalDeferred ($cmd);
+
+	
+
+}
+
+global proc abxAssetsMakeTexturesLocal (string $assetPath) {
+	string $tokenBuffer[];
+	tokenize $assetPath "/" $tokenBuffer;
+	string $assetLib = $tokenBuffer[0];
+	string $assetType = $tokenBuffer[1];
+	string $assetName = $tokenBuffer[2];
+
+
+	string $mayaFiles[] = `ls -type file -type psdFileTex -type mentalrayTexture`;
+
+	for ($each in $mayaFiles){
+		string $texPath = `getAttr ($each+".ftn")`;
+		if (`filetest -r $texPath`){
+		// move file to local dir
+		string $texExt = fileExtension($texPath);
+		string $texFileName = basename($texPath ,("."+$texExt));
+		string $newTexPath = (`workspace -q -rd`+$assetLib+"/"+$assetType+"/"+$assetName+"/sourceimages/"+$texFileName+"."+$texExt);
+
+		if ($newTexPath!=$texPath){
+	
+			evalEcho("sysFile -copy \""+$newTexPath+"\" \""+ $texPath+"\"");
+			evalEcho("setAttr -type \"string\" "+$each+".ftn"+" \""+ $newTexPath+"\"");
+		}
+		else{
+			print ("Texture Already Local:"+$texPath+"\n");
+		}
+		}
+	}
+
+
+}
+
+global proc abxAssetsDeleteAllDisplayLayers () {
+	string $displayLayers[] = `ls -type displayLayer`;
+
+	for ($each in $displayLayers){
+		if (!`gmatch $each "*defaultLayer*"`){
+			layerEditorDeleteLayer $each;
+			//delete $each;
+			//updateEditorLayer DisplayLayerTab;
+			print ("Deleting Display Layer "+$each+"\n");
+		}
+	}
+
+}
+
+global proc abxAssetsDeleteAllRenderLayers () {
+	string $renderLayers[] = `ls -type renderLayer`;
+
+	for ($each in $renderLayers){
+		if (!`gmatch $each "*defaultRenderLayer*"`){
+			renderLayerEditorDeleteLayer RenderLayerTab $each;
+			//delete $each;
+			updateEditorRenderLayer RenderLayerTab;
+			print ("Deleting Render Layer "+$each+"\n");
+		}
+	}
+
+}
+
+global proc abxAssetsHideJointAxes () {
+
+	string $joints[] = `ls -type joint`;
+	for ($each in $joints){
+		setAttr ($each+".displayLocalAxis") 0;
+ 
+	}
+}
+
+global proc abxAssetsNoPolySmooth() {
+	
+	string $geo[] = `ls -type mesh`;
+ 	for ($each in $geo){
+   		displaySmoothness -divisionsU 0 -divisionsV 0 -pointsWire 4 -pointsShaded 1 -polygonObject 1 $each;
+    	subdivDisplaySmoothness -smoothness 1 $each;
+ 
+ 	}
+	
+}
+
+global proc abxAssetsAttachMRProxy () {
+	
+
+}
+
+
+global proc abxAssetsRemoveUnusedInfluences () {
+
+	string $skinnedPolys[] = `ls -type skinCluster`;
+	for ($each in $skinnedPolys){
+		// removeUnusedForSkin $each 1;
+ 
+	}
+}
+
+global proc abxAssetsRemoveAllReferences(){
+
+	string $references[] = `file -q -r`;
+	for ($each in $references){
+		file -rr $each;
+
+	}
+
+	string $references[] = `file -q -r`;
+	for ($each in $references){
+		file -rr $each;
+
+	}
+
+	string $references[] = `file -q -r`;
+	for ($each in $references){
+		file -rr $each;
+
+	}
+
+
+}
+
+global proc abxDeleteAllRN() {
+	// clear out old reference nodes
+	$oldRN = `ls -type reference`;
+	for ($each in $oldRN){
+		lockNode -l 0 $each;
+		delete $each;
+	}
+
+}
+
+global proc abxDeleteUnknownRefNodes (){
+	select `ls -type reference "*UNKNOWN*"`;
+	if (size(`ls -sl`) > 0)
+		lockNode -l 0;
+	delete `ls -type reference "*UNKNOWN*"`;
+}
+
+global proc abxDeleteSharedRefNodes (){
+	select `ls -type reference "*sharedReference*"`;
+	if (size(`ls -sl`) > 0)
+		lockNode -l 0;
+	delete `ls -type reference "*sharedReference*"`;
+}
+
+global proc abxDeleteExtraDefaultRenderLayers () {
+	string $drl[] = `ls "*defaultRenderLayer"`;
+	for ($each in $drl){
+
+		if ($each != "defaultRenderLayer" && $each != "defaultRenderLayerFilter"){
+			delete $each;
+			
+		}
+	}
+
+	$drl = `ls "*defaultLayer"`;
+	for ($each in $drl){
+
+		if ($each != "defaultLayer" && $each != "defaultLayerFilter"){
+			delete $each;
+			
+		}
+	}
+
+	$drl = `ls "defaultRenderLayer*"`;
+	for ($each in $drl){
+
+		if ($each != "defaultRenderLayer" && $each != "defaultRenderLayerFilter"){
+			delete $each;
+			
+		}
+	}
+
+	$drl = `ls "defaultLayer*"`;
+	for ($each in $drl){
+
+		if ($each != "defaultLayer" && $each != "defaultLayerFilter"){
+			delete $each;
+			
+		}
+	}
+}
+
+global proc abxAssetsDeleteUnkownNodes () {
+
+	delete `ls -type unknown`;
+}
+
+
+global proc abxAssetsAutoRig (string $assetPath) {
+
+
+	// open the rig scene template
+
+	// reference the geo file
+
+	// parent the all contents of the geo file under the mover node
+
+	// add geometry to all the res sets
+
+	// save rig work file for asset
+}
+

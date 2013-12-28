@@ -1,0 +1,43 @@
+global proc distFinder()
+{
+string $array[] = `ls -sl`;
+$numobjs=size($array);
+if($numobjs % 2 == 0)
+{
+    if($numobjs < 2)
+    {
+        confirmDialog -title "Rerun the Script" -message "You can only select two Objects. Please select two and rerun the script." 
+        -button "Okay";
+    }
+    else{
+         distance;
+    }
+}
+
+else{
+        confirmDialog -title "Rerun the Script" -message "You can only select two Objects. Please select two and rerun the script." 
+        -button "Okay";
+}
+}
+
+global proc distance()
+{
+string $array[] = `ls -sl`;
+select $array[0];
+float $part1Pos[] = `xform -q -ws -t`;
+select $array[1];
+float $part2Pos[] = `xform -q -ws -t`;
+
+
+float $distancePos[];
+$distancePos[0] = $part1Pos[0] - $part2Pos[0];
+$distancePos[1] = $part1Pos[1] - $part2Pos[1];
+$distancePos[2] = $part1Pos[2] - $part2Pos[2];
+
+// Use mag to get the length of those 3 values
+// This very conveniently also converts 3 (vector) values in 1 (float).
+float $distance = `mag <<$distancePos[0], $distancePos[1], $distancePos[2]>>`;
+//return the result
+select -cl;
+confirmDialog -title "Distance" -message ("The distance between the two objects is " + $distance) 
+        -button "Okay";}

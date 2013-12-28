@@ -1,0 +1,23 @@
+// keyAtValue
+global proc keyAtValue() {
+
+
+	$sel = `ls -sl`;
+	float $i = 101;
+	for ($i=155;$i<193;$i=$i+.2){
+		currentTime -e $i;
+		for ($each in $sel){
+			float $yVal = `getAttr ($each+".ty")`;
+			if ($yVal < -1 && $yVal > -2){
+				//string $selBuffer[];
+				//stringArrayRemove($sel, $selBuffer);
+				//$sel = $selBuffer;
+				setKeyframe ($each+".ty");
+				print "keyframe set\n";
+			}
+		}
+
+	}
+	
+
+}

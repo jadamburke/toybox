@@ -1,0 +1,7 @@
+// rsCameraUI
+// Created by: adam
+// Date: 2013/03/20 11:24:16
+
+global proc rsCameraUI(){
+python("import rsCameraUI;rsCameraUI.rsCameraUIBuild()");
+}

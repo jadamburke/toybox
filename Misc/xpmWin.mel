@@ -1,0 +1,82 @@
+//
+// xpmWin;
+// smann@charlex.com
+//
+// creates a simple window with all the generic maya icons
+//  click on the button to isolate it in its own window.
+//
+
+global proc xpmWin()
+{
+	string $iconDirs = `getenv XBMLANGPATH`;
+	
+string $xpmPath = `getenv XBMLANGPATH`;
+string $pathBuffer[];
+tokenize $xpmPath ";" $pathBuffer;
+print $pathBuffer;
+
+string $extrasIconDir = "C:/Program Files/AliasWavefront/Maya6.0.1/extras/icons/";
+$pathBuffer[`size$pathBuffer`] = $extrasIconDir;
+
+    if ( `window -exists XPM` )
+        deleteUI XPM;
+
+
+    window -title xpms -iconName "Icons" XPM;
+
+	scrollLayout;
+	columnLayout;
+	text -l " BMPS" -font "boldLabelFont";
+ for ($path in $pathBuffer)
+ 	{
+ 	string $imgs[] = `getFileList -folder ($path + "/") -fs "*.bmp"`;
+		if (size($imgs) <=0)
+			print "no icons\n";
+		else
+		{
+ 	frameLayout -cll 1 -cl 1 -l $path ;
+		rowColumnLayout -numberOfColumns 10 ;
+ 			for ($img in $imgs)
+ 				{
+ 				if ($path == $extrasIconDir)
+ 					$img = `tolower $img`;
+ 				string $imgName = ($path + "/" + $img);
+ 				if (`filetest -r $imgName` == 0)
+ 					break;
+ 				string $cmd = ("window;columnLayout; symbolButton -image \"" +  $img + "\"; showWindow;");
+             	           	symbolButton -image $imgName -c $cmd -annotation $img;
+ 				}
+ 		setParent ..;
+	setParent ..;
+		}
+ 	}
+ 	text -l " XPMS" -font "boldLabelFont";
+ for ($path in $pathBuffer)
+ 	{
+	string $imgs[] = `getFileList -folder ($path + "/") -fs "*.xpm"`;
+		if (`size$imgs` <=0)
+		   print "no icons \n";
+		else
+		{
+ 	frameLayout -cll 1 -cl 1 -l $path ;
+		rowColumnLayout -numberOfColumns 10 ;
+ 			for ($img in $imgs)
+ 				{
+ 				string $imgName = ($path + "/" + $img);
+ 				if (`filetest -r $imgName` == 0 || $img == "render_tc_curvature.xpm" || $img == "render_tc_curvature.xpm")
+ 					print ($imgName + "bah\n");
+ 				else
+                                        {
+                                        string $cmd = ("window;columnLayout; symbolButton -image \"" +  $img + "\"; showWindow;");
+                                        symbolButton -image $imgName -c $cmd -annotation $img;
+                                        }
+ 				}
+		setParent ..;
+	setParent ..;
+		}
+ 	}
+
+///        setParent.. ;
+
+    showWindow;
+}

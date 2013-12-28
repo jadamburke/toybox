@@ -1,0 +1,107 @@
+// setCloudLightDir.mel
+// Created by: raphe
+// Date: 2013/04/11 17:53:57
+
+global proc setCloudLightDir(){
+	
+	string $object[] = `ls -sl`;
+
+	string $current;
+	int $count = 0;
+
+	for ($current in $object){
+	    $count = $count + 1;
+	    if($count == 1){
+	        continue;
+	    }
+
+	    // light dir
+		$dirRotX = `getAttr ($object[0] + ".rotateX")`;
+		$dirRotY = `getAttr ($object[0] + ".rotateY")`;
+		$dirRotZ = `getAttr ($object[0] + ".rotateZ")`;
+
+		// fluid container rotation
+	    $curRotX = `getAttr ($current + ".rotateX")`;
+	    $curRotY = `getAttr ($current + ".rotateY")`;
+	    $curRotZ = `getAttr ($current + ".rotateZ")`;
+
+	    $newRotX = 1;
+	    $newRotY = 1;
+		$newRotZ = 1;
+
+
+
+	    // combining
+	    // if ($dirRotX < 0){
+	    // 	$newRotX = $dirRotX + $curRotX;
+	    // }else{
+	    $newRotX = $dirRotX - $curRotX;
+	    // }
+	    
+	    // if ($dirRotY < 0){
+	    // 	if ($curRotY < 0){
+	    		// $bla=-5;
+	    		// print(abs $bla);
+	    		// return;
+	    		$newRotY = $dirRotY - $curRotY;
+
+	    // 	}else{
+	    // 		$newRotY = $dirRotY - $curRotY;
+	    // 	}
+	    // }else{
+	    // 	if ($curRotY < 0){
+	    // 		$newRotY = $dirRotY - $curRotY;
+
+	    // 	}else{
+	    // 		$newRotY = $dirRotY - $curRotY;
+	    // 	}
+	    // }
+	    
+	    // if ($dirRotZ < 0){
+	    // 	$newRotZ = $dirRotZ + $curRotZ;
+	    // }else{
+	    $newRotZ = $dirRotZ - $curRotZ;
+	    // }
+	    // $newRotY = $dirRotY + $curRotY;
+	    // $newRotZ = $dirRotZ + $curRotZ;
+
+	    // setting sphere to combination
+	    setAttr ($object[0] + ".rotateX") $newRotX;
+	    setAttr ($object[0] + ".rotateY") $newRotY;
+	    setAttr ($object[0] + ".rotateZ") $newRotZ;
+
+		float $TM[] = `xform -q -ws -matrix $object[0]`;
+		float $zVec[] = {$TM[8], $TM[9], $TM[10]};
+		float $zVecInverse[] = {-$zVec[0], -$zVec[1], -$zVec[2]};
+
+	    // float $TM_i[] = `xform -q -ws -matrix $current`;
+	    // float $zVec_i[] = {$TM_i[8], $TM_i[9], $TM_i[10]};
+	    // float $zVecInverse_i[] = {-$zVec_i[0], -$zVec_i[1], -$zVec_i[2]};
+
+	    // print $current;
+	    // print ":\n";
+	    // print ($zVecInverse_i[0] + "\n");
+	    // print ($zVecInverse_i[1] + "\n");
+	    // print ($zVecInverse_i[2] + "\n");
+	    // print "\n\n";
+
+		setAttr ($current + ".directionalLightX") $zVecInverse[0] (!`getAttr ($current + ".directionalLightX")`);
+		setAttr ($current + ".directionalLightY") $zVecInverse[1] (!`getAttr ($current + ".directionalLightY")`);
+		setAttr ($current + ".directionalLightZ") $zVecInverse[2] (!`getAttr ($current + ".directionalLightZ")`);
+
+		setAttr ($object[0] + ".rotateX") $dirRotX;
+	    setAttr ($object[0] + ".rotateY") $dirRotY;
+	    setAttr ($object[0] + ".rotateZ") $dirRotZ;
+
+	 //    print ($zVecInverse[0] + $zVecInverse_i[0]);
+		// print "\n";
+	 //    print ($zVecInverse[1] + $zVecInverse_i[1]);
+		// print "\n";
+	 //    print ($zVecInverse[2] + $zVecInverse_i[2]);
+
+		// setAttr ($current + ".directionalLightX") ($zVecInverse[0] + $zVecInverse_i[0]) (!`getAttr ($current + ".directionalLightX")`);
+		// setAttr ($current + ".directionalLightY") ($zVecInverse[1] + $zVecInverse_i[1]) (!`getAttr ($current + ".directionalLightY")`);
+		// setAttr ($current + ".directionalLightZ") ($zVecInverse[2] + $zVecInverse_i[2]) (!`getAttr ($current + ".directionalLightZ")`);
+	}
+
+}

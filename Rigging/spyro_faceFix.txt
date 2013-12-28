@@ -1,0 +1,10 @@
+string $sels[] = `ls -selection`;
+
+for ($tmp in $sels)
+{
+string $drivenControl = substitute("_touch",$tmp,"");
+
+//disconnectAttr ($drivenControl+".translate");
+connectAttr -f ($tmp+".translate")($drivenControl+".translate");
+connectAttr -f ($tmp+".rotate")($drivenControl+".rotate");
+}

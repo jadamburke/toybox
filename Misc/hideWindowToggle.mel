@@ -1,0 +1,46 @@
+// hideWindowToggle
+
+global proc hideWindowToggle() {
+
+	global string $abxVisWindows[];
+	if (size($abxVisWindows)==0){
+		$abxVisWindows[0] = "visible";
+	}
+	
+	// hides the windows
+	if ($abxVisWindows[0] == "visible"){
+
+		// get list of visible windows
+		clear $abxVisWindows;
+		$abxVisWindows[0] = "hidden";
+	
+		string $currentWindows[] = `lsUI -windows`;
+		for ($each in $currentWindows) {
+		
+			if (`window -q -visible $each` && $each != "MayaWindow"){
+				$abxVisWindows[size($abxVisWindows)] = $each;
+				window -e -iconify 1 $each;
+			}
+			
+	
+		}
+	}
+	else if ($abxVisWindows[0] == "hidden"){
+	
+		
+
+		if (size($abxVisWindows) > 1){
+			int $i = 1;
+			for ($i=1;$i<size($abxVisWindows);$i++){
+				if (`window -exists $abxVisWindows[$i]`){
+					window -e -iconify 0 $abxVisWindows[$i];
+				}
+
+			}
+
+		}
+		clear $abxVisWindows;
+
+	}
+
+}

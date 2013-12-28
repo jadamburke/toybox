@@ -1,0 +1,115 @@
+// textureRezSwitch
+// Created by: Jason
+// Modified by: Raphe on 3/26/2013
+//
+// This script loops through all file nodes in a scene,
+// figures out what SG nodes they're attached to and what mesh objects
+// the SG nodes are attached to, then compares the camera location to
+// a vertex on the geo and sets texture resolution based on the difference
+
+global proc textureRezSwitch()
+{
+    //find the renderCam
+    string $renderCamera;
+    string $cams[] = `ls -type camera`;
+    for ($cam in $cams){
+        string $camNameSpace[];
+        tokenize ($cam,":",$camNameSpace);
+        int $z = `size $camNameSpace`-1;
+        if($camNameSpace[$z] == "renderCamShape"){
+            $renderCamera = substitute("Shape",$cam,"");;
+        }
+    }
+
+    //make locator group or declare it
+    string $locGroup;
+    
+    if(`objExists "texture_distance_loc_GRP"`){
+        $locGroup = "texture_distance_loc_GRP";
+        print "group exists\n";
+    }else{
+        $locGroup = `group -em -n "texture_distance_loc_GRP"`;
+        addAttr -ln "distance"  -at double  texture_distance_loc_GRP;
+        setAttr -e-keyable true texture_distance_loc_GRP.distance;
+        setAttr ($locGroup+".distance") 200;
+    }
+
+    string $fileNodes[] = `ls -type file`;
+    
+    for($tmp in $fileNodes){
+       
+        string $filePath = `getAttr ($tmp+".fileTextureName")`;
+        string $ext = fileExtension($filePath);
+        // string $baseFileName = `basename($filePath)`;
+        string $baseFileName = `basenameEx($filePath)`;
+
+        string $pathParts[];
+        tokenize($filePath,"/",$pathParts);
+        int $ppLOW = `size $pathParts`-1;
+
+        $lowPath = substitute($pathParts[$ppLOW],$filePath,("LOW/"+$baseFileName+"_LOW."+$ext));
+        $medPath = substitute($pathParts[$ppLOW],$filePath,("MED/"+$baseFileName+"_MED."+$ext));
+        int $existsLow = `filetest -r $lowPath`;
+        int $existsMed = `filetest -r $medPath`;
+        if(! $existsLow){
+            $lowPath = $filePath;
+        }
+        if(! $existsMed){
+            $medPath = $filePath;
+        }
+       
+        string $outGoing[] = `listHistory -f true $tmp`;
+        for($going in $outGoing){
+            if(`objectType -isType shadingEngine $going`){
+                string $distNode;
+                string $parts[];
+                string $nameSpace = tokenize ($tmp,":",$parts);
+                string $fullName = ($parts[0]+"_"+$parts[1]+"_"+$parts[2]);
+                int $q = `size $parts` - 2;
+                string $connection[] = `listConnections -et 1 -type mesh -s 1 -d 0 ($going+".dagSetMembers[0]")`;
+                
+                if(`objExists $connection[0]`){
+                    if( `objExists ($fullName+"_COND")`){
+                        // print "pass: ";
+                        // print ($fullName+"_COND");
+                        // print "\n";
+                    }else{
+                        $works = catch(`xform -worldSpace -q -translation ($connection[0]+".vtx[1]")`);
+                        if($works == 0){
+
+                            float $spaceValue[] = `xform -worldSpace -q -translation ($connection[0]+".vtx[1]")`;
+                            string $distLoc = `createNode transform -n ($fullName+"_texture_dist_LOC")`;
+
+                            createNode locator -n ($fullName+"_texture_dist_LOCShape") -parent $distLoc;
+                            parent $distLoc $locGroup;
+                            setAttr ($distLoc+".translate") $spaceValue[0] $spaceValue[1] $spaceValue[2];
+                            setAttr ($distLoc+".visibility") 0;
+                        
+                            $distNode = `createNode distanceBetween -n ($fullName+"_texture_DIST")`;
+                            connectAttr ($renderCamera+".translate") ($distNode+".point1");
+                            connectAttr ($distLoc+".translate") ($distNode+".point2");
+                            
+                            string $theBody = ($parts[0]+":"+$parts[1]+":BODY");
+                            pointConstraint -mo $theBody $distLoc;
+                            string $condition = `createNode condition -n ($fullName+"_COND")`;
+                            setAttr ($condition+".operation") 2;
+                            setAttr ($condition+".colorIfTrueR") 2;
+                            setAttr ($condition+".colorIfFalseR") 1;
+                            connectAttr ($distNode+".distance") ($condition+".firstTerm");
+                            connectAttr ($condition+".outColorR") ($tmp+".frameExtension");
+                            connectAttr ($locGroup+".distance") ($condition+".secondTerm");
+                            
+                            print ($distNode+".distance");
+                            print "\n";
+                            // string $expDataLow = ("if("+$distNode+".distance > 250) {"+$tmp+".fileTextureName=\""+$lowPath+"\";}");
+                            // string $expDataMed = ("if("+$distNode+".distance > 100) {"+$tmp+".fileTextureName=\""+$MedPath+"\";}");
+                            // expression -s $expDataLow -n ($fullName+"_EXP");
+                            // expression -s $expDataMed -n ($fullName+"_EXP");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

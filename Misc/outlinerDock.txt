@@ -1,0 +1,4 @@
+Outliner Dock: Creates a dockable outliner window 
+ 
+ 
+ 

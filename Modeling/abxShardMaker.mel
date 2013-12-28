@@ -1,0 +1,137 @@
+// abxShardMaker
+global proc abxShardMaker() {
+
+if (`window -ex abxShardMakerWindow` != true)
+	{
+		window -w 150 -h 200 -t "abxShardMaker" -in "abxShardMaker" -s true -tb true abxShardMakerWindow;
+
+		columnLayout -rs 1 -w 400 -cal "center" -cat "both" 0 -adj true abxShardMakerColLyt;
+
+		
+		textFieldButtonGrp -label "Splitter Geo" -text "" -buttonLabel "<--" -bc "abxShardMakerGetSlice" abxShardMakerSlicerTextField;
+		radioButtonGrp -numberOfRadioButtons 2 -label "Method" -labelArray2 "Per Obj" "Group";
+		intSliderGrp -label "Iterations" -field true -s 1 -fs 1 -minValue 1 -maxValue 8 -fieldMinValue 1 -fieldMaxValue 10 -value 1 abxShardMakerIntField;
+		intSliderGrp -label "Cuts Per Iteration" -field true -s 1 -fs 1 -minValue 1 -maxValue 8 -fieldMinValue 1 -fieldMaxValue 10 -value 1 abxShardMakerCutIntGrp;
+		checkBoxGrp -l "Cleanup";
+		checkBoxGrp -l "Center Pivots";
+		checkBoxGrp -l "Check for Errors";
+		checkBoxGrp -l "Seperate Faces";
+		floatSliderGrp -enable true -label "Center Cut Bias" -field true -minValue 0 -maxValue 1 -fieldMinValue 0 -fieldMaxValue 1.0 -value 0  abxShardMakerCutBiasFloatSlider;
+		button -label "Do It" -h 20 -w 60 -c "abxShardMakerProc `intSliderGrp -q -v abxShardMakerIntField` `textFieldButtonGrp -q -text abxShardMakerSlicerTextField` `floatSliderGrp -q -v abxShardMakerCutBiasFloatSlider`";
+		button -label "Cleanup GEO" -h 20 -w 60 -c "polyCleanupArgList 3 { \"0\",\"1\",\"0\",\"0\",\"0\",\"0\",\"0\",\"0\",\"1\",\"1e-005\",\"1\",\"0.001\",\"0\",\"1e-005\",\"0\",\"1\",\"1\" };";
+		button -label "Delete History" -h 20 -w 60 -c "DeleteHistory";
+
+		window -e -w 413 -h 135 abxShardMakerWindow;
+		showWindow abxShardMakerWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 413 -h 135 abxShardMakerWindow;
+		showWindow abxShardMakerWindow;
+    	}
+}
+
+global proc abxShardMakerProc (int $iterations,string $splitObj, float $cutBias) {
+
+string $sel[] = `ls -sl`;
+//string $splitObj = $sel[0];
+string $obj = $sel[0];
+string $newObj[] = {$obj};
+string $result[];
+//abxShardSplit $splitObj $obj;
+for ($i=1;$i<=$iterations;$i++){
+	string $bufferArray[] = $newObj;
+	$newObj = {};	
+	for ($each in $bufferArray){
+		$result = `abxShardSplit $splitObj $each $cutBias`;
+		string $arrayCatBuffer[] = stringArrayCatenate($newObj,$result);
+		$newObj = $arrayCatBuffer;
+	}
+	
+}
+
+
+
+}
+
+global proc string[] abxShardSplit(string $splitObj, string $obj, float $centerCut) {
+
+string $result[];
+$newObj = `duplicate $splitObj`;
+//$centerCut = abs($centerCut-1);
+
+float $center[] = `objectCenter -gl $obj`;
+float $origBbox[] = `exactWorldBoundingBox $obj`;
+float $bbox[] = {($center[0] - $origBbox[0]*$centerCut+$origBbox[0]),
+		($center[1] - $origBbox[1]*$centerCut+$origBbox[1]),
+		($center[2] - $origBbox[2]*$centerCut+$origBbox[2]),
+		($center[0] - $origBbox[3]*$centerCut+$origBbox[3]),
+		($center[1] - $origBbox[4]*$centerCut+$origBbox[4]),
+		($center[2] - $origBbox[5]*$centerCut+$origBbox[5])};
+float $randPos[] = {rand($bbox[0],$bbox[3]),rand($bbox[1],$bbox[4]),rand($bbox[2],$bbox[5])};
+float $randRot[] = {rand(-180,180), rand(-180,180), rand(-180,180)};
+move -a -rpr $randPos[0] $randPos[1] $randPos[2] $newObj;
+rotate -a $randRot[0] $randRot[1] $randRot[2] $newObj;
+
+$splitObj = $newObj[0] ;
+string $splitObjShape[] = `listRelatives -shapes $newObj`;
+string $objShape[] = `listRelatives -shapes $obj`;
+$polyBoolName = ($obj+"_boolA");
+$polyBoolNameB = ($obj+"_boolB");
+$cutObjA = ($obj+"_pieceA");
+$cutObjB = ($obj+"_pieceB");
+
+createNode polyBoolOp -name $polyBoolName;
+setAttr ($polyBoolName+".op") 3;
+connectAttr ($objShape[0]+".outMesh") ($polyBoolName+".inputPoly[0]");
+connectAttr ($objShape[0]+".worldMatrix[0]") ($polyBoolName+".inputMat[0]");
+connectAttr ($splitObjShape[0]+".outMesh") ($polyBoolName+".inputPoly[1]");
+connectAttr ($splitObjShape[0]+".worldMatrix[0]") ($polyBoolName+".inputMat[1]");
+createNode mesh -name $cutObjA;
+connectAttr ($polyBoolName+".output") ($cutObjA+".inMesh");
+//connectAttr -na ($cutObjA+".instObjGroups[0]") "initialShadingGroup.dagSetMembers";
+sets -e -forceElement initialShadingGroup $cutObjA;
+
+createNode polyBoolOp -name $polyBoolNameB;
+setAttr ($polyBoolNameB+".op") 2;
+connectAttr ($objShape[0]+".outMesh") ($polyBoolNameB+".inputPoly[0]");
+connectAttr ($objShape[0]+".worldMatrix[0]") ($polyBoolNameB+".inputMat[0]");
+connectAttr ($splitObjShape[0]+".outMesh") ($polyBoolNameB+".inputPoly[1]");
+connectAttr ($splitObjShape[0]+".worldMatrix[0]") ($polyBoolNameB+".inputMat[1]");
+createNode mesh -name $cutObjB;
+connectAttr ($polyBoolNameB+".output") ($cutObjB+".inMesh");
+//connectAttr -na ($cutObjB+".instObjGroups[0]") "initialShadingGroup.dagSetMembers";
+sets -e -forceElement initialShadingGroup $cutObjB;
+
+setAttr ($splitObj+".visibility") 0;
+setAttr ($obj+".visibility") 0;
+
+string $temp[] = `listRelatives -parent $cutObjA`;
+string $temp2[] = `listRelatives -parent $cutObjB`;
+string $result[] = {$temp[0],$temp2[0]};
+
+select $splitObj;
+
+return $result;
+
+}
+
+global proc abxShardMakerGetSlice(){
+	$sel = `ls -sl`;
+	textFieldButtonGrp -e -text $sel[0] abxShardMakerSlicerTextField;
+}
+
+global proc int abxShardMakerOriginCheck(string $obj){
+		
+
+	int $vtxCount = `polyEvaluate -v $obj`;
+	int $i=0;
+	for ($i=0;$i<$vtxCount;$i++){
+		float $ppos[] = `pointPosition -w ($obj+".pt["+$i+"]")`;
+		if ($ppos[0] == 0 && $ppos[1] == 0 && $ppos[2] == 0){
+			return 1;
+		}
+	}
+	
+	return 0;
+}

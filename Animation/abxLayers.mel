@@ -1,0 +1,229 @@
+// abxAnimLayers
+global proc abxLayers(){
+	if (`window -q -ex abxLayersWindow`){
+		showWindow abxLayersWindow;
+	}
+	else{
+	
+	string $parent = `window -w 186 -h 300 -t abxLayers -tlb true abxLayersWindow`;
+	$panelName = "abxLayers";
+	setParent $parent;
+	$panelName = `formLayout $panelName`;
+	//$panelName = `columnLayout -rs 2 -cal "center" -cat "both" 0 -adj true $panelName` ;
+	//--------------Toolbar Layout-----------------------
+	rowLayout -nc 3 -adj 1 -co3 2 0 0  -cw3 67 23 23 -ct3 "both" "both" "both" -cl3 "right" "center" "center" abxLayersToolbar;
+		textField -ann "Character Menu" -editable false -text "None" abxLayersCharText;
+			popupMenu -b 1 abxLayersCharMenu;
+		iconTextButton -ann "New Character" -image "out_character.xpm" -w 23 -h 23 -command "columnLayout -e -visible true abxLevelNewForm; tabLayout -e -visible false abxLayersCharTabs";
+		iconTextButton -ann "New Layer" -di "fileNew.xpm" -image "newlayer.xpm" -w 23 -h 23 -command "abxLayersNew(eval(\"layout -q -dtg (`tabLayout -q -st abxLayersCharTabs`)\"),\"Layer\")" abxLayersSave;
+
+		//iconTextButton -ann "Refresh" -image "autoload.xpm" -w 23 -h 23 -command "abxLayersRefresh";
+		//iconTextButton -ann "Help" -style "iconOnly" -w 23 -h 23 -image "pickOtherComp.xpm" -label "?" -command "abxLayersHelp";
+		
+		
+		setParent..;
+
+	//--------------Picker Tab Layout--------------------
+	tabLayout -tabsVisible false -imw 0 -imh 0 abxLayersCharTabs;	
+	
+	//--------------New Level Layout -------------------
+	columnLayout -visible false -rs 2 -cat "both" 3 -adj true -parent $panelName abxLevelNewForm;
+		textFieldGrp -adj 2 -cw 1 50 -label "Name" -text "Character" abxLevelCharNameTxt;
+		rowLayout -adj 1 -nc 3 -cw3 10 50 50 -ct3 "both" "both" "both" -cl3 "center" "center" "center" -co3 5 5 5;
+			button -visible false;
+			button -label "OK" -c "abxLayersNewChar `textFieldGrp -q -text abxLevelCharNameTxt`;layout -e -visible true abxLayersCharTabs;layout -e -visible false abxLevelNewForm" ;
+			button -label "Cancel" -c "layout -e -visible true abxLayersCharTabs;layout -e -visible false abxLevelNewForm";
+		setParent..;
+
+	abxLayersRead();
+	
+	formLayout -e 
+		-af abxLayersToolbar "top" 0
+		-af abxLayersToolbar "left" 0
+		-af abxLayersToolbar "right" 0
+		-aof abxLayersToolbar "bottom" -24
+
+		-af abxLayersCharTabs "top" 24
+		-af abxLayersCharTabs "left" 0
+		-af abxLayersCharTabs "right" 0
+		-af abxLayersCharTabs "bottom" 0
+
+		-af abxLevelNewForm "top" 24
+		-af abxLevelNewForm "left" 0
+		-af abxLevelNewForm "right" 0
+		-af abxLevelNewForm "bottom" 0
+
+		$panelName;
+	
+	showWindow abxLayersWindow;
+	}
+}
+
+
+global proc abxLayersNewControl (string $parent, string $char, string $layer) {
+
+	string $name;
+	if (`frameLayout -q -exists ($layer+"Lyt")`){
+		int $i=1;
+		while (`frameLayout -q -exists ($layer+$i+"Lyt")`)
+			$i++;
+		$layer = ($layer+$i);
+	}
+	print $parent;
+		
+	frameLayout -parent $parent -cll false -lv false -bs "etchedIn" ($layer+"Lyt");
+	string $newLyt = `rowLayout -nc 6 -co6 2 2 0 0 0 0 -adj 3 -cw6 20 25 40 20 20 20`;
+
+	$timeTgl = `iconTextCheckBox -h 18 -w 18 -v 1 -l "" -style textOnly -font plainLabelFont`;
+		iconTextCheckBox -e -cc ("abxLayersTimeTgl "+$timeTgl+" "+$char+" "+$layer) $timeTgl;
+	$isoTgl = `iconTextCheckBox -h 18 -w 18 -v 1 -l "" -style textOnly -font plainLabelFont`;
+		iconTextCheckBox -e -cc ("abxLayersIsoTgl "+$isoTgl)  $isoTgl;
+	text -label $layer;
+			popupMenu -b 3;
+			menuItem -label $layer;
+			menuItem -d true;menuItem -d true;menuItem -d true;
+			menuItem -label "Rename Level";
+			menuItem -label "Select Members" -c ("abxLayersSelectMembers "+$char+" "+$layer);
+			menuItem -label "Add Selected to Level";
+			menuItem -label "Remove Selected from Level";
+			menuItem -d true;
+			menuItem -label "Add Selected to Isolate";
+			menuItem -label "Remove Selected from Isolate";
+			menuItem -d true;
+			menuItem -label "Sync Keyframes";
+			menuItem -d true;
+			menuItem -label "Delete Level";
+	button -label "K" -c ("abxLayersKey "+$char+" "+$layer+" 0");
+	button -label "B" -c ("abxLayersKey "+$char+" "+$layer+" 1");
+	button -label "S" -c ("abxLayersKey "+$char+" "+$layer+" 2");
+}
+
+global proc abxLayersNewChar(string $name){
+	
+	gridLayout -parent abxLayersCharTabs -cw 200 -ch 25 -ag true -nr 1 -nc 1 -dtg $name ("abxLayers"+$name+"CharLyt");
+	$nodeName = ($name+"_LVL");
+	tabLayout -e -st ("abxLayers"+$name+"CharLyt") abxLayersCharTabs;
+	menuItem -parent abxLayersCharMenu -label $name -c ("tabLayout -e -st \"abxLayers"+$name+"CharLyt\" abxLayersCharTabs");
+}
+
+global proc abxLayersNew(string $name, string $layer){
+
+	string $members[] = `ls -sl`;
+	string $node = ($name+"_LVL");
+	abxLayersNewControl ("abxLayers"+$name+"CharLyt") $name "Layer";
+	
+	if (!`objExists $node`)
+		createNode -n $node "geometryVarGroup";
+		
+	if (!`attributeExists "abxLyrToc" $node`)
+		addAttr -longName "abxLyrToc" -dt "stringArray" $node;
+	
+	string $tableOfContents[] = `getAttr ($node+".abxLyrToc")`;
+	$tableOfContents[size($tableOfContents)] = $layer;
+	
+	if (`attributeExists ("abxLyr"+$layer) $node`){
+		int $i=1;
+		while (`attributeExists ("abxLyr"+$layer+$i) $node`)
+			$i++;
+		$layer = ($layer+$i);
+		addAttr -longName ("abxLyr"+$layer) -dt "stringArray" $node;
+	}
+	else{
+			addAttr -longName ("abxLyr"+$layer) -dt "stringArray" $node;
+	}
+	
+		
+	string $setAttrCmd = ("setAttr "+$node+".abxLyr"+$layer+" -type stringArray "+(size($members)));
+	for ($each in $members)
+		$setAttrCmd = ($setAttrCmd+" \""+$each+"\"");
+	eval ($setAttrCmd);
+	
+	string $setAttrCmd = ("setAttr "+$node+".abxLyrToc -type stringArray "+(size($tableOfContents)));
+	for ($each in $tableOfContents)
+		$setAttrCmd = ($setAttrCmd+" \""+$each+"\"");
+	eval ($setAttrCmd);
+
+}
+
+global proc abxLayersRename(string $char, string $oldName, string $newName){
+
+}
+
+global proc abxLayersRead(){
+	string $layerNodes[] = `ls "*_LVL"`;
+	for ($each in $layerNodes){
+		string $tokenBuffer[];
+		string $name = "";
+		tokenize $each "_" $tokenBuffer;
+		for ($i=0;$i<size($tokenBuffer)-1;$i++)
+			$name = ($name + $tokenBuffer[$i]);
+		
+		abxLayersNewChar($name);
+		
+		string $tableOfContents[] = `getAttr ($each+".abxLyrToc")`;
+		for ($every in $tableOfContents){
+			$layerMembers = `getAttr ($each+".abxLyr"+$every)`;
+			abxLayersNewControl ("abxLayers"+$name+"CharLyt") $name $every;
+		}
+	}
+}
+
+global proc abxLayersSelectMembers(string $name, string $layer){
+	string $members[] = `getAttr ($name+"_LVL.abxLyr"+$layer)`;
+	select $members;
+}
+
+global proc abxLayersTimeTgl(string $control, string $name, string $layer){
+	string $label = `iconTextCheckBox -q -l $control`;
+	string $layout = `iconTextCheckBox -q -parent $control`;
+	string $members[] = `getAttr ($name+"_LVL.abxLyr"+$layer)`;
+
+	if ($label == ""){
+		iconTextCheckBox -e -v 1 -l "T" $control;
+		if (!`objExists abxLevelsActiveSet`)
+			sets -name "abxLevelsActiveSet" -em;
+		sets -e -addElement abxLevelsActiveSet $members ;
+	}
+	else{
+		iconTextCheckBox -e -v 1 -l "" $control;
+		sets -e -rm abxLevelsActiveSet $members;
+	}
+	global string $gPlayBackSlider;
+	if (size(`sets -q abxLevelsActiveSet`)==0){
+		timeControl -e -mlc animationList $gPlayBackSlider;
+	}
+	else{
+		$abxLevelsList = `selectionConnection -obj abxLevelsActiveSet`;
+		timeControl -e -mlc $abxLevelsList $gPlayBackSlider;
+	}
+}
+
+global proc abxLayersIsoTgl(string $control){
+	$label = `iconTextCheckBox -q -l $control`;
+	if ($label == ""){
+		iconTextCheckBox -e -v 1 -l "I" $control;
+	}
+	else{
+		iconTextCheckBox -e -v 1 -l "" $control;
+	}
+}
+
+global proc abxLayersKey(string $name, string $layer, int $mode){
+	string $members[] = `getAttr ($name+"_LVL.abxLyr"+$layer)`;
+	if ($mode == 0){
+		setKeyframe $members;
+	}
+	else if ($mode == 1){
+		setKeyframe -bd true $members;
+	}
+	else if ($mode == 2){
+		setKeyframe $members;
+		for ($each in $members){
+			string $curves[] = `keyframe -q -name $each`;
+			for ($every in $curves)
+				keyframe -time `currentTime -q` -e -tds on $every;
+		}
+	}
+
+
+}

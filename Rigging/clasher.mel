@@ -1,0 +1,122 @@
+//
+// clasher.mel
+// checks all objects in scene for clashing node names
+//
+//
+//
+
+//************************************
+// Main Procedure 
+global proc string clasher () {
+
+// First pass to make list of clashing nodes
+string $obj, $objPart, $buffer[], $clashList[1] = {"noClash"};
+string $stripped, $pointerTest, $nodeList[] = `ls -transforms -shapes`;
+//string $stripped, $pointerTest, $nodeList[] = `ls -transforms `;
+int $i, $j, $bufferSize, $clashNum = 0, $dupExist;
+int $ptrSizeA, $ptrSizeB;
+
+for ($obj in $nodeList) {
+  $dupExist = 0;
+  $pointerTest = 0;
+  $bufferSize = `tokenize $obj "|" $buffer`;
+  if ($bufferSize != 1) {
+
+    // Makes sure "pointers" to same node aren't confused for clashing nodes
+    //for ($j = 0; $j < $bufferSize - 1; $j++) {
+      // $ptrSizeA = size($buffer[$j]);
+      //$ptrSizeB = $ptrSizeA - 1;
+      //$ptrTest = `substring $buffer[$j] $ptrSizeB $ptrSizeA`;
+	  //print ("Buffer: " + $buffer[$j] + " ptrTest = " + $ptrTest + "\n");
+    if (`match "->" $obj` == "->") {
+		//print ("Excising pointer " + $obj + "\n");
+        $dupExist++;
+    }
+
+    // Checks to make sure node isn't already stored in clashList
+    if ($dupExist == 0) {
+      for ($i = 0; $i < $clashNum; $i++) {
+        if ($buffer[$bufferSize - 1] == $clashList[$i]) {
+          $dupExist++;
+		  //print ("Excising clash " + $obj + "\n");
+          break; 
+        }
+      }
+    }
+	
+	// Weed out any shapes that are instanced
+	// if we're looking at a shape
+	if ($dupExist == 0) {
+	  int $shapes = size(`ls -allPaths -shapes $obj`);
+	  if ($shapes >= 1) {	  	  
+	    // make sure no transforms have the same name as this shape ( a clash )
+	    int $transforms = size(`ls -allPaths -transforms $buffer[$bufferSize-1]`);
+	    // instanced shapes should register as the same object, if not, this next command will fail
+	    // that means the shape name is shared among other instances ( a clash )
+	    //int $allShapes = catch(`listRelatives -allParents $buffer[$bufferSize-1]`);
+	    int $allShapes = size(`ls -sn $buffer[$bufferSize-1]`);
+	    // make sure the number of parents match the number of shapes if these are instances
+	    int $numParents = size(`listRelatives -allParents $obj`);
+	    if (($shapes == $numParents) && ($allShapes==1) && ($transforms==0)) {
+	      // who's your daddy?
+	      string $parents[] = `listRelatives -allParents $obj`;
+	      if (size($parents) > 1) {
+	        $dupExist++; 		  
+		  }
+		  
+		  // this next part excises curve shapes clashing with other curve shapes
+		  // it slows down performance dramatically so don't use it
+		  
+	    } // else if (size(`ls -type "nurbsCurve" $buffer[$bufferSize-1]`) > 1) {
+	      // int $numCurves = size(`ls -type "nurbsCurve" $buffer[$bufferSize-1]`);
+	      // int $numAll = size(`ls -sn $buffer[$bufferSize-1]`);
+	      // if ($numCurves == $numAll) {
+	      //  	$dupExist++;	
+	      //}
+		//}
+      }
+	}
+	
+    // Stores clashing node's shortened name
+    if ($dupExist == 0) {
+      $clashList[$clashNum++] = $buffer[$bufferSize - 1];
+    }
+
+  }
+}
+
+
+// Weed out the nodes that aren't really clashes
+string $clashListB[1] = {"noClash"};
+int $clashNumB = 0;
+for ($i = 0; $i < $clashNum; $i++) {
+  string $testClash[] = `ls -l -allPaths $clashList[$i]`;
+  if (`size($testClash)` != 1) {
+    $clashListB[$clashNumB++] = $clashList[$i];
+  }
+}
+
+
+// Print the results
+if ($clashNumB == 0) {
+  print ("COMPLETE: *The Clasher* found NO nodes with the same name.\n");
+  return "";
+}
+else {
+  print ("These " + $clashNumB + " clashes were discovered:\n\n");
+  for ($i = 0; $i < $clashNumB; $i++) {
+    print ("\"*" + $clashListB[$i] + "*\" is shared among the following nodes:\n");
+    print `ls -l -allPaths $clashListB[$i]`;
+    print "\n";
+  }
+  print ("--------------------------------------------\n");
+  //warning ("*The Clasher* found " + $clashNumB + " clashing node names.");
+  return ("*The Clasher* found " + $clashNumB + " clashing node names.");
+
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+}
+

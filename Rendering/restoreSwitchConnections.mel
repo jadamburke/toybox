@@ -1,0 +1,58 @@
+// restoreSwitchConnections
+
+global proc restoreSwitchConnections () {
+
+	string $tssNodes[] = `ls -type tripleShadingSwitch`;
+	
+	for ($each in $tssNodes){
+
+
+		// blow away any connections to the tripple shading switch;
+
+
+		string $foundSources[];
+		string $foundTriples[];
+
+		int $numOfConnections = `getAttr -size ($each+".input")`;
+		for ($i=0;$i<$numOfConnections;$i++){
+
+			string $sourceShape = `connectionInfo -sfd ($each+".input["+$i+"].inShape")`;
+			string $sourceTriple = `connectionInfo -sfd ($each+".input["+$i+"].inTriple")`;
+
+			if (size($sourceShape)> 0){
+				$foundSources[size($foundSources)] = $sourceShape;
+				evalEcho("disconnectAttr "+$sourceShape+" "+$each+".input["+$i+"].inShape;\n");
+					
+			}
+			if (size($sourceTriple)> 0 ){
+				evalEcho("disconnectAttr "+$sourceTriple+" "+$each+".input["+$i+"].inTriple;\n");
+
+			}
+			
+
+		}
+
+		string $compiledString = "";
+		
+		if (`attributeExists $each ".notes"`){
+			$compiledString = `getAttr ($each+".notes")`;
+			string $tokenBuffer[];
+			tokenize $compiledString "\n" $tokenBuffer;
+			for ($each in $tokenBuffer){
+
+				if (catch(eval($each)));
+					//print ($each +"failed\n");
+					//evalEcho($each);
+
+
+
+			}
+		}
+		else {
+			warning ($each +" skipped because no notes were found\n");
+		}
+		
+
+	}
+
+}

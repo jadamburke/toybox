@@ -1,0 +1,54 @@
+// reflectAtCam
+
+global proc reflectAtCam() {
+	if (`window -ex abxReflectAt` != true) {
+		window -w 200 -h 300 -t abxReflectAt -tlb true abxReflectAt;	
+		columnLayout ;
+ 		textFieldButtonGrp -l "Camera" -text "" -bl "Get" -bc "abxGetSel \"textFieldButtonGrp\" \"cameraGrp\"" cameraGrp;
+		textFieldButtonGrp -l "Object to Aim At" -text "" -bl "Get" -bc "abxGetSel \"textFieldButtonGrp\" \"objGrp\"" objGrp;
+ 		floatFieldGrp -numberOfFields 3 -label "Mirror Face Axis" -value1 0 -value2 0 -value3 -1 mirrorVec;
+		checkBoxGrp -numberOfCheckBoxes 3 -label "Rotate Axis" -labelArray3 "X" "Y" "Z" -v1 true -v2 true -v3 true applyAxisGrp;
+		button -label "Reflect Selected Mirrors" -command "doReflectAtCam `textFieldButtonGrp -q -text cameraGrp` `textFieldButtonGrp -q -text objGrp` `floatFieldGrp -q -value1 mirrorVec` `floatFieldGrp -q -value2 mirrorVec` `floatFieldGrp -q -value3 mirrorVec`";	
+		showWindow abxReflectAt;
+	}
+	else{
+		showWindow abxReflectAt;
+	}
+}
+
+global proc doReflectAtCam (string $camera, string $object, float $val1, float $val2, float $val3){
+	float $aimVec[] =  {$val1,$val2,$val3};
+	string $selected[] = `ls -sl`;
+	for ($mirror in $selected){
+		float $eAX = `checkBoxGrp -q -v1 applyAxisGrp`;
+		float $eAY = `checkBoxGrp -q -v2 applyAxisGrp`; 
+		float $eAZ = `checkBoxGrp -q -v3 applyAxisGrp`;
+		float $camPos[] = `xform -q -ws -rp $camera`;
+		float $objPos[] = `xform -q -ws -rp $object`;
+		float $mirPos[] = `xform -q -ws -rp $mirror`;
+
+		vector $objVec = <<$objPos[0]-$mirPos[0],$objPos[1]-$mirPos[1],$objPos[2]-$mirPos[2]>>;
+		vector $camVec = <<$camPos[0]-$mirPos[0],$camPos[1]-$mirPos[1],$camPos[2]-$mirPos[2]>>;
+
+		$objVec = <<($objVec.x)*$eAX,($objVec.y)*$eAY,($objVec.z)*$eAZ>>;
+		$camVec = <<($camVec.x)*$eAX,($camVec.y)*$eAY,($camVec.z)*$eAZ>>;
+
+		float $vecAngle = .5*(angle($camVec,$objVec));
+		vector $normalVec = rot($camVec,`cross $camVec $objVec`,$vecAngle);
+
+		//vector $normalVec = (($objVec-$camVec)*.5)+$camVec;
+		//vector $normalVec = $objVec;
+		float $newRot[] = `angleBetween -euler -v1 $aimVec[0] $aimVec[1] $aimVec[2] -v2 ($normalVec.x) ($normalVec.y) ($normalVec.z)`;
+
+		rotate -ws $newRot[0] $newRot[1] $newRot[2] $mirror;
+	}
+}
+
+global proc abxGetSel (string $controlType, string $controlName){
+
+	string $selectedNodes[] = `ls -sl`;
+	
+	if (size($selectedNodes) >0)
+		eval ($controlType + " -e -text "+$selectedNodes[0]+" "+$controlName);
+
+}

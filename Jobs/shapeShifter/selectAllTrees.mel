@@ -1,0 +1,9 @@
+// selectAllTrees
+
+global proc selectAllTrees() {
+	select -r "treeRainforest*GOD*";
+	select -add "treeMapleSapling*GOD*";
+	select -add "treeLongTrunk*GOD*";
+
+
+}

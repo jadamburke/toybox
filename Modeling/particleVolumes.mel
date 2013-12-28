@@ -1,0 +1,527 @@
+// Santa Barbara Studios Script File
+// MODIFY THIS AT YOUR OWN RISK
+//
+// Last Edit:	10 July 1998
+// Author:	Andrew Harris   andy@sbst.com
+// Concept:	Mark Wendell	mark@sbst.com	
+//
+//
+//  Procedure Name:
+//
+//      particleVolumes 
+//
+//  Description:
+//
+//     	This is a utility for filling volumes with particles.
+//	Those particles inherit the surface normal of the surface
+//	and are assigned a distance from the original surface.
+//	Expressions are then added for interactive and hardware lighting of the
+//	particles.
+//
+//	The script creates some UI which has two modes. Create and Add.
+//	In the create mode you must move the geometry you want to fill
+//	into a designated cube. Try and fit the geometry as closely as possible
+//	to this cube. Things will go much faster and will be more accurately.
+//	The expressions will be added for lighting and two example lights will
+//	be created.
+//
+//	The Add mode is good for adding more particles to certain areas
+//	of the volume. A sphere will appear which you can scale and move into
+//	the desired position. Only the areas of your geometry that intersect
+//	with this sphere will be filled will particles. They will
+//	continue to use all the lighting expressions.
+//
+//	Note: The number of particles is aproximate. For the sake of
+//	speed, particles that do not fall within the volume on creation of
+//	discarded. Use the returned stats to help in entering the right number.
+//     	
+//  Input Arguments:
+//    	
+//  Return Value:
+//      
+
+global proc changeMenu(string $cl1, string $cl2, string $modeMenu)
+{
+	string $mode = `optionMenu -q -v $modeMenu`;
+
+	if (gmatch($mode,"Create"))
+	{
+		columnLayout -edit -m 1 $cl1;
+		columnLayout -edit -m 0 $cl2;
+		hide PVsphere;
+		showHidden PVcube;
+	}
+	else
+	{
+		columnLayout -edit -m 0 $cl1;
+		columnLayout -edit -m 1 $cl2;
+		showHidden PVsphere;
+		hide PVcube;
+		select PVsphere;
+	}
+
+}
+
+global proc particleVolumes()
+{
+	$win = "particleVolumeWin";
+	if (!`window -exists $win`)
+	{
+		string $sel[] = `ls -sl`;
+		polyCube -n PVcube;
+		toggle -template;
+		scale -a 24 24 24;
+
+		createNode -n PVcps closestPointOnSurface;
+		createNode -n PVpsi pointOnSurfaceInfo;
+
+		createNode -n PVsphere transform;
+		createNode -p PVsphere implicitSphere; 
+
+		select $sel;
+		makePVWin $win;
+		scriptJob -p $win -uid $win ("select \"PV*\";delete;");
+	}
+
+	showWindow $win;
+}
+
+global proc makePVWin (string $win)
+{
+	window 
+		-title "Particle Volume Editor" 
+		-iconName "Particle Volume" 
+		-titleBar true
+		-minimizeButton true 
+		-maximizeButton false 
+		-sizeable false
+		-rtf true
+		$win;
+
+	string $cl = `formLayout`;
+
+	string $modeMenu = `optionMenu -label "Editor mode"`;
+		menuItem -p $modeMenu -label "Create" ;
+		menuItem -p $modeMenu -label "Add" ;
+
+	text -l "";
+
+	string $numSlider = `intSliderGrp 
+		-l " Number of Particles" 
+		-field true
+		-min 0
+		-max 1000
+		-fmn 0
+		-fmx 50000
+		-v 100`;
+
+	string $cl1 = `columnLayout -rs 5 -adjustableColumn true`;
+
+		string $createPartName = `textFieldGrp
+			-label "Particle Name"
+			-text  "particle#"
+			-p $cl1`;
+
+		string $myForm1 = `formLayout`;
+
+			string $newVolumeButton = `button 
+				-w 200
+				-l "New volume"
+				-c ("partFill " 
+					+ $numSlider + " " 
+					+ $createPartName) `;
+
+			string $closeButton1 = `button 
+				-w 200
+				-l "Close"
+				-c ("window -e -vis 0 " +$win)`;
+
+	string $cl2 = `columnLayout -rs 5 -adjustableColumn true -p $cl`;
+
+		string $p[] = `ls -type particle`;
+		string $pt[];
+		if (size($p)>0)
+			$pt = `listRelatives -p $p[0]`;
+		else
+			$pt[0] = "particle1";
+		string $addPartName = `textFieldGrp
+			-label "Particle Object"
+			-text  $pt[0]`;
+
+		string $myForm2 = `formLayout`;
+
+			string $addVolumeButton = `button 
+				-w 200
+				-l "Add to volume"
+				-c ("insertVolume " 
+					+ $numSlider + " " 
+					+ $addPartName) `;
+
+			string $closeButton2 = `button 
+				-w 200
+				-l "Close"
+				-c ("window -e -vis 0 " +$win)`;
+
+		formLayout -e
+	
+			-af $newVolumeButton top 0 
+			-af $newVolumeButton left 0
+			-ac $newVolumeButton right 0 $closeButton1
+			-af $newVolumeButton bottom 0
+
+			-af $closeButton1 top 0 
+			-af $closeButton1 right 0
+			-af $closeButton1 bottom 0
+			$myForm1;
+
+		formLayout -e
+
+			-af $addVolumeButton top 0 
+			-af $addVolumeButton left 0
+			-ac $addVolumeButton right 0 $closeButton2
+			-af $addVolumeButton bottom 0
+
+			-af $closeButton2 top 0 
+			-af $closeButton2 right 0
+			-af $closeButton2 bottom 0
+			$myForm2;
+		
+	formLayout -e
+		-af $modeMenu top 0
+		-af $modeMenu left 0
+		
+		-ac $numSlider top 5 $modeMenu
+		-af $numSlider left 0 
+
+		-ac $cl1 top 5 $numSlider
+		-af $cl1 left 0 
+		
+		-ac $cl2 top 5 $numSlider
+		-af $cl2 left 0
+		$cl;
+
+	optionMenu -edit -cc ("changeMenu " + $cl1 + " " + $cl2 + " " + $modeMenu) $modeMenu;
+
+	changeMenu $cl1 $cl2 $modeMenu;
+	showWindow $win;
+
+}
+
+
+global proc partFill (string $numSlider, string $partName)
+{
+	waitCursor -state on;	
+
+	int $num = `intSliderGrp -q -v $numSlider`;
+	string $pn = `textFieldGrp -q -text $partName`;
+	string $sel[] = `ls -sl`;
+	string $current;
+
+	createNode -n PVcps closestPointOnSurface;
+	createNode -n PVpsi pointOnSurfaceInfo;
+
+	string $lcheck[] = `ls -typ transform "particleLight*"`;
+	if (size($lcheck)<2)
+	{
+		delete $lcheck;
+		pointLight -n particleLight1;
+		move -a 15 15 15;
+		pointLight -n particleLight2;
+		move -a -15 -15 -15;
+	}
+
+	for($current in $sel)
+	{
+
+		float $bb[] = `xform -q -ws -bb PVcube`;
+	
+		connectAttr -f ($current + ".worldSpace[0]") PVcps.inputSurface;
+		connectAttr -f ($current + ".worldSpace[0]") PVpsi.inputSurface;
+		string $part[] = `particle -jbp 0 0 0 -nj $num -jr 0 -c 1`;
+
+		addAttr -ln normalPP0 -dt vectorArray  ("|" + $part[0] + "|" + $part[1]);
+		addAttr -ln normalPPCache -dt vectorArray  ("|" + $part[0] + "|" + $part[1]);
+		addAttr -ln normalPP -dt vectorArray  ("|" + $part[0] + "|" + $part[1]);
+		setAttr -e -keyable true ("|" + $part[0] + "|" + $part[1] + ".normalPP");
+
+		addAttr -ln surfaceDisPP0 -dt vectorArray  ("|" + $part[0] + "|" + $part[1]);
+		addAttr -ln surfaceDisPPCache -dt vectorArray  ("|" + $part[0] + "|" + $part[1]);
+		addAttr -ln surfaceDisPP -dt vectorArray  ("|" + $part[0] + "|" + $part[1]);
+		setAttr -e -keyable true ("|" + $part[0] + "|" + $part[1] + ".surfaceDisPP");
+
+		addAttr -is true -ln "diffuseRed" -dv 1.0 -at double ("|" + $part[0] + "|" + $part[1]);
+		setAttr -e -keyable true ("|" + $part[0] + "|" + $part[1] + ".diffuseRed");
+		addAttr -is true -ln "diffuseGreen" -dv 1.0 -at double ("|" + $part[0] + "|" + $part[1]);
+		setAttr -e -keyable true ("|" + $part[0] + "|" + $part[1] + ".diffuseGreen");
+		addAttr -is true -ln "diffuseBlue" -dv 1.0 -at double ("|" + $part[0] + "|" + $part[1]);
+		setAttr -e -keyable true ("|" + $part[0] + "|" + $part[1] + ".diffuseBlue");
+
+		addAttr -is true -ln "ambientRed" -dv 0.0 -at double ("|" + $part[0] + "|" + $part[1]);
+		setAttr -e -keyable true ("|" + $part[0] + "|" + $part[1] + ".ambientRed");
+		addAttr -is true -ln "ambientGreen" -dv 0.0 -at double ("|" + $part[0] + "|" + $part[1]);
+		setAttr -e -keyable true ("|" + $part[0] + "|" + $part[1] + ".ambientGreen");
+		addAttr -is true -ln "ambientBlue" -dv 0.0 -at double ("|" + $part[0] + "|" + $part[1]);
+		setAttr -e -keyable true ("|" + $part[0] + "|" + $part[1] + ".ambientBlue");
+
+		addAttr -ln minScatter -at double  ("|" + $part[0] + "|" + $part[1]);
+		setAttr -e -keyable true ("|" + $part[0] + "|" + $part[1] + ".minScatter");
+
+		addAttr -ln maxScatter -at double  ("|" + $part[0] + "|" + $part[1]);
+		setAttr -e -keyable true ("|" + $part[0] + "|" + $part[1] + ".maxScatter");
+
+
+		addAttr -is true -ln "opacity" -at double ("|" + $part[0] + "|" + $part[1]);
+		addAttr -ln "lifespanPP" -dt doubleArray ("|" + $part[0] + "|" + $part[1]);
+		addAttr -ln "rgbPP" -dt vectorArray ("|" + $part[0] + "|" + $part[1]);
+
+		setAttr ("|" + $part[0] + "|" + $part[1] + ".opacity") 1.0;
+		setAttr ("|" + $part[0] + "|" + $part[1] + ".depthSort") 1;
+
+
+		dynExpression -s (" \
+			vector $rand; \
+			vector $a; \
+			$rand = <<rand(" + $bb[0] + "," + $bb[3] + "),rand(" + $bb[1] + "," + $bb[4] + "),rand(" + $bb[2] + "," + $bb[5] + ")>>; \
+			setAttr -type double3 PVcps.ip ($rand.x) ($rand.y) ($rand.z); \
+			float $u = `getAttr PVcps.u`; \
+			float $v = `getAttr PVcps.v`; \
+			setAttr PVpsi.u $u; \
+			setAttr PVpsi.v $v; \
+			float $normal[] = `getAttr PVpsi.nn`; \
+			float $pos[] = `getAttr PVcps.p`; \
+			$a = $rand - <<$pos[0],$pos[1],$pos[2]>>; \
+			vector $b = <<$normal[0],$normal[1],$normal[2]>>; \
+			if(unit($a)*$b<0) \
+			{ \
+				" + $part[1] + ".normalPP = <<$normal[0],$normal[1],$normal[2]>>; \
+				" + $part[1] + ".surfaceDisPP = mag($a); \
+				" + $part[1] + ".position = $rand; \
+			} \
+			else \
+			{ \
+				" + $part[1] + ".lifespanPP = 0; \
+			} \
+			") -c $part[1];
+
+		currentTime -edit 1;
+		playButtonStepForward;
+
+		saveInitialState -all $part[1];
+		dynExpression -s "" -c $part[1];
+
+		playButtonStart;
+	
+		float $count = `getAttr ($part[1] + ".count")`;
+		int $percent = ($count/$num) * 100;
+
+		print ($count + " particles were created inside the selected volume.\n");
+		print ($percent + " percent of the particles fell within the volume. Those that did not were deleted.\n");
+
+		dynExpression -s (" \
+if (1){ \n \
+vector $ambientColor = <<ambientRed,ambientGreen,ambientBlue>>;\n \
+vector $diffuseColor = <<diffuseRed,diffuseGreen,diffuseBlue>>;\n \
+float $grad = linstep(minScatter,maxScatter,mag(surfaceDisPP));\n \
+vector $randomNormal = dnoise(<<id,id,id>>);\n \
+// \n \
+// First light in the scene. \n \
+// \n \
+\n \
+vector $lightPosition = <<particleLight1.tx,particleLight1.ty,particleLight1.tz>>; \n \
+vector $lightDirection = unit($lightPosition - position); \n \
+vector $lightColor = <<particleLightShape1.colorR,particleLightShape1.colorG,particleLightShape1.colorB>>; \n \
+float $lightIntensity = particleLightShape1.intensity; \n \
+float $lightFalloff = 1-linstep(0,40,mag($lightPosition - position)); \n \
+float $dot = ($lightDirection) * ((((1-$grad)*normalPP) + ($grad*$randomNormal)) * $lightFalloff); \n \
+vector $diffuse = (<<$diffuseColor.x*$lightColor.x,$diffuseColor.y*$lightColor.y,$diffuseColor.z*$lightColor.z>>) * $dot * $lightIntensity; \n \
+vector $ambient = $ambientColor; \n \
+\n \
+if ($dot>0) \n \
+	rgbPP = $diffuse + $ambient; \n \
+else \n \
+	rgbPP = $ambient; \n \
+\n \
+// \n \
+// Additional lights copy this section. \n \
+// \n \
+\n \
+vector $lightPosition = <<particleLight2.tx,particleLight2.ty,particleLight2.tz>>; \n \
+vector $lightDirection = unit($lightPosition - position); \n \
+vector $lightColor = <<particleLightShape2.colorR,particleLightShape2.colorG,particleLightShape2.colorB>>; \n \
+float $lightIntensity = particleLightShape2.intensity; \n \
+float $lightFalloff = 1-linstep(0,40,mag($lightPosition - position)); \n \
+float $dot = ($lightDirection) * ((((1-$grad) * normalPP) + ($grad*$randomNormal)) * $lightFalloff); \n \
+vector $diffuse = (<<$diffuseColor.x*$lightColor.x,$diffuseColor.y*$lightColor.y,$diffuseColor.z*$lightColor.z>>) * $dot * $lightIntensity; \n \
+vector $ambient = $ambientColor; \n \
+\n \
+if ($dot>0) \n \
+	rgbPP += $diffuse + $ambient; \n \
+else \n \
+	rgbPP += $ambient; \n \
+} \n \
+		") -r $part[1];
+
+		string $Rexp = `dynExpression -q -r -s $part[1]`;
+		dynExpression -s $Rexp -c $part[1];
+	
+	}
+
+	delete PVcps PVpsi;
+	waitCursor -state off;	
+
+}
+
+
+
+global proc insertVolume (string $numSlider, string $partName)
+
+{
+	waitCursor -state on;	
+
+	int $num = `intSliderGrp -q -v $numSlider`;
+	string $pn = `textFieldGrp -q -text $partName`;
+	string $sel[] = `ls -sl`;
+	string $current;
+	string $check[];
+
+	$check = `ls -dag -sl -type nurbsSurface $sel`;
+	if (size($check)==0)
+	{
+		warning "Please select a surface to fill.\n";
+	}
+	else
+	{
+		float $ss[] = `xform -q -ws -s PVsphere`;
+		float $PVspherePos[] = `xform -q -ws -t PVsphere`;
+		int $mxd = `max $ss[0] $ss[1]`;
+		int $mxd = `max $mxd $ss[2]`;
+		string $part[] = `ls -dag $pn`;
+
+		emitter -pos $PVspherePos[0] $PVspherePos[1] $PVspherePos[2] -n PVemitter -type omni -speed 0 -rate ($num*24) -mnd 0 -mxd $mxd;
+		createNode -n PVcps closestPointOnSurface;
+		createNode -n PVpsi pointOnSurfaceInfo;
+
+		if (size($part)!=2)
+		{
+			warning "Please enter a valid particle object.\n";
+		}
+		else
+		{
+			for($current in $sel)
+			{
+				connectAttr -f ($current + ".worldSpace[0]") PVcps.inputSurface;
+				connectAttr -f ($current + ".worldSpace[0]") PVpsi.inputSurface;
+				connectDynamic -em PVemitterShape $part[1];
+
+				$check = `ls ($part[1] + ".checkPP")`;
+
+				if (!size($check))
+				{
+					addAttr -ln checkPP0 -dt doubleArray  ( $part[0] + "|" + $part[1]);
+					addAttr -ln checkPPCache -dt doubleArray  ( $part[0] + "|" + $part[1]);
+					addAttr -ln checkPP -dt doubleArray  ( $part[0] + "|" + $part[1]);
+					setAttr -e -keyable true ( $part[0] + "|" + $part[1] + ".checkPP");
+				}
+
+				$check = `ls ($part[1] + ".normalPP")`;
+
+				if (!size($check))
+				{
+					addAttr -ln normalPP0 -dt vectorArray  ( $part[0] + "|" + $part[1]);
+					addAttr -ln normalPPCache -dt vectorArray  ( $part[0] + "|" + $part[1]);
+					addAttr -ln normalPP -dt vectorArray  ( $part[0] + "|" + $part[1]);
+					setAttr -e -keyable true ( $part[0] + "|" + $part[1] + ".normalPP");
+				}
+	
+				$check = `ls ($part[1] + ".surfaceDisPP")`;
+				if (!size($check))
+				{
+					addAttr -ln surfaceDisPP0 -dt vectorArray  ( $part[0] + "|" + $part[1]);
+					addAttr -ln surfaceDisPPCache -dt vectorArray  ( $part[0] + "|" + $part[1]);
+					addAttr -ln surfaceDisPP -dt vectorArray  ( $part[0] + "|" + $part[1]);
+					setAttr -e -keyable true ( $part[0] + "|" + $part[1] + ".surfaceDisPP");
+				}
+
+
+				$check = `ls ($part[1] + ".lifespanPP")`;
+				if (!size($check))
+				{
+					addAttr -ci true -sn "lifespanPP" -ln "lifespanPP" -dt "doubleArray" ( $part[0] + "|" + $part[1]);
+					addAttr -ci true -sn "lifespanPP0" -ln "lifespanPP0" -dt "doubleArray" ( $part[0] + "|" + $part[1]);
+					addAttr -ci true -sn "lifespanPPCache" -ln "lifespanPPCache" -dt "doubleArray" ( $part[0] + "|" + $part[1]);
+				}
+	
+				$check = `ls ($part[1] + ".rgbPP")`;
+				if (!size($check))
+				{
+					addAttr -ci true -sn "rgbPP" -ln "rgbPP" -dt "vectorArray" ( $part[0] + "|" + $part[1]);
+					addAttr -ci true -sn "rgbPP0" -ln "rgbPP0" -dt "vectorArray" ( $part[0] + "|" + $part[1]);
+					addAttr -ci true -sn "rgbPPCache" -ln "rgbPPCache" -dt "vectorArray" ( $part[0] + "|" + $part[1]);
+				}
+
+				string $Rexp = `dynExpression -q -r -s $part[1]`;
+				string $Cexp = `dynExpression -q -c -s $part[1]`;
+
+				dynExpression -s "" -r $part[1];
+				dynExpression -s "" -c $part[1];
+
+				playButtonStart;			
+
+				dynExpression -s (" \
+					if (checkPP != 1){ \
+					vector $rand; \
+					vector $a; \
+					$posPP = position; \
+					setAttr -type double3 PVcps.ip ($posPP.x) ($posPP.y) ($posPP.z); \
+					float $u = `getAttr PVcps.u`; \
+					float $v = `getAttr PVcps.v`; \
+					setAttr PVpsi.u $u; \
+					setAttr PVpsi.v $v; \
+					float $normal[] = `getAttr PVpsi.nn`; \
+					float $pos[] = `getAttr PVcps.p`; \
+					$a = $posPP - <<$pos[0],$pos[1],$pos[2]>>; \
+					vector $b = <<$normal[0],$normal[1],$normal[2]>>; \
+					if(unit($a)*$b<0) \
+					{ \
+						" + $part[1] + ".normalPP = <<$normal[0],$normal[1],$normal[2]>>; \
+						" + $part[1] + ".surfaceDisPP = mag($a); \
+						" + $part[1] + ".rgbPP =abs(normalPP); \
+						" + $part[1] + ".checkPP =1; \
+					} \
+					else \
+					{ \
+						" + $part[1] + ".lifespanPP = 0; \
+					}} \
+					") -c $part[1];
+
+				float $count1 = `getAttr ($part[1] + ".count")`;
+	
+				playButtonStepForward;
+				playButtonStepForward;
+				setParticleAttr -at age -fv 0 $part[1];
+				saveInitialState $part[1];
+
+				dynExpression -s "" -c $part[1];
+
+				playButtonStart;			
+
+				dynExpression -s $Cexp -c $part[1];
+				dynExpression -s $Rexp -r $part[1];
+
+				float $count2 = `getAttr ($part[1] + ".count")` - $count1;
+				int $percent = ($count2/$num) * 100;
+
+				print ($count2 + " particles were created inside the selected volume.\n");
+				print ($percent + " percent of the particles fell within the volume. Those that did not were deleted.\n");
+			}
+		}
+
+		delete PVcps PVpsi PVemitter;
+		playButtonStepForward;
+		saveInitialState $part[1];
+		playButtonStart;			
+
+		waitCursor -state off;	
+
+	}
+}

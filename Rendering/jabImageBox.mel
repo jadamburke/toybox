@@ -1,0 +1,446 @@
+// jabImageBox
+
+// Bug: sort of two image sequences with same name but different extension gets interpreted as individual images
+
+global proc jabImageBox() {
+	
+   	if (`window -ex jabImageBoxWindow` != true) {
+		window -w 640 -h 480 -t "ImageBox - Sequence Manager" -in "ImageBox" -menuBar true -s true -tb true jabImageBoxWindow;
+
+		menu -label "Edit";
+			menuItem -label "Options...";
+			menuItem -d true;
+			menuItem -label "Close" -c "window -e -vis 0 jabImageBoxWindow";
+		menu -label "Load";
+			menuItem -label "Browse..." -c "fileBrowserDialog -m 4 -fc \"jabImageBoxBrowsePath\" -ft \"directory\" -an \"Load Image Sequence Folder\" -ds 0;";;
+			menuItem -d true;
+			menuItem -label "Unload Current Tab";
+		menu -label "View";
+			menuItem -label "Refresh";
+			menuItem -d true;
+			menuItem -label "Icon";
+			menuItem -label "Icon/Text Below";
+			menuItem -label "Icon/Text Beside";
+			menuItem -d true;
+			menuItem -label "Open in Explorer";
+		menu -label "Sequence";
+			menuItem -label "Convert Sequence" -c "jabImageBoxConvertSeq";
+		menu -label "FCheck";
+			radioMenuItemCollection fcheckFrameRate;
+			menuItem -label "24 fps" -radioButton on -cl "fcheckFrameRate" jabMenu24fps;
+			menuItem -label "25 fps" -radioButton off -cl "fcheckFrameRate" jabMenu25fps;
+			menuItem -label "30 fps" -radioButton off -cl "fcheckFrameRate" jabMenu30fps;
+			menuItem -d true;
+			radioMenuItemCollection fcheckSize;
+			menuItem -label "Half Size" -radioButton off -cl "fcheckSize" jabMenuHalfSize;
+			menuItem -label "Full Size" -radioButton on -cl "fcheckSize";
+			menuItem -label "Double Size" -radioButton off -cl "fcheckSize" jabMenuDoubleSize;
+			menuItem -d true;
+			menuItem -cb false -label "Load Z-Buffer" jabImageBoxUseZ;
+		menu -label "Help";
+			menuItem -label "How To Use..." -c "jabImageBoxHelp";
+			menuItem -label "About" -c "jabImageBoxAbout";
+
+		setParent jabImageBoxWindow;
+		
+		formLayout jabImageBoxmainForm;
+		rowLayout -numberOfColumns 5 
+			-cw 1 27
+			-cw 2 27
+			-cw 3 27
+			-cw 4 37 -cal 4 "right"
+			-cw 5 50 -cal 4 "right" -rat 5 "top" 2
+			jabImageBoxToolbar;
+			iconTextButton
+			   -width 27 -height 27
+			   -st "textOnly"
+			   -l "cpy"
+			   -annotation ("");
+			iconTextButton
+			   -width 27 -height 27
+			   -st "textOnly"
+			   -l "mov"
+			   -annotation ("");
+			iconTextButton
+			   -width 27 -height 27
+			   -st "textOnly"
+			   -l "ren"
+			   -annotation ("");
+			iconTextButton
+			   -width 27 -height 27
+			   -st "textOnly"
+			   -l "del"
+			   -annotation ("");
+			optionMenuGrp
+			   -cw 1 32 -cal 1 "right"
+			   -l "Custom";
+			   menuItem -label "Rename";
+			   menuItem -label "Reorder";
+			   menuItem -label "Dump";
+			   setParent ..;
+			   
+			   
+			
+		
+			
+			setParent..;
+		tabLayout mainTab1;
+		
+		// load the default project/images/ folder
+		jabLoadImageListTab mainTab1 (`workspace -q -fn`+"/"+`workspace -q -rte "images"`+"/");
+
+		formLayout -e 
+			-attachForm mainTab1 "left" 0
+			-attachForm mainTab1 "right" 0
+			-attachForm mainTab1 "top" 32
+			-attachForm mainTab1 "bottom" 0
+			
+			-attachForm jabImageBoxToolbar "left" 0
+			-attachForm jabImageBoxToolbar "right" 0
+			-attachForm jabImageBoxToolbar "top" 3
+			-attachControl jabImageBoxToolbar "bottom" 0 mainTab1
+			
+			jabImageBoxmainForm;
+		
+		showWindow jabImageBoxWindow;
+	}
+    	else
+    	{
+			showWindow jabImageBoxWindow;
+	}
+
+
+}
+
+global proc jabGetSequence(string $imagePath) {
+	int $i= 0;
+	int $j = 0;
+	int $k = 0;
+	int $imageListCount = 0;
+	string $finalImageList[];
+	string $tokenBuffer[];
+	string $tokenBuffer2[];
+	string $highestNumber;
+	string $paddedType = "";
+	string $lastNumber;
+	string $imageSize="";
+	int $countSize;
+	int $startFrame;
+	int $stopFrame;
+	int $stepSize;
+	int $paddedNumber;
+	int $sizeOfFrameNum;
+	int $amount = 0;
+
+	// start progress window process
+	progressWindow
+           -title "Checking for Sequences"
+           -progress $amount
+           -status "0%:Sorting Files"
+           -isInterruptable true;
+
+	string $masterFileListUnsorted[] = `getFileList -fld $imagePath -fs "*.*"`;
+	// sort the list alphabetically
+	string $masterFileList[] = sort ($masterFileListUnsorted);
+
+	progressWindow -edit 
+		-progress 5 
+		-status ($amount+"%:Checking Sequences");
+
+	// for each file and folder
+	for ($i=0;$i<size($masterFileList);$i++){
+		if ( `progressWindow -query -isCancelled` ) break;
+		$amount = (float($i)/float(size($masterFileList)))*95+5;
+		progressWindow -edit 
+			-progress $amount 
+			-status ("Loading: "+$amount+"%");
+		
+		$fileFullPath = ($imagePath+$masterFileList[$i]);
+		if (`filetest -d $fileFullPath`){
+			// if it is a folder get the contents of the folder
+			string $subFolderListUnsorted[] = `getFileList -fld ($fileFullPath+"/") -fs "*.*"`;
+			string $subFolderList[] = sort ($subFolderListUnsorted);
+			string $subFolderListNoFolders[];
+			clear($subFolderListNoFolders);
+			int $count = 0;
+				
+			// append folder name onto image name
+			for ($j=0;$j<size($subFolderList);$j++){
+				if (`filetest -d ($fileFullPath+"/"+$subFolderList[$j])`!=1){
+					$subFolderListNoFolders[$count] = (basename($fileFullPath,"")+"/"+$subFolderList[$j]);
+					//print (basename($fileFullPath,"")+"/"+$subFolderList[$j]+"\n");
+					$count++;
+				}
+				
+				//{print (basename($fileFullPath,"")+"/"+$subFolderList[$j]+"\n");}
+			}
+			// if there is only one image sequence in the folder add it to sequence list
+			appendStringArray($masterFileList, $subFolderListNoFolders, size($subFolderListNoFolders));
+		}
+		// if it is an image file
+		else if (gmatch($masterFileList[$i],"*_tmp*")==0){
+			int $isValidImage = 0;
+			// if it is a valid image format
+			string $tempExt = `fileExtension $fileFullPath`;
+			switch ($tempExt){
+				case "iff":
+				case "tga":
+				case "rgb":
+				case "sgi":
+				case "tif":
+				case "jpg":
+				case "bmp":
+				case "tga":
+					$isValidImage = 1;
+					break;
+			}
+			
+			// break image name apart by dots into name, numbers, extension.
+			tokenize $masterFileList[$i] "." $tokenBuffer;
+
+			// ignore files that aren't a valid image
+			if ($isValidImage == 0){
+			}	
+			else if (size($tokenBuffer) == 3){
+				// tokenize the next image sequence test
+				tokenize $masterFileList[$i+1] "." $tokenBuffer2;
+				if (size($tokenBuffer2) == 3){
+					// if the next imageFile has the same extension and name
+					if ($tokenBuffer[2] == $tokenBuffer2[2] && $tokenBuffer[0] == $tokenBuffer2[0]){
+						$sizeOfFrameNum = size($tokenBuffer[1]);
+						$startFrame = int($tokenBuffer[1]);
+						$i++;
+						$countSize = 1;
+						$paddedNumber = 1;
+						$paddedType = "";
+						$highestNumber = "0";
+						// test for step size
+						$stepSize = (int($tokenBuffer2[1])-$startFrame);
+						
+						// for loop all images with matching name
+						while ($tokenBuffer[2] == $tokenBuffer2[2] && $tokenBuffer[0] == $tokenBuffer2[0]){
+							// finds the highest number in the sequence to use as the end frame
+							if (int($highestNumber)<int($tokenBuffer2[1]))
+								$highestNumber = $tokenBuffer2[1];
+							
+							// stores the previous number for latter comparison
+							$lastNumber = $tokenBuffer2[1];
+							$i++;
+							$countSize++;
+							tokenize $masterFileList[$i] "." $tokenBuffer2;	
+							
+							// finds the smallest step size in the sequence greater than 0
+							if (int($tokenBuffer2[1])-int($lastNumber) < $stepSize && int($tokenBuffer2[1])-int($lastNumber) > 0)
+								$stepSize = int($tokenBuffer2[1])-int($lastNumber);
+							
+							// sets padded zero flag
+							if ($sizeOfFrameNum != size($lastNumber))
+								$paddedNumber = 0;
+						}			
+						$stopFrame = int($highestNumber);
+						// if their are padded numbers
+						if ($paddedNumber==1){
+							// create a pad character for the number of digits found
+							for ($k=0;$k<$sizeOfFrameNum;$k++)
+								$paddedType = ($paddedType+"@");
+							if ($paddedType == "@@@@")
+								$paddedType = "#";
+						}
+						// else padding is one digit
+						else {
+							$paddedType = "@";
+						}
+						// get the image size of the first frame
+						$imageSize = jabGetImageInfo($fileFullPath); 
+						
+						// add the image sequence to the list
+						$finalImageList[$imageListCount] = ($tokenBuffer[0]+"."+$paddedType+"."+$tokenBuffer[2]+":"+$startFrame+":"+$stopFrame+":"+$stepSize+":"+$countSize+":"+$imageSize);
+						$imageListCount++;
+						$i--;
+					}
+					else {
+						$imageSize = jabGetImageInfo($fileFullPath); 
+						$finalImageList[$imageListCount] = ($masterFileList[$i]+":"+"None");
+						$imageListCount++;
+					}
+				}
+				else {
+					$imageSize = jabGetImageInfo($fileFullPath); 
+					$finalImageList[$imageListCount] = ($masterFileList[$i]+":"+"None");
+					$imageListCount++;
+				}
+				
+			}
+			else {
+				$imageSize = jabGetImageInfo($fileFullPath); 
+				$finalImageList[$imageListCount] = ($masterFileList[$i]+":"+"None");
+				$imageListCount++;			}
+		}
+	}
+	progressWindow -endProgress;
+	string $finalImageListSorted[] = sort($finalImageList);
+	for ($i=0;$i<size($finalImageListSorted);$i++){
+		jabAddImageListItem "jabImageBoxColumnLayout" $imagePath $finalImageListSorted[$i];
+	}
+}
+
+global proc jabAddImageListItem(string $parent,string $imagePath, string $imageListInfo) {
+	
+	string $tokenBuffer[];
+	string $animationCmd;
+	
+	tokenize $imageListInfo ":" $tokenBuffer;
+	//print $tokenBuffer;
+	string $nameWithPath = ($imagePath+$tokenBuffer[0]);
+
+	if (size($tokenBuffer)==6) {
+		$animationCmd = ("-n "+$tokenBuffer[1]+" "+$tokenBuffer[2]+" "+$tokenBuffer[3]);
+		setParent $parent;
+		rowLayout 
+		  -numberOfColumns 7
+		  -adj 1  
+		  -cw 1 20 -cal 1 "left" -cat 1 "both" 0
+		  -cw 2 40 -cal 2 "right" -cat 2 "both" 0
+		  -cw 3 40 -cal 3 "right" -cat 3 "both" 0
+		  -cw 4 40 -cal 4 "right" -cat 4 "both" 0
+		  -cw 5 40 -cal 5 "right" -cat 5 "both" 0
+		  -cw 6 100 -cal 6 "center" -cat 6 "both" 0
+		  -cw 7 50 -cal 7 "left" -cat 7 "both" 0
+		  -bgc 0 0 0;
+			checkBox -label (basename($tokenBuffer[0],""));
+			text -label $tokenBuffer[4] -al "right";
+			text -label $tokenBuffer[1] -al "right";
+			text -label $tokenBuffer[2] -al "right";
+			text -label $tokenBuffer[3] -al "right";
+			text -label $tokenBuffer[5] -al "right";
+			//button -label "Fcheck" -al "center" -c $fcheckCommand;
+			symbolButton
+				-i "rvRender.xpm"
+				-width 20 -height 20
+				-annotation ("Load Sequence in FCheck")
+				-command ("jabImageBoxFcheck \""+$nameWithPath+"\" \"" +$animationCmd+"\"");
+	}
+	else {
+		
+		//$fcheckCommand = ("system \"start fcheck \\\""+ $nameWithPath +"\\\"\"");
+		
+		setParent $parent;
+		rowLayout 
+		  -numberOfColumns 7
+		  -adj 1  
+		  -cw 1 20 -cal 1 "left" -cat 1 "both" 0
+		  -cw 2 40 -cal 2 "right" -cat 2 "both" 0
+		  -cw 3 40 -cal 3 "right" -cat 3 "both" 0
+		  -cw 4 40 -cal 4 "right" -cat 4 "both" 0
+		  -cw 5 40 -cal 5 "right" -cat 5 "both" 0
+		  -cw 6 100 -cal 6 "center" -cat 6 "both" 0
+		  -cw 7 50 -cal 7 "left" -cat 7 "both" 0
+		  -bgc 0 0 0;
+			checkBox -label (basename($tokenBuffer[0],""));
+			text -label "1" -al "right";
+			text -label "---" -al "right";
+			text -label "---" -al "right";
+			text -label "---" -al "right";
+			text -label `jabGetImageInfo $nameWithPath` -al "right";
+			// button -label "Fcheck" -al "center" -c $fcheckCommand;	
+			symbolButton
+				-i "rvRender.xpm"
+				-width 20 -height 20
+				-annotation ("Load Sequence in FCheck")
+				-command ("jabImageBoxFcheck \""+$nameWithPath+"\" \"\"");
+	}
+}
+
+global proc jabLoadImageListTab(string $parent, string $imagePath) {	
+
+	$tabName = basename($imagePath,"");
+	setParent $parent;
+	scrollLayout -cr true -hst 0 ($tabName+"Tab");
+	columnLayout -cw 100 -cat "both" 2 -adj 1 -rs 1 -co "right" 5 -bgc 0 0 0 jabImageBoxColumnLayout ;
+		// create header labels 
+		rowLayout 
+		  -numberOfColumns 7
+		  -adj 1  
+		  -cw 1 20 -cal 1 "left" -cat 1 "both" 1
+		  -cw 2 40 -cal 2 "right" -cat 2 "both" 1
+		  -cw 3 40 -cal 3 "right" -cat 3 "both" 1
+		  -cw 4 40 -cal 4 "right" -cat 4 "both" 1
+		  -cw 5 40 -cal 5 "right" -cat 5 "both" 1
+		  -cw 6 100 -cal 6 "center" -cat 6 "both" 1
+		  -cw 7 50 -cal 7 "left" -cat 7 "both" 3;
+			checkBox -label "Name";
+			text -label "Count" -al "right";
+			text -label "Start" -al "right";
+			text -label "End" -al "right";
+			text -label "Step" -al "right";
+			text -label "Res";
+			text -label "Fcheck";
+			setParent ..;
+	jabGetSequence($imagePath);
+}
+
+global proc string jabGetImageInfo (string $imageFile){
+	string $tokenBuffer3[];
+	int $imageHeight;
+	int $imageWidth;
+	string $infoData = system("imf_info \""+$imageFile+"\"");
+	tokenize $infoData "\n" $tokenBuffer3;
+	if (size($tokenBuffer3) > 1){
+		$imageWidth = int(`substring $tokenBuffer3[1] 1 6`);
+		$imageHeight = int(`substring $tokenBuffer3[1] 7 14`);
+	}
+	return ($imageWidth+"x"+$imageHeight);
+}
+
+global proc jabImageBoxFcheck(string $filename, string $animationCmd){
+	
+	// build fcheck command to execute
+	string $fcheckCommand = "system \"start fcheck";
+	
+	if (`menuItem -q -rb jabMenu24fps`)
+		$fcheckCommand = ($fcheckCommand + " -r 24");
+	else if (`menuItem -q -rb jabMenu25fps`)
+		$fcheckCommand = ($fcheckCommand + " -r 25");
+	else if (`menuItem -q -rb jabMenu30fps`)
+		$fcheckCommand = ($fcheckCommand + " -r 30");
+		
+	if (`menuItem -q -rb jabMenuHalfSize`)	
+		$fcheckCommand = ($fcheckCommand + " -s 2");
+	else if (`menuItem -q -rb jabMenuDoubleSize`)
+		$fcheckCommand = ($fcheckCommand + " -m 2");	
+		
+	if (`menuItem -q -cb jabImageBoxUseZ`)
+		$fcheckCommand = ($fcheckCommand + " -Z");
+	
+	if ($animationCmd == ""){
+		$fcheckCommand = ($fcheckCommand + " \\\""+ $filename+"\\\"\"");
+	}
+	else {
+		$fcheckCommand = ($fcheckCommand + " "+$animationCmd+ " \\\""+ $filename+"\\\"\"");
+	}
+	
+	eval($fcheckCommand);
+}
+
+global proc jabImageBoxBrowsePath (string $customMelPath, string $fileType) {
+
+	// set the textpath to the chosen directory
+	// textField -e -text ($customMelPath+"/") textPath;
+	
+	jabGetSequence $customMelPath;
+	//jabLoadImageListTab mainTab1 $customMelPath);
+
+}
+
+global proc jabImageBoxConvertSeq (){
+
+	
+}
+
+
+global proc jabImageBoxHelp () {
+}
+
+global proc jabImageBoxAbout() {
+	confirmDialog -t "About ImageBox" -message "ImageBox Script v1.0\n© 2005 J. Adam Burke\nhttp://www.adamburke.net/" -button "OK" -defaultButton "OK";
+}

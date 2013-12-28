@@ -1,0 +1,173 @@
+// abxOffset
+
+// offset values - current values on a sequence of objects
+
+// offset animation
+
+// if keyframes aren't selected then
+// 	then use selected channels
+// 	else use all animated attributes
+
+// offset in value 
+
+// offset in time
+global proc abxOffset() {
+	if (`window -ex abxOffsetWindow` != true)
+	{
+		window -w 210 -h 110 -t "abxOffset" -in "abxOffset" -menuBar false -s true -tb true abxOffsetWindow;
+
+		formLayout mainOffsetForm;
+		
+		//separator -style "in" -h 3 sep0 ;
+			
+			
+			//optionVar -sv offsetFalloffCurveOptionVar "0,0,1";
+			//optionVar -sva offsetFalloffCurveOptionVar "1,1,1";
+
+			gradientControlNoAttr -optionVar "offsetFalloffCurveOptionVar" offsetFalloffCurve;
+
+			checkBoxGrp -numberOfCheckBoxes 1 -label "Reverse Order" -v1 false offsetReverse;
+			floatSliderButtonGrp -field true -label "tr" -min -5 -max 5 -value 1 -step .5
+				-cw 1 30
+				-cw 2 40
+				-cat 4 "both" 0
+				-cal 4 "center"
+				-adj 3
+				-buttonLabel "Value"
+				-bc "doAbxValueOffset(`floatSliderButtonGrp -q -v sldrValOffset`,`checkBoxGrp -q -v1 offsetReverse`)"
+				sldrValOffset;
+			floatSliderButtonGrp -field true -label "rt" -min -90 -max 90 -value 1 -step 1
+				-cw 1 30
+				-cw 2 40
+				-cat 4 "both" 0
+				-cal 4 "center"
+				-adj 3
+				-buttonLabel "Value"
+				-bc "doAbxValueOffset(`floatSliderButtonGrp -q -v sldrValOffset2`,`checkBoxGrp -q -v1 offsetReverse`)"
+				sldrValOffset2;
+			floatSliderButtonGrp -field true -label "%" -min -5 -max 5 -value 1 -step .001
+				-cw 1 30
+				-cw 2 40
+				-cat 4 "both" 0
+				-cal 4 "center"
+				-adj 3
+				-buttonLabel "Key"
+				-bc "doAbxKeyOffset(`floatSliderButtonGrp -q -v sldrKeyOffset`, `checkBoxGrp -q -v1 offsetReverse`)"
+				sldrKeyOffset;
+
+		formLayout -e
+		
+			//-attachForm sep0 "left" 0 
+	   	 	//-attachForm sep0 "right" 0
+	    		//-attachForm sep0 "top" 0
+	    		//-attachNone sep0 "bottom"
+			
+	    		-attachForm offsetFalloffCurve "left" 0 
+	    		-attachForm offsetFalloffCurve "right" 5
+	   		-attachForm offsetFalloffCurve "top" 5 
+	    		-attachOppositeForm offsetFalloffCurve "bottom" -100
+
+	    		-attachForm offsetReverse "left" 0 
+	    		-attachForm offsetReverse "right" 5
+	   		-attachControl offsetReverse "top" 5 offsetFalloffCurve
+	    		-attachNone offsetReverse "bottom"
+		
+	    		-attachForm sldrValOffset "left" 0 
+	    		-attachForm sldrValOffset "right" 5
+	   		-attachControl sldrValOffset "top" 5 offsetReverse
+	    		-attachNone sldrValOffset "bottom"
+
+	    		-attachForm sldrValOffset2 "left" 0 
+	    		-attachForm sldrValOffset2 "right" 5
+	   		-attachControl sldrValOffset2 "top" 5 sldrValOffset
+	    		-attachNone sldrValOffset2 "bottom"
+
+	    		-attachForm sldrKeyOffset "left" 0 
+	    		-attachForm sldrKeyOffset "right" 5
+	   		-attachControl sldrKeyOffset "top" 10 sldrValOffset2
+	    		-attachNone sldrKeyOffset "bottom"
+			
+		mainOffsetForm;
+
+
+		window -e -w 210 -h 310 abxOffsetWindow;
+		showWindow abxOffsetWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 210 -h 310 abxOffsetWindow;
+		showWindow abxOffsetWindow;
+    	}
+
+}
+
+
+global proc doAbxValueOffset(float $amount, int $reverse) {
+	$sel = `ls -sl`;
+	$selectedChnl = `channelBox -q -sma mainChannelBox`;
+	// string $gradientData[] = `optionVar -q offsetFalloffCurveOptionVar`;
+
+	// reverse selected array
+	if ($reverse == 1){
+		string $reversed[];
+		int $j = 0;
+		for ($i=(size($sel)-1);$i>=0;$i--){
+			$reversed[$j]=$sel[$i];
+			$j++;
+		}
+		$sel = $reversed;
+	}
+
+	int $noChannelsFlag = 0;
+	if (size($selectedChnl)==0)
+		$noChannelsFlag = 1;
+		
+	for ($i=0;$i<size($sel);$i++){
+		if ($noChannelsFlag==1)
+			$selectedChnl = `listAttr -keyable $sel[$i]`;
+		for ($each in $selectedChnl){
+			float $oldValue = `getAttr ($sel[$i]+"."+$each)`;
+			float $newVal = ($i*$amount+$oldValue);
+			setAttr ($sel[$i]+"."+$each) $newVal;
+		}
+	
+	}
+	
+
+}
+
+global proc doAbxKeyOffset(float $amount, int $reverse) {
+	$sel = `ls -sl`;
+	$selectedChnl = `channelBox -q -sma mainChannelBox`;
+	//string $gradientData[] = `optionVar -q offsetFalloffCurveOptionVar`;
+	global string $gPlayBackSlider;
+
+	// reverse selected array
+	if ($reverse == 1){
+		string $reversed[];
+		int $j = 0;
+		for ($i=(size($sel)-1);$i>=0;$i--){
+			$reversed[$j]=$sel[$i];
+			$j++;
+		}
+		$sel = $reversed;
+	}
+
+	string $timeRange = `timeControl -q -rng $gPlayBackSlider`; 
+	print (":"+$timeRange+":\n");
+	//$frameNum = `currentTime -q`;
+	int $noChannelsFlag = 0;
+	if (size($selectedChnl)==0)
+		$noChannelsFlag = 1;
+		
+	for ($i=0;$i<size($sel);$i++){
+		if ($noChannelsFlag==1)
+			$selectedChnl = `listAttr -keyable $sel[$i]`;
+		for ($each in $selectedChnl){
+			eval ("keyframe -edit -relative -timeChange "+($i*$amount)+" -time "+$timeRange+" "+$sel[$i]+"."+$each);
+		}
+	
+	}
+	
+
+}

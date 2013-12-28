@@ -1,0 +1,2561 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: shotView
+''    Author:  
+''    Last Updated: Aug 09, 2008
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/animation/4274.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+
+///////////////////////////////////////////
+//						//
+// shotView v2.1.0  by Cameron Fielding  //
+// 					  	//
+///////////////////////////////////////////////////////////////////////////////////////////////
+//													   
+// Highend3D release  										 
+//													  
+// FEEDBACK AND SUGGESTIONS ENCOURAGED at: 						
+//													   											          
+// pweepeo@hotmail.com										 
+//													   
+// Drop by the website at www.fliponline.blogspot.com 						
+//													   
+//-------------------------------------------------------------------------------------------//
+//													    //
+// Please read supporting "how to install.txt" for information about where to put files that //
+// are needed for shotView to work properly ( these files are included in the download zip ) //
+//													    //
+// Main proc to launch script: shotView								    //					
+//												           //
+/////////////////////////////////////////////////////////////////////////////////////////////// 
+
+
+global proc shotView()
+{
+
+global int $firstSVLoad;
+global string $prefsLocation; 
+
+	global string $svError;
+
+	$svError = 0;
+
+$prefsLocation = `internalVar -userScriptDir`;
+
+
+		if ( `file -q -exists ( $prefsLocation + "shotViewShotWinPrefs.txt" )` == 0 )
+		{	
+		
+			print "  \n";
+			print "-------------------------- SHOTVIEW ERROR INFORMATION --------------------------\n";
+			print "  \n";
+			print "There are 4 text files included with the original Zip file you downloaded:\n";
+			print "  \n";
+			print "shotViewDisplayPrefs.txt\n";
+			print "shotViewControlWinPrefs.txt\n";
+			print "shotViewPlayBlastPrefs.txt\n";
+			print "shotViewShotWinPrefs.txt\n";
+			print "  \n";
+			print "In order for shotView to work you need to copy these files to this location:\n";
+			print "  \n";
+			print ( $prefsLocation + "\n" );
+			print "  \n";
+			print "You also may need to copy the file \"shotViewPlayBlast.xpm\" to your icons folder: \n";
+			print "  \n";
+			print ( (`internalVar -userPrefDir`) + "icons/\n" );
+			print "  \n";
+			print "---------------------------------------------------------------------------------\n";
+			print "  \n";
+			error "ShotView could not find its preference files. See the script editor for details...";
+
+
+		}
+		else
+		{
+
+			string $evalMe =  (    "system ( \"ATTRIB -R \\\"" + $prefsLocation + "shotViewDisplayPrefs.txt\\\"\" ) "  ) ;
+			eval $evalMe;
+
+			string $evalMe =  (    "system ( \"ATTRIB -R \\\"" + $prefsLocation + "shotViewControlWinPrefs.txt\\\"\" ) "  ) ;
+			eval $evalMe;
+
+			string $evalMe =  (    "system ( \"ATTRIB -R \\\"" + $prefsLocation + "shotViewPlayBlastPrefs.txt\\\"\" ) "  ) ;
+			eval $evalMe;
+
+			string $evalMe =  (    "system ( \"ATTRIB -R \\\"" + $prefsLocation + "shotViewShotWinPrefs.txt\\\"\" ) "  ) ;
+			eval $evalMe;
+		}
+
+
+
+global int $playClock;
+
+$playClock = 0;
+
+$firstSVLoad = 0;
+
+	chooseCam;
+}
+
+
+
+global proc chooseCam()
+{
+
+global int $global_Misc[];
+
+
+if (`window -exists camChoice` )
+{
+	deleteUI -window camChoice;	
+}
+			
+if (`windowPref -exists camChoice` ) 
+{
+	windowPref -remove camChoice ;	
+}
+
+
+	window  -w 311 -h 300 -t "Camera Setup" camChoice;
+
+formLayout camListForm;
+
+		text -fn "boldLabelFont" -l "Shot Camera   " scText;
+		textScrollList -ams 0 -w 200 -h 200 cameraList;
+
+setParent camListForm;
+
+		text -fn "boldLabelFont" -l "Control Camera(s)         " -en false scText2;
+		textScrollList -ams 1 -w 200 -h 200 -en false controlCameraList ;
+	
+setParent camListForm;
+
+	columnLayout sVCBOptions;
+
+	checkBox -l " Use control camera(s)" svUseCCam;
+		
+		checkBox -e -onc "text -e -en true scText2; textScrollList -e -en true controlCameraList" svUseCCam;
+		checkBox -e -ofc "text -e -en false scText2; textScrollList -e -en false controlCameraList" svUseCCam;
+
+	checkBox -l " Save camera setup with this scene" svUseEmbed;
+
+setParent camListForm;
+
+	rowColumnLayout -nc 2 -cw 1 200 -cw 2 200 SbutRow2;
+
+		button -l "Apply" -h 20 -c "initiateShotWin 0";
+		button -l "Cancel" -h 20 -c "deleteUI camChoice";
+
+	formLayout -edit 
+
+
+		-af scText "top" 3
+		-af scText "left" 52
+
+		-af cameraList "top" 22
+		-af cameraList "bottom" 67
+		-af cameraList "left" 0
+
+		-af scText2 "top" 3
+		-af scText2 "left" 252
+
+		-af controlCameraList "top" 22
+		-af controlCameraList "bottom" 67
+		-ac controlCameraList "left" 2 cameraList 
+
+		-ac sVCBOptions "top" 5 cameraList 
+		-af sVCBOptions "left" 5
+		
+		-af SbutRow2 "bottom" 3  
+		-af SbutRow2 "left" 1
+
+	camListForm;
+
+
+
+	if (`objExists "shotView_Setup"`) 
+	{
+
+		window -t "shotView: pre-defined camera setup found" -w 775 -h 129 svFoundCamx;    
+
+		if ( $global_Misc[0] == 1 )
+		{
+			window -e -s true svFoundCamx; 
+		}
+
+		rowColumnLayout -nc 1 -cw 1 700;
+
+		text -l " ";
+		text -l "      There is a shotView camera setup saved in this scene. Do you want to use it ? " ;
+		text -l " ";
+
+		rowColumnLayout -nc 5 -cw 1 150 -cw 2 300 -cw 3 100 -cw 4 50 -cw 5 50;
+
+		text -l "     Shot camera:" -fn "boldLabelFont";
+
+			string $camSetup = `getAttr "shotView_Setup.cameras"`;
+
+			string $tbuffer[];
+
+			tokenize $camSetup "<" $tbuffer;
+
+			if ( `size $tbuffer` == 1 )
+			{
+				text -l $tbuffer[0];
+
+				text -l " ";
+				text -l " ";
+				text -l " ";
+
+				text -l "     Control camera(s):" -fn "boldLabelFont"; 
+				text -l "none" -fn "obliqueLabelFont";
+
+				button -l "delete setup" -c "deleteUI svFoundCamx; delete shotView_Setup; showWindow camChoice; updateSVCamList;";				
+				button -l "yes" -c "deleteUI svFoundCamx; usePreDefinedCamSetup";
+				button -l "no" -c "deleteUI svFoundCamx; showWindow camChoice; updateSVCamList;";
+
+			}
+			else
+			{
+
+				text -l $tbuffer[0];
+
+
+				text -l " ";
+				text -l " ";
+				text -l " ";
+				
+				text -l "     Control camera(s):" -fn "boldLabelFont"; 
+
+				string $controlCamString = "";
+
+				for ( $i = 1; $i < `size $tbuffer`; $i ++ )
+				{
+					$controlCamString = ( $controlCamString + $tbuffer[$i] + ", " );
+				}
+
+				text -l $controlCamString;
+
+				button -l "delete setup" -c "deleteUI svFoundCamx; delete shotView_Setup; showWindow camChoice; updateSVCamList;";	
+				button -l "yes" -c "deleteUI svFoundCamx; usePreDefinedCamSetup";
+				button -l "no" -c "deleteUI svFoundCamx; showWindow camChoice; updateSVCamList;";
+
+			}
+
+		showWindow svFoundCamx;
+		
+	}
+	else
+	{
+
+		showWindow camChoice;
+		updateSVCamList;
+
+	}
+
+
+}
+
+
+
+global proc initiateShotWin( int $fromPrefWindow )
+{
+	
+	global string $shotCam[], $SVControlCam[];
+	global int $blackThick, $global_ShotCamera[], $global_Playblast[], $global_ControlCamera[], $global_playback[], $useSVCCam;
+	global float $SvVres, $SvHres;
+
+
+	loadSizingSettings;
+
+	if ( $fromPrefWindow == 0 )
+	{
+		clear $SVControlCam;
+	}
+       
+	if ( $fromPrefWindow == 0 )
+	{
+		$shotCam = `textScrollList -q -si cameraList`;
+
+		if ( `checkBox -q -v svUseCCam` == 1 )
+		{
+
+			$SVControlCam = `textScrollList -q -si controlCameraList`;
+			$useSVCCam = 1;
+		}
+		else
+		{
+			$useSVCCam = 0;
+		}
+
+
+	}
+
+	$blackThick = $global_ShotCamera[3];
+
+	$SvHres = ( $global_ShotCamera[0] * $global_ShotCamera[2] ) /100;
+	$SvVres = ( $global_ShotCamera[1] * $global_ShotCamera[2] ) /100;
+
+
+	if ( $fromPrefWindow == 0 )
+	{
+	if ( `checkBox -q -v svUseEmbed` == 1 )
+	{
+		
+		if (`objExists "shotView_Setup"`) 
+		{
+			delete shotView_Setup;
+		}
+
+
+		string $null = `group -em -n "shotView_Setup"`;
+
+		addAttr -ln "cameras" -dt "string" $null;
+
+		if ( $useSVCCam == 0 )
+		{
+
+			setAttr -type "string" ( $null + ".cameras" ) $shotCam[0];
+
+		}
+		else
+		{
+
+			string $comp = ( $shotCam[0] + "<" );
+
+			for ( $cam in $SVControlCam )
+			{
+				$comp = ( $comp + $cam + "<" );
+			}
+
+			setAttr -type "string" ( $null + ".cameras" ) $comp;
+		
+		}
+
+	}
+		deleteUI camChoice;
+	}
+
+
+	shotWinUI;
+
+
+}
+
+
+
+global proc shotWinUI()
+{
+
+	global string $shotCam[], $SVControlCam[];
+	global int $blackThick, $global_ShotCamera[], $global_Playblast[], $global_ControlCamera[], $global_playback[], $global_Misc[];
+	global int $useSVCCam;
+	global float $SvVres, $SvHres;
+	global int $sVUseFrameNo, $firstSVLoad;
+	
+	global string $prefsLocation;
+
+	loadSizingSettings;
+
+$sVUseFrameNo = 1;
+
+
+if (`window -exists shotWin` )
+{
+	deleteUI -window shotWin;	
+}
+
+if (`windowPref -exists shotWin` )
+{
+	windowPref -remove shotWin ;
+}
+
+
+	int $winHeight = ( $SvVres + ( 2 *  $blackThick )) + 82;  
+	int $winWidth = ( $SvHres + ( 2 * $blackThick )) + 14; 
+
+
+window -t "shotView:    www.fliponline.blogspot.com" -w $winWidth -h $winHeight shotWin;
+
+
+		if ( $global_Misc[0] == 1 )
+		{
+			window -e -s true shotWin; 
+		}
+
+
+	if ( $useSVCCam == 1 )
+	{
+		window -e -w (( $winWidth + $global_ControlCamera[0] ) + ($blackThick )) shotWin;
+	}
+
+menuBarLayout;
+
+menu -l "Options" -aob true -to true ;
+
+
+
+if ( `checkCameraLocked $shotCam[0] "translate"` != 0 )
+{
+	menuItem -label "Lock camera" -checkBox on -c "lockCam" camLocked;
+}
+else
+{
+	menuItem -label "Lock the shot camera" -checkBox off -c "lockCam" camLocked;
+}
+
+
+	menuItem -label "Open shot camera options" -c "cameraOptions";
+	menuItem -label "Toggle viewport options bar(s)" -c "toggleViewPortBar";
+
+
+
+menu -l "Window" -aob true -to true ;
+
+
+	menuItem -label "Navigator" -c "svCreateNavigator";
+	menuItem -label "Preferences" -c "shotViewPreferencesSetup";
+
+	
+formLayout -bgc 0 0 0 shotForm;
+	
+	paneLayout  -h 28 -bgc 1 1 1 Srow1;
+	timePort -bgc 0.4 0.4 0.4 -h 23 SVTimePort;
+
+setParent shotForm;
+
+	rowColumnLayout -bgc 0.4 0.4 0.4 -h 30 -numberOfColumns 7 -columnWidth 1 25 -columnWidth 2 25 -columnWidth 3 25 -columnWidth 4 25 -columnWidth 5 25 -columnWidth 6 25 -columnWidth 7 25 Sbutts ;
+
+	
+		symbolButton -image "timerew.xpm"  -c "playButtonStart" ;
+		symbolButton -image "timeplay.xpm" -c "playShotView" shotViewplayButt;
+		symbolButton -image "timeend.xpm" -c "playButtonStepBackward" ;		
+		symbolButton -image "timestart.xpm" -c "playButtonStepForward" ;
+
+		symbolButton -image "timeprev.xpm"  -c "currentTime -edit `findKeyframe -timeSlider -which previous`" ;	
+		symbolButton -image "timenext.xpm"  -c "currentTime -edit `findKeyframe -timeSlider -which next`" ;
+
+		symbolButton -image (  (`internalVar -userPrefDir`) + "icons/shotViewPlayBlast.xpm" ) -c "blastit 0" ;
+
+		        popupMenu;
+
+
+            		 menuItem -l "View most recent playblast" -c "svViewRecentBlast";
+			 menuItem -l "Explore playblast directory" -c"svExplorePlayBlastLocation";
+
+			if ( $useSVCCam == 1 )
+			{
+			 	menuItem -d true;
+			 	menuItem -l "Playblast the Control Camera" -c "blastit 1";
+			}
+
+
+		//------------------------------------------------------------------------------------------------------------------------//		
+
+
+setParent shotForm;
+
+	paneLayout -w ( $SvHres + 6 ) -h ( $SvVres + 6 ) shotViewShotPanel;
+	catchQuiet ( `deleteUI -pnl shotViewShotWindow` );
+	modelPanel -mbv false -camera $shotCam[0] -p shotViewShotPanel shotViewShotWindow;
+
+setParent shotForm;
+
+
+	if ( $useSVCCam == 1 )
+	{
+		paneLayout -w $global_ControlCamera[0] -h ( $SvVres + 6 ) shotViewControlCamPanel;
+		catchQuiet ( `deleteUI -pnl shotViewControlCamWindow` );
+		modelPanel -mbv false -camera $SVControlCam[0] -p shotViewControlCamPanel shotViewControlCamWindow;
+	}
+
+	
+setParent shotForm;
+
+
+if ( `size $SVControlCam` > 1 )
+{
+
+
+	int $controlCamIndex = `size  $SVControlCam`;
+
+	//gridLayout -bgc 0.4 0.4 0.4  -numberOfColumns $controlCamIndex -cellWidthHeight $global_ControlCamera[1] ( $global_ControlCamera[1] * 0.65 ) -w ( ($global_ControlCamera[1] * $controlCamIndex) ) controlCamButRow;
+	gridLayout  -bgc 0.4 0.4 0.4  -numberOfColumns $controlCamIndex -cellWidthHeight $global_ControlCamera[1] ( $global_ControlCamera[1] * 0.65 ) controlCamButRow;
+
+	int $clock = 1;
+
+	for ( $CCam in $SVControlCam )
+	{
+		button -l $clock  -c ( "svSwitchControlCam " + $CCam ) -ann $CCam;
+		$clock++;	
+	}
+
+}
+
+	formLayout -e 
+
+       	-af shotViewShotPanel "top" $blackThick 
+       	-af shotViewShotPanel "left" $blackThick  
+
+		-af Srow1 "left" 1
+		-af Srow1 "right" 176
+		-af Srow1 "bottom" 1
+
+		-ac Sbutts "left" 1 Srow1
+		-af Sbutts "bottom" 0 
+
+	shotForm;
+
+	if ( $useSVCCam == 1 )
+	{
+
+		formLayout -e 
+
+		-af shotViewControlCamPanel "top" $blackThick 
+		-ac shotViewControlCamPanel "left" $blackThick shotViewShotPanel 
+
+		shotForm;
+
+		if ( `size $SVControlCam` > 1 )
+		{
+
+			formLayout -e 
+
+			-ac controlCamButRow "top" 5 shotViewControlCamPanel 
+			-aoc controlCamButRow "left" 0 shotViewControlCamPanel 
+			
+			shotForm;
+		}
+
+
+	}
+	
+	global int $sVTogVPBar;
+
+	$sVTogVPBar = 0;
+
+
+
+
+showWindow;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// This is a stupid hack because the window capture function stores the current camera, so screws up the loading and playblasting //
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+loadDrawingSettings 0 ;
+
+	modelPanel -e -camera $shotCam[0] shotViewShotWindow;
+	saveDrawingSettings "shotViewShotWindow" ( $prefsLocation + "shotViewShotWinPrefs.txt" );
+
+loadDrawingSettings 1 ;
+
+	modelPanel -e -camera $shotCam[0] shotViewShotWindow;
+	saveDrawingSettings "shotViewShotWindow" ( $prefsLocation + "shotViewPlayBlastPrefs.txt" );
+
+loadDrawingSettings 0 ;
+
+	if ( $useSVCCam == 1 )
+	{
+		modelPanel -e -camera $SVControlCam[0] shotViewControlCamWindow;
+		saveDrawingSettings "shotViewControlCamWindow" ( $prefsLocation + "shotViewControlWinPrefs.txt");
+	}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+print "shotView loaded \n";
+
+}
+
+
+
+global proc blastit( int $recordControlCamera )
+{
+
+	global string $gPlayBackSlider, $global_svStrings[], $sVrecentPlayBlast;
+	global int $global_Playblast[], $global_ControlCamera[], $global_ShotCamera[];
+
+	int $realPlayblastSettings[];
+
+	
+	$startTime = `playbackOptions -q -min`;
+	$endTime = `playbackOptions -q -max`;
+
+	string $sounds[] =`ls -type "audio"`;
+
+	loadDrawingSettings 1;
+
+	modelEditor -e -av shotViewShotWindow;
+
+	if ( $recordControlCamera == 1 )
+	{
+		
+		clear $realPlayblastSettings;
+
+	 	modelEditor -e -av shotViewControlCamWindow;
+
+		$realPlayblastSettings[0] = $global_Playblast[0];
+		$realPlayblastSettings[1] = $global_Playblast[1];
+		$realPlayblastSettings[2] = $global_Playblast[2];
+
+		$global_Playblast[0] = $global_ControlCamera[0];
+		$global_Playblast[1] = ( ($global_Playblast[1] * $global_ShotCamera[2]) / 100 ) ;
+		$global_Playblast[2] = 100;
+
+	}
+
+
+	float $rangeToBlast[] = `timeControl -q -ra $gPlayBackSlider`;
+
+	if ( $rangeToBlast[1] - $rangeToBlast[0] == 1 )
+	{
+		$startTime = `playbackOptions -q -min`;
+		$endTime = `playbackOptions -q -max`;
+	}
+	else
+	{
+		$startTime = $rangeToBlast[0];
+		$endTime = $rangeToBlast[1];
+	}
+
+
+		if ( $global_Playblast[9] == 1 )
+		{
+			playblast -startTime ( $startTime - $global_Playblast[3] )  -endTime ( $endTime + $global_Playblast[4] ) -format image -w ( ($global_Playblast[0] * $global_Playblast[2]) / 100 ) -h ( ($global_Playblast[1] * $global_Playblast[2]) / 100 ) -clearCache 0 -viewer 1 -showOrnaments 1 -percent 100;
+		}
+		
+	
+		if ( $global_Playblast[9] == 0 && $global_Playblast[5] == 0 )	
+		{
+			playblast -startTime ( $startTime - $global_Playblast[3] )  -endTime ( $endTime + $global_Playblast[4] ) -format movie -w ( ($global_Playblast[0] * $global_Playblast[2]) / 100 ) -h ( ($global_Playblast[1] * $global_Playblast[2]) / 100 ) -clearCache 0 -viewer 1 -showOrnaments 1 -percent 100 -sound `timeControl -q -s $gPlayBackSlider`;
+		}
+
+
+		if ( $global_Playblast[9] == 0 && $global_Playblast[5] == 1 )	
+		{
+
+			string $pBfileName, $blastSize, $buffer[], $stamp, $svSceneName;
+
+
+				if ( $global_Playblast[8] == 1 )
+				{
+
+					$svSceneName = `file -q -sn`;
+
+					tokenize $svSceneName "/" $buffer;
+
+		      			$svSceneName = $buffer[`size $buffer` - 1];
+
+		     			tokenize $svSceneName"." $buffer;
+
+		      			$global_svStrings[0] = $buffer[0];
+
+				}
+
+			sysFile -md ( $global_svStrings[1] + "/" + $global_svStrings[0] );	
+
+			$pBfileName = ( $global_svStrings[1] + "/" + $global_svStrings[0] + "/" + $global_svStrings[0] );
+
+
+
+				if ( $global_Playblast[6] == 0 )
+				{
+					sysFile -delete ( $pBfileName + ".avi" );
+				}
+
+		
+				if ( $global_Playblast[6] == 1 )
+				{
+						string $blastsInFolder[] = `getFileList -fld ( $global_svStrings[1] + "/" + $global_svStrings[0] + "/" )`;
+
+						int $size = `size $blastsInFolder`;
+
+						$size++;
+
+						if ( $size < 10 )
+						{ $blastSize = ( "00" + $size ); }
+
+						if ( $size > 9 && $size < 99 )
+						{ $blastSize = ( "0" + $size ); } 
+			
+
+					$pBfileName = ( $global_svStrings[1] + "/" + $global_svStrings[0] + "/" + $global_svStrings[0] + "_" + $blastSize );
+
+
+				}
+
+				if ( $global_Playblast[7] == 1 )
+				{
+
+					string $getTime = `date -d`;
+
+					tokenize $getTime "/" $buffer;
+
+
+					if ( $buffer[1] == "01" )
+					{ $buffer[1] = "Jan"; }
+					if ( $buffer[1] == "02" )
+					{ $buffer[1] = "Feb"; }
+					if ( $buffer[1] == "03" )
+					{ $buffer[1] = "Mar"; }
+					if ( $buffer[1] == "04" )
+					{ $buffer[1] = "Apr"; }
+					if ( $buffer[1] == "05" )
+					{ $buffer[1] = "May"; }
+					if ( $buffer[1] == "06" )
+					{ $buffer[1] = "Jun"; }
+					if ( $buffer[1] == "07" )
+					{ $buffer[1] = "Jul"; }
+					if ( $buffer[1] == "08" )
+					{ $buffer[1] = "Aug"; }
+					if ( $buffer[1] == "09" )
+					{ $buffer[1] = "Sep"; }
+					if ( $buffer[1] == "10" )
+					{ $buffer[1] = "Oct"; }
+					if ( $buffer[1] == "11" )
+					{ $buffer[1] = "Nov"; }
+					if ( $buffer[1] == "12" )
+					{ $buffer[1] = "Dec"; }
+
+
+					$stamp = ( $buffer[2] + "." + $buffer[1] + "." + $buffer[0] );
+
+					string $getTime = `date -st`;
+
+					tokenize $getTime ":" $buffer;
+
+					$stamp = ($stamp + "(" + $buffer[0] + "." + $buffer[1] + ")" );			
+
+					$pBfileName = ( $pBfileName + "_" + $stamp );
+				}
+
+
+			print ( "attempting to create playBlast file:  " + $pBfileName + "\n" );
+
+			playblast -startTime ( $startTime - $global_Playblast[3] )  -endTime ( $endTime + $global_Playblast[4] ) -format movie -w ( ($global_Playblast[0] * $global_Playblast[2]) / 100 ) -h ( ($global_Playblast[1] * $global_Playblast[2]) / 100 ) -clearCache 0 -viewer 1 -showOrnaments 1 -percent 100 -sound `timeControl -q -s $gPlayBackSlider` -filename $pBfileName;                                                                     
+
+			$sVrecentPlayBlast = $pBfileName;
+
+		}
+
+
+
+		if ( $recordControlCamera == 1 )
+		{
+			$global_Playblast[0] = $realPlayblastSettings[0];
+			$global_Playblast[1] = $realPlayblastSettings[1];
+			$global_Playblast[2] = $realPlayblastSettings[2];
+
+			print " \n";
+		}
+
+
+	loadDrawingSettings 0;
+		
+}
+
+
+global proc cameraOptions()
+{
+
+	global string $shotCam[];
+
+	if ( `objExists $shotCam[0]` == 0 )
+	{
+   		svErrorWarning "shotView can't find the shot camera in this scene that was originally setup" "It may have been deleted or renamed. You will need to restart shotView." "Restart" "deleteUI svWarnWindowsds; shotView " "cancel" "deleteUI svWarnWindowsds";
+	}
+	else
+	{
+		select -r $shotCam[0];
+		openAEWindow;
+	}
+}
+
+
+
+global proc playShotView()
+{
+
+	global int $playClock, $global_Playback[];
+
+	global string $currentRefreshSettings[];
+
+
+	modelEditor -e -av shotViewShotWindow;	
+
+
+	if ( $playClock == 0 )
+	{
+
+		$currentRefreshSettings[0] = `playbackOptions -q -v`;	
+
+
+		if ( $global_Playback[0] == 1 )
+		{
+			
+
+			playbackOptions -e -v active;
+
+			playButtonForward;
+
+			$playClock = 1;
+
+		}
+		else
+		{
+			
+			playButtonForward;
+			$playClock = 1;
+		
+		}
+
+	}
+	else
+	{
+
+		
+		play -st false;
+		$playClock = 0;
+
+		playbackOptions -e -v $currentRefreshSettings[0];
+
+
+	}	
+	
+}
+
+
+global proc lockCam()
+{
+
+global string $shotCam[];
+
+	int $isLocked = `menuItem -q -cb camLocked`;
+
+	string $svCameraShapeNode[] = `listRelatives -s $shotCam[0]`;
+
+	if ( $isLocked == 1 )
+	{
+		setAttr -lock true ( $shotCam[0] + ".tx");
+		setAttr -lock true ( $shotCam[0] + ".ty");
+		setAttr -lock true ( $shotCam[0] + ".tz");
+		setAttr -lock true ( $shotCam[0] + ".rx");
+		setAttr -lock true ( $shotCam[0] + ".ry");
+		setAttr -lock true ( $shotCam[0] + ".rz");
+		setAttr -lock true ( $shotCam[0] + ".sx");
+		setAttr -lock true ( $shotCam[0] + ".sy");
+		setAttr -lock true ( $shotCam[0] + ".sz");
+		setAttr -lock true ( $shotCam[0] + ".v");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".hfa");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".vfa");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".fl");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".lsr");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".fs");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".fd");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".sa");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".coi");
+	}
+	else
+	{
+		setAttr -lock false ( $shotCam[0] + ".tx");
+		setAttr -lock false ( $shotCam[0] + ".ty");
+		setAttr -lock false ( $shotCam[0] + ".tz");
+		setAttr -lock false ( $shotCam[0] + ".rx");
+		setAttr -lock false ( $shotCam[0] + ".ry");
+		setAttr -lock false ( $shotCam[0] + ".rz");
+		setAttr -lock false ( $shotCam[0] + ".sx");
+		setAttr -lock false ( $shotCam[0] + ".sy");
+		setAttr -lock false ( $shotCam[0] + ".sz");
+		setAttr -lock false ( $shotCam[0] + ".v");
+		setAttr -lock false ( $svCameraShapeNode[0] + ".hfa");
+		setAttr -lock false ( $svCameraShapeNode[0] + ".vfa");
+		setAttr -lock false ( $svCameraShapeNode[0] + ".fl");
+		setAttr -lock false ( $svCameraShapeNode[0] + ".lsr");
+		setAttr -lock false ( $svCameraShapeNode[0] + ".fs");
+		setAttr -lock false ( $svCameraShapeNode[0] + ".fd");
+		setAttr -lock false ( $svCameraShapeNode[0] + ".sa");
+		setAttr -lock false ( $svCameraShapeNode[0] + ".coi");
+	}
+}
+
+
+
+global proc int checkCameraLocked( string $object, string $channel )
+{
+	
+	string $writable[];
+
+	int $error = 0;
+
+	$writable = `listAttr -l $object`;
+
+					
+		for ( $attr in $writable )
+		{
+
+			if ( $attr == ( $channel + "X") )
+			{
+				$error++;
+			}
+			if ( $attr == ( $channel + "Y") )
+			{
+				$error++;
+			}
+			if ( $attr == ( $channel + "Z") )
+			{
+				$error++;
+			}
+
+		}
+
+
+return $error;
+
+}
+
+
+
+global proc shotViewPreferencesSetup()
+{
+
+	global int $sVUseCustom, $sVW, $sVH, $sVUseAnimInfo, $sVUseFrameNo, $sVUseRollObj, $CB_svpreRoll, $CB_svpostRoll, $useSVCCam, $global_Misc[];
+	global string $sVRollObj;
+
+	global string $prefsLocation; 
+
+
+if (`window -exists  SVPrefWindow` )
+{
+	deleteUI -window  SVPrefWindow;	
+}
+
+if (`windowPref -exists  SVPrefWindow` )
+{
+	windowPref -remove  SVPrefWindow ;
+}
+
+window -t "shotView preferences" -w 375 -h 645 SVPrefWindow;
+
+		if ( $global_Misc[0] == 1 )
+		{
+			window -e -s true SVPrefWindow; 
+		}
+//nn
+tabLayout svTabs;
+
+formLayout ShotCamera;
+
+
+	rowColumnLayout -nc 1 -cw 1 160 -h 100 RC_svCapcolumn;
+
+	button -l "Capture viewport settings" -c ( "saveDrawingSettings \"shotViewShotWindow\" " + "\"" + $prefsLocation + "shotViewShotWinPrefs.txt\"" )  svDisplayCapture;
+
+	text -l " ";
+
+	text -l "To configure your preferred ";
+	text -l "display settings for shotView's";
+	text -l "3D Viewports, do the following:";
+	text -l " ";	
+	text -l "1) goto options menu and choose";
+	text -l "\"toggle viewport option bar(s)\"";
+	text -l " ";	
+	text -l "2) setup your viewport display as";
+	text -l "you want it to appear by default";
+	text -l "( object filters, lighting";
+	text -l "preferences, shading etc )";
+	text -l " ";	
+	text -l "4) press ";
+	text -l "\"Capture viewport settings\"";
+	text -l " ";
+	text -l "You can capture different settings";
+	text -l "for the main shot camera viewport,";
+	text -l "the control camera viewport, and";
+	text -l "when recording a playblast, by  ";
+	text -l "using the capture button under";
+	text -l "the appropriate tab.  ";
+
+	text -l " ";
+	text -l "Captured viewport settings are";
+	text -l "saved automatically.";
+	text -l "You only need to press \"save\"";
+	text -l "if you change any of the other";
+	text -l "preference options.";
+
+
+
+setParent ShotCamera;
+
+	rowColumnLayout -nc 1 -cw 1 140  RC_svIFcolumn;
+
+	text -fn "boldLabelFont" -l "Sizing defaults" -w 100 -h 30 ;
+	text -l "Resolution " -h 30 ;
+	intField -v 10 -min 10 IF_svWindow0;
+	intField -v 10 -min 10 IF_svWindow1;
+
+	button -l "4:3" -c "setAspect IF_svWindow0 IF_svWindow1 1.333";
+	button -l "16:9" -c "setAspect IF_svWindow0 IF_svWindow1 1.778";
+	button -l "1:1.85" -c "setAspect IF_svWindow0 IF_svWindow1 1.85";
+	button -l "1:2.35" -c "setAspect IF_svWindow0 IF_svWindow1 2.35";
+	button -l "1:1" -c "setAspect IF_svWindow0 IF_svWindow1 1";
+
+	text -l "Scale percent "  -h 30 ;
+	intField -v 10 -min 1 IF_svWindow2;
+	text -l "Black bar thickness "  -h 30 ;
+	intField -v 10 -min 0 IF_svWindow3;
+
+
+setParent ShotCamera;
+
+	rowColumnLayout -nc 2 -cw 1 175 -cw 2 175 svbutcolumn;
+
+	button -l "Save" -c "saveSizingSettings" -h 22;
+	button -l "Cancel" -c "deleteUI SVPrefWindow";
+
+
+setParent ShotCamera;
+
+	rowColumnLayout -nc 1 -cw 1 400 svWarn;
+
+	text -l "Note: aspect ratio presets are based on current horizontal resolution";
+
+formLayout -e 
+
+	-af RC_svCapcolumn "top" 18
+	-af RC_svCapcolumn "left" 18 
+	-af RC_svCapcolumn "bottom" 100
+
+	-af RC_svIFcolumn "top" 18
+	-af RC_svIFcolumn "left" 195
+
+	-af svbutcolumn "bottom" 3
+	-af svbutcolumn "left" 3
+
+	-af svWarn "bottom" 43
+	-af svWarn "left" 18
+
+
+ShotCamera;
+
+setParent SVPrefWindow;
+
+//////////////////////////////
+
+formLayout ControlCamera;	
+
+
+	rowColumnLayout -nc 1 -cw 1 140 -en true RC_svpBcolumnCC;
+
+	text -fn "boldLabelFont" -l "Sizing defaults" -h 30 cct1;
+
+	text  -l "Window width" cct2;
+
+		intField -v 300 -min 2 IF_svWindowWzz;
+
+	text  -l "Size of switching buttons" cctxx2;
+
+		intField -v 10 -min 2 IF_svWindowWzzbs;
+
+
+
+setParent ControlCamera;
+
+
+	rowColumnLayout -nc 1 -cw 1 160 -h 100 -en true RC_svPBCapcolumnCC;
+
+	button -l "Capture viewport settings" -c ( "saveDrawingSettings \"shotViewControlCamWindow\" " + "\"" + $prefsLocation + "shotViewControlWinPrefs.txt\"" ) svControlCamCapture;
+
+	
+setParent ControlCamera;
+
+	rowColumnLayout -nc 2 -cw 1 175 -cw 2 175  svbutcolumnede;
+
+	button -l "Save" -c "saveSizingSettings" -h 22;
+	button -l "Cancel" -c "deleteUI SVPrefWindow";
+
+
+
+	formLayout -e 
+	
+	-af RC_svPBCapcolumnCC "top" 18
+	-af RC_svPBCapcolumnCC "left" 18
+	
+	-af RC_svpBcolumnCC "top" 18
+	-af RC_svpBcolumnCC "left" 195
+	
+	-af svbutcolumnede "bottom" 3
+	-af svbutcolumnede "left" 3
+
+
+	ControlCamera;
+
+
+
+	if ( $useSVCCam == 0 )
+	{
+		text -e -en false cct1;
+		text -e -en false cct2;
+		intField -e -en false IF_svWindowWzz;
+		button -e -en false svControlCamCapture;
+
+		text -e -en false cctxx2;
+		intField -e -en false IF_svWindowWzzbs;
+	}
+
+
+setParent SVPrefWindow;
+
+///////////////////////////////
+
+formLayout Playblast;	
+
+	rowColumnLayout -nc 1 -cw 1 140 RC_svpBcolumn;
+	
+	text -fn "boldLabelFont" -l "Sizing defaults" -h 30;
+
+	text  -l "Resolution"  -h 30 ;
+
+		intField -v 10 -min 2 IF_svWindow4;
+		intField -v 10 -min 2 IF_svWindow5;
+
+	button -l "4:3" -c "setAspect IF_svWindow4 IF_svWindow5 1.333";
+	button -l "16:9" -c "setAspect IF_svWindow4 IF_svWindow5 1.778";
+	button -l "1:1.85" -c "setAspect IF_svWindow4 IF_svWindow5 1.85";
+	button -l "1:2.35" -c "setAspect IF_svWindow4 IF_svWindow5 2.35";
+	button -l "1:1" -c "setAspect IF_svWindow4 IF_svWindow5 1";
+		
+	text -l "Scale percent";
+
+		intField -v 10 -min 2 IF_svWindow6;
+
+	text -l "Pre-roll and post roll ";
+
+			intField -v 0 -min 0 IF_svWindow7;
+			intField -v 0 -min 0 IF_svWindow8;
+	text -l " ";
+
+
+
+	checkBox -l " Save playblasts" -h 30 CB_svSaveBlasts;
+
+		text -l "Name:" svText1; 
+
+		textField  TF_svPBName;
+
+		text -l "Location:"  svText2;
+
+setParent Playblast;
+
+	rowColumnLayout -nc 2 -cw 1 120 -cw 2 20 RC_svpBcolumnSub;
+
+		textField  TF_svPBLocation;
+		button -l "..." -c "fileBrowserDialog -m 4 -fc \"sVSelectPBDirectory\" -an \"choose playblast directory\" -om \"OK\" " svText3;
+
+		text -l "Player exe location:"  svText4;
+		text -l " ";
+		textField  TF_svPBPlayer;
+		button -l "..." -c "sVSelectPBPlayer" svText5;
+	
+		checkBox -l " Incremental save"  CB_svPBIncSave;
+		text -l " ";
+		checkBox -l " Include time stamp"   CB_svPBIncStamp;
+		text -l " ";
+		checkBox -l " Use scene name"   CB_svPBUseSceneName;
+		text -l " ";
+
+		text -l " ";
+		text -l " ";
+
+
+	checkBox -e -onc "textField -e -text \"( using scene name )\" TF_svPBName" CB_svPBUseSceneName; 
+	checkBox -e -ofc "textField -e -text \"\" TF_svPBName" CB_svPBUseSceneName; 
+
+	checkBox -l " Render to FCheck" CB_fcheckCheck;
+
+setParent Playblast;
+
+	rowColumnLayout -nc 1 -cw 1 160 -h 100 RC_svPBCapcolumnEPBL;
+
+	text -l "Its reccomended to choose";
+	text -l "\"Save playblasts\" as this" ;
+	text -l "offers easy access to and fast" ;
+	text -l "management of playblast videos" ;
+	text -l "as you are animating. Currently " ;
+	text -l "this is only supported on"; 
+	text -l "Windows systems .";
+	text -l " ";
+	text -l "Setting the default \"Player exe\"" ;
+	text -l "is used to tell shotView which";
+	text -l "program will play back the most";
+	text -l "recent playblast file. This does";
+	text -l "not affect your usual player";
+	text -l "for normal playblasting.";
+	text -l " ";
+	text -l  "Tested exe files include:";
+	text -l " ";
+	text -l "wmplayer (windows media)";		
+	text -l "mplayerc (media player classic)";
+	text -l " ";
+	text -l "( you can find the option to play ";
+	text -l "back the most recent playblast";
+	text -l "under the right mouse menu of";
+	text -l "shotView's playblast button )";
+	
+setParent Playblast;
+
+	rowColumnLayout -nc 1 -cw 1 160 -h 100 RC_svPBCapcolumn;
+
+	button -l "Capture viewport settings" -c ( "saveDrawingSettings \"shotViewShotWindow\" " + "\"" + $prefsLocation + "shotViewPlayBlastPrefs.txt\"" ) svPBlastCapture;
+	
+
+setParent Playblast;
+
+	rowColumnLayout -nc 2 -cw 1 175 -cw 2 175  svbutcolumnededd;
+
+	button -l "Save" -c "saveSizingSettings" -h 22;
+	button -l "Cancel" -c "deleteUI SVPrefWindow";
+
+
+	formLayout -e 
+	
+	-af RC_svPBCapcolumn "top" 18
+	-af RC_svPBCapcolumn "left" 18
+	
+	-af RC_svpBcolumn "top" 18
+	-af RC_svpBcolumn "left" 195
+
+	-ac RC_svpBcolumnSub "top" 0 RC_svpBcolumn
+	-af RC_svpBcolumnSub "left" 195
+
+	-af svbutcolumnededd "bottom" 3
+	-af svbutcolumnededd "left" 3
+
+	-af RC_svPBCapcolumnEPBL "top" 55
+	-af RC_svPBCapcolumnEPBL "left" 18 
+	
+
+	Playblast;
+
+
+setParent SVPrefWindow;
+
+/////////////////////////////////
+
+
+setParent SVPrefWindow;
+
+
+formLayout Playback;
+
+rowColumnLayout -nc 1 -cw 1 300 CB_svpBacklist;
+
+
+	text -fn "boldLabelFont" -l "Refresh" -w 200 -h 30 ;
+	checkBox -l " Playback in shotView window only " CB_svp41;
+	text -l " ";
+	text -vis false -fn "boldLabelFont" -l "Looping mode" -w 200;
+
+	setParent Playback;
+
+	rowColumnLayout -nc 1 -cw 1 190 -h 100 CB_svmisc3;
+
+	text -l "This tells maya to only playback ";
+	text -l "animation in shotView's main shot ";
+	text -l "camera viewport, when you press the";
+	text -l "custom shotView play button.";
+	text -l " ";
+	text -l "You can potentially get faster ";
+	text -l "playback with this option, but ";
+	text -l "still have the benefit of having";
+	text -l "your main maya setting on ";
+	text -l "\"update > All \"";
+	text -l "which will update shotView's viewports";
+	text -l "when you scrub or play back from the";
+	text -l "main maya timeLine. ";
+	text -l " ";
+	text -l "If you like to use a hotkey to control";
+	text -l "playback, use the toggle command:";
+	text -l " ";
+	text -l "\"playShotView\"";
+
+
+	setParent Playback;
+
+	rowColumnLayout -nc 2 -cw 1 175 -cw 2 175  svbutcolumnddededdxx;
+
+	button -l "Save" -c "saveSizingSettings" -h 22;
+	button -l "Cancel" -c "deleteUI SVPrefWindow";
+
+	formLayout -e 
+	
+	-af CB_svpBacklist "top" 18
+	-af CB_svpBacklist "left" 50
+
+	-af CB_svmisc3 "top" 65
+	-af CB_svmisc3 "left" 50
+
+	-af svbutcolumnddededdxx "bottom" 3
+	-af svbutcolumnddededdxx "left" 3
+
+	
+	Playback;
+
+
+setParent Playback;
+
+setParent SVPrefWindow;
+
+
+formLayout Misc;
+
+rowColumnLayout -nc 1 -cw 1 300 CB_svmisc1;
+
+/*
+	text -fn "boldLabelFont" -l "Interface" -w 200 -h 30;
+	checkBox -l " Make main windows sizeable " -en false -h 30 CB_svpMac;
+	text -l " ";
+
+	setParent Misc;
+
+	rowColumnLayout -nc 1 -cw 1 190 CB_svmisc2;
+
+	text -l "This is mostly for Mac OSX users ";
+	text -l "because some size settings are ";
+	text -l "different from windows. This can";
+	text -l "cause some buttons and checkboxes";
+	text -l "to appear cropped. For windows";
+	text -l "users its best to leave this option";
+	text -l "off.";
+	text -l " ";
+	text -l "Note:";
+	text -l "Only affects the main shotView";
+	text -l "window and preferences window,";
+	text -l "not the sizing of any of the 3D";
+	text -l "viewports, or controls.";
+
+*/
+setParent Misc;
+
+	rowColumnLayout -nc 1 -cw 1 300 CB_svOrthoFilter;
+
+	checkBox -l " Don't display orthographic cameras " -h 30 CB_svOrthossFilter;
+	text -l " ";
+
+setParent Misc;
+
+	rowColumnLayout -nc 1 -cw 1 190 txt_svmisc3;
+
+	text -l "This filters out orthographic ";
+	text -l "cameras from the selection list ";
+	text -l "when you first start shotView. ";
+
+setParent Misc;
+
+	rowColumnLayout -nc 2 -cw 1 175 -cw 2 175  svbutcolumnddededdxxyy;
+
+	button -l "Save" -c "saveSizingSettings" -h 22;
+	button -l "Cancel" -c "deleteUI SVPrefWindow";
+
+	formLayout -e 
+	
+	//-af CB_svmisc1 "top" 18
+	//-af CB_svmisc1 "left" 50
+
+	//-af CB_svmisc2 "top" 85
+	//-af CB_svmisc2 "left" 50
+
+	-af CB_svOrthoFilter "top" 35 
+	-af CB_svOrthoFilter "left" 50
+
+	-af svbutcolumnddededdxxyy "bottom" 3
+	-af svbutcolumnddededdxxyy "left" 3
+
+	-af txt_svmisc3 "top" 80
+	-af txt_svmisc3 "left" 50
+
+// mm
+	
+	Misc;
+
+
+setParent Playback;
+
+tabLayout -e -st ShotCamera svTabs;
+showWindow;
+
+loadSizingSettings;
+
+
+}
+
+
+
+
+global proc toggleViewPortBar()
+{
+	
+	global int $sVTogVPBar, $useSVCCam;
+	
+	if ( $sVTogVPBar == 0 )
+	{
+		
+			
+
+			modelPanel -e -mbv true shotViewShotWindow;
+
+			window -e -h ( `window -q -h shotWin` + 19 ) shotWin;
+
+			paneLayout -e -h ( `paneLayout -q -h shotViewShotPanel` + 19 ) shotViewShotPanel;
+
+
+			if ( $useSVCCam == 1 )
+			{
+				modelPanel -e -mbv true shotViewControlCamWindow;
+				paneLayout -e -h ( `paneLayout -q -h shotViewControlCamPanel` + 19 ) shotViewControlCamPanel;
+			}
+
+			
+			$sVTogVPBar = 1;
+			
+	}
+	else
+	{
+			
+			modelPanel -e -mbv false shotViewShotWindow;
+
+			window -e -h ( `window -q -h shotWin` - 19 ) shotWin;
+
+			paneLayout -e -h ( `paneLayout -q -h shotViewShotPanel` - 19 ) shotViewShotPanel;
+
+
+			if ( $useSVCCam == 1 )
+			{
+				modelPanel -e -mbv false shotViewControlCamWindow;
+				paneLayout -e -h ( `paneLayout -q -h shotViewControlCamPanel` - 19 ) shotViewControlCamPanel;
+			}
+			
+			$sVTogVPBar = 0;
+		
+	}
+	
+	
+}
+
+
+
+
+global proc setAspect( string $horizontalWin, string $verticalWin, float $aspect )
+{
+
+global string $prefsLocation; 
+
+int $horiz = `intField -q -v $horizontalWin`;
+
+string $finalAspect = $horiz / $aspect;
+
+string $buffer[];
+tokenize $finalAspect "." $buffer;
+
+
+if ( `size $buffer` > 1 )
+{
+
+	int $buff0 = $buffer[0];
+	int $buff1 = $buffer[1];
+
+	float $wager = ( "0." + $buffer[1] );
+
+		if ( $wager < 0.5 )
+		{
+			$finalAspect = $buff0;
+		}
+		else
+		{
+			$finalAspect = $buff0 + 1;
+	
+		}
+}
+
+int $finalAspectInt = $finalAspect;
+intField -e -v $finalAspectInt $verticalWin;
+
+}
+
+
+global proc updateSVCamList()
+{
+
+		global int $global_Misc[];
+
+		string $cams[];
+		string $svCameraShape[];
+
+		$cams = `SelectAllCameras`;
+		$cams = `ls -sl -fl`;
+
+		textScrollList -e -ra cameraList;
+		textScrollList -e -ra controlCameraList;
+
+		for ( $camera in $cams)
+		{
+
+				$svCameraShape = `listRelatives -s $camera`;
+
+
+				if ( $global_Misc[1] == 0 )
+				{
+
+					if (`attributeExists "isSVNavCam" $camera` == 0 )
+					{
+						textScrollList -e -append $camera cameraList;
+						textScrollList -e -append $camera controlCameraList;
+					}
+				}
+				else
+				{
+		
+					if ( $global_Misc[1] == 1 && `getAttr ( $svCameraShape[0] + ".orthographic" )` == 0 ) 
+					{
+						if (`attributeExists "isSVNavCam" $camera` == 0 )
+						{
+							textScrollList -e -append $camera cameraList;
+							textScrollList -e -append $camera controlCameraList;
+						}
+					}
+
+				} 
+				// zz
+
+		}
+
+}
+
+
+
+
+
+global proc loadSizingSettings()
+{
+	global int $useSVCCam;
+
+	global string $prefsLocation; 
+	
+	prefIO "read" "[ShotCamera]" 0 " " 0 ( $prefsLocation + "shotViewDisplayPrefs.txt" );
+	prefIO "read" "[Playblast]" 0 "" 0 ( $prefsLocation + "shotViewDisplayPrefs.txt" );
+
+	global string $prefsLocation; 
+
+
+		prefIO "read" "[ControlCamera]" 0 "" 0 ( $prefsLocation + "shotViewDisplayPrefs.txt" );
+
+
+	prefIO "read" "[Playback]" 0 "" 0 ( $prefsLocation + "shotViewDisplayPrefs.txt" );
+	catch ( `prefIO "read" "[Misc]" 0 "" 0 ( $prefsLocation + "shotViewDisplayPrefs.txt" )` );
+}
+
+
+
+global proc saveSizingSettings()
+{
+
+	//pp
+
+	int $error = 0;
+
+	if ( `checkBox -q -v CB_svPBUseSceneName` == 0 && `textField -q -text TF_svPBName` == "" && `checkBox -q -v CB_svSaveBlasts` == 1 )
+	{
+		$error = 1;
+
+		svErrorWarning "You must enter a name for your playblast file if not using the \"Use scene name\" option" "" " " " " "OK" "deleteUI svWarnWindowsds" ;
+
+	}
+
+	if ( `checkBox -q -v CB_svSaveBlasts` == 1 && `textField -q -text TF_svPBLocation` == "" )
+	{
+		$error = 1;
+
+		svErrorWarning "You must choose a location when \"Save playblasts\" option is switched on." "" " " " " "OK" "deleteUI svWarnWindowsds" ;
+
+	}
+
+
+	if ( `checkBox -q -v CB_svSaveBlasts` == 1 && `textField -q -text TF_svPBPlayer` == "" )
+	{
+		$error = 1;
+
+		svErrorWarning "You must choose a player exe when \"Save playblasts\" option is switched on." "" " " " " "OK" "deleteUI svWarnWindowsds" ;
+
+	}
+
+	
+
+	if ( $error == 0 )
+	{
+
+		global string $prefsLocation; 
+
+		$fileId = `fopen ( $prefsLocation + "shotViewDisplayPrefs.txt" ) "w"`;
+
+		prefIO "write" "ShotCamera" 0 "" $fileId "";
+		prefIO "write" "Playblast" 0 "" $fileId "";
+		prefIO "write" "ControlCamera" 0 "" $fileId "";
+		prefIO "write" "Playback" 0 "" $fileId "";
+		prefIO "write" "Misc" 0 "" $fileId "";
+
+		fclose $fileId;
+
+
+ 		deleteUI SVPrefWindow; deleteUI shotWin; initiateShotWin 1;
+
+	}
+}
+
+
+global proc saveDrawingSettings( string $window, string $fileHandler )
+{
+	
+	int $fileId = `fopen $fileHandler "w"`;
+
+	prefIO "write" " " 1 $window $fileId $fileHandler;
+	fclose $fileId;
+
+}
+
+
+global proc loadDrawingSettings( int $playBlast )
+{
+	global string $prefsLocation; 
+
+	global int $useSVCCam;
+
+	if ( $playBlast == 1 )
+	{
+
+		prefIO "read" "[shotViewShotWindow]" 0 " " 0 ( $prefsLocation + "shotViewPlayBlastPrefs.txt" );
+		
+	}
+	else
+	{
+		prefIO "read" "[shotViewShotWindow]" 0 " " 0 ( $prefsLocation + "shotViewShotWinPrefs.txt" );
+
+		if ( $useSVCCam == 1 )
+		{
+			
+			prefIO "read" "[shotViewControlCamWindow]" 0 "" 0  ( $prefsLocation + "shotViewControlWinPrefs.txt" );
+		}
+	}
+
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+global proc prefIO( string $readWrite, string $topControl, int $capture, string $windowToFilter, int $fileId, string $fileHandler )
+{
+
+	string $buffer[];		
+
+	if ( $capture == 0 )
+	{
+
+		if ( $readWrite == "write" )
+		{
+
+			string $topLevel[] = `formLayout -q -ca $topControl`;
+
+
+				fprint $fileId  ( "[" + $topControl + "]>\n");
+				fprint $fileId  ( "global int $global_" + $topControl + "[];>\n" );	
+				fprint $fileId  ( "global string $global_svStrings[];>\n" );	
+
+				int $arrayClock = 0;
+				int $stringarrayClock = 0;
+
+			for ( $layoutBranch in $topLevel )
+			{
+
+				string $branchChildren[] = `rowColumnLayout -q -ca $layoutBranch`;	
+
+
+
+				for ( $LChild in $branchChildren )
+				{
+
+
+					tokenize $LChild "_" $buffer;
+
+
+					if ( $buffer[0] == "CB" )
+					{
+						int $state = `checkBox -q -v $LChild`;
+						fprint $fileId  ( "$global_" + $topControl + "[" + $arrayClock + "] = " + $state + ";>\n" );
+						fprint $fileId  ( "if (`window -exists SVPrefWindow`){ checkBox -e -v " + $state + " " + $LChild + ";}>\n" );
+						$arrayClock++;
+
+			
+					}
+
+					if ( $buffer[0] == "IF" )
+					{		
+						int $state = `intField -q -v $LChild`;
+						fprint $fileId  ( "$global_" + $topControl + "[" + $arrayClock + "] = " + $state + ";>\n" );
+						fprint $fileId  ( "if (`window -exists SVPrefWindow`){ intField -e -v " + $state + " " + $LChild + ";}>\n" );
+						$arrayClock++;
+
+
+					}
+
+
+					if ( $buffer[0] == "TF" )
+					{		
+						string $Sstate = `textField -q -text $LChild`;
+						fprint $fileId  ( "$global_svStrings[" + $stringarrayClock + "] = \"" + $Sstate + "\";>\n" );
+						fprint $fileId  ( "if (`window -exists SVPrefWindow`){ textField -e -text \"" + $Sstate + "\" " + $LChild + ";}>\n" );
+						$stringarrayClock++;
+
+
+					}
+					
+				}
+
+
+			}
+
+			
+		fprint $fileId  "->\n";
+
+		
+		}
+
+		if ( $readWrite == "read" )
+		{
+
+			global string $RFData[];
+
+			SVReadFromFile $fileHandler $topControl 0;
+
+			string $EvalMe = " ";
+
+			for ( $line in $RFData )
+			{
+				$EvalMe = ( $EvalMe + $line );
+			}
+
+			eval $EvalMe;
+
+		}	
+
+	}
+
+	else   
+	{
+
+				fprint $fileId  ( "[" + $windowToFilter + "]>\n");
+
+				string $drawSettings = `modelEditor -q -sts $windowToFilter`;
+
+				fprint $fileId  ( "string $editorName = \"" + $windowToFilter + "\";>\n");
+
+				fprint $fileId  ( $drawSettings + ";>\n" );	
+
+				fprint $fileId  "->\n";
+
+
+	}
+
+
+
+}
+
+
+
+
+global proc usePreDefinedCamSetup()
+{
+
+	global string $shotCam[], $SVControlCam[];
+	global int $useSVCCam;
+
+	string $camSetup = `getAttr "shotView_Setup.cameras"`;
+
+	string $tbuffer[];
+
+	tokenize $camSetup "<" $tbuffer;
+
+	$shotCam[0] = $tbuffer[0];
+
+	int $clock = 0;
+	int $error = 0;
+
+	for ( $i = 1; $i < `size $tbuffer`; $i ++ )
+	{
+
+		$SVControlCam[$clock] = $tbuffer[$i];
+		$clock ++;
+
+	}
+
+	if ( `size $tbuffer` > 1 )
+	{
+		$useSVCCam = 1;
+	}
+
+	if ( `objExists $shotCam[0]` == 0 )
+	{
+		$error = 1;
+	}
+
+	if ( $useSVCCam == 1 )
+	{
+		for ( $cam in $SVControlCam )
+		{
+			if ( `objExists $cam` == 0 )
+			{
+				$error = 2;
+			}
+		}
+	}
+
+
+
+	if ( $error == 0 )
+	{
+       	initiateShotWin 1;
+	}
+
+	if ( $error == 1 )
+	{
+       	   		svErrorWarning "shotView can't find the shot camera in this scene that was originally setup" "It may have been deleted or renamed. You will need to restart shotView." "Restart" "deleteUI svWarnWindowsds; shotView " "cancel" "deleteUI svWarnWindowsds";
+
+	}
+
+	if ( $error == 2 )
+	{
+       	   		svErrorWarning "shotView can't find one of the control cameras originally setup" "It may have been deleted or renamed. You will need to restart shotView." "Restart" "deleteUI svWarnWindowsds; shotView " "cancel" "deleteUI svWarnWindowsds";
+
+	}
+	
+}
+
+
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+global proc SVReadFromFile ( string $file, string $bank, int $debug )
+	
+{    
+
+	$fileToRead = $file;
+
+     	$fileId = `fopen $fileToRead "r"`;
+	
+	global string $RFData[]; string $buffer[], $bankText;
+	
+	clear $RFData;
+	
+	int $i, $error;
+	
+	$i = 0;
+	$error = 1;
+	
+   	    string $lineText = "begin"; // start off the search so the WHILE can begin //
+	
+   		while ( size( $lineText ) > 0 ) // continue until $lineText returns nothing (empty line... will only return empty laine at END of file  START FROM START OF FILE + READ WHOLE FILE//
+		{
+			
+			
+    			$lineText = `fgetline $fileId`; // get the line ( entire line and blank space ) //
+								
+				if ( `size $lineText` != 0 ) // if there was text there ( this will always run, so you can have blank lines if you want ) //
+				{
+					
+
+   					tokenize $lineText ">" $buffer;  // remove the white space behind ">" //
+					
+					
+					if ( $buffer[0] == $bank ) // find the block identifier //
+					{
+							$bankText = "start of block";
+							
+							$error = 0;	
+						
+							while ( size( $bankText ) > 0 ) // kick off the line reader ( > 0 means nothing cos of break ... will run till end symbol ) STARTING FROM SPECIFIED BLOCK //
+							{
+						
+								$bankText = `fgetline $fileId`;	  // get the text //
+								
+  								tokenize $bankText ">" $buffer;  // remove the white space behind ">" //
+							
+								if ( $buffer[0] != "-" ) // check for the `end of bank` symbol //
+								{
+									
+									$RFData[$i] = $buffer[0]; // add the result to the array //
+							
+									$i = $i + 1; // shift array on by one //
+									
+								}
+								else
+								{
+									break;
+								}
+						
+							}
+					}
+					else{}
+				}
+		}
+		 
+
+		 
+    fclose $fileId;
+	
+	if ( $error == 1 )
+	{
+		error ( "the dataBlock " + $bank +  " from file " + $file + " wasnt found. Check the block name.." );
+
+	}else{}
+	
+	
+    if ( $debug == 1 )
+	{
+		print "----------------------------------- \n";
+		print ( "bank " + $bank + " returned:\n" );
+		print $RFData;
+		print "----------------------------------- \n";
+	}else{}
+	
+	
+}
+
+
+
+global proc int sVSelectPBDirectory( string $filename, string $fileType )
+{
+	textField -e -text $filename TF_svPBLocation;
+	textField -e -ann $filename TF_svPBLocation;
+   	return 1;
+}
+
+
+global proc int sVSelectPBPlayer()
+{
+	string $filename = `fileDialog -dm  "*.exe"`;
+
+	textField -e -text $filename TF_svPBPlayer;
+	textField -e -ann $filename TF_svPBPlayer;
+   	return 1;
+}
+
+
+
+
+
+
+global proc svExplorePlayBlastLocation()
+{
+
+	global string $global_svStrings[];
+	global int $global_Playblast[5];
+
+
+	if ( $global_Playblast[5] == 0 )
+	{
+              svErrorWarning "Access to playblast directories is not available because you don't have the" "\"Save playblasts\" option switched on in the preferences window." " " " " "Ok" "deleteUI svWarnWindowsds";
+//nn
+	}
+	else
+	{
+
+	string $buffer[];
+
+	string $location = $global_svStrings[1];
+
+	tokenize $location "/" $buffer;
+
+	string $location = "";
+	
+	for ( $i in $buffer )
+	{
+		
+		$location = ( $location + $i + "\\\\" ); 
+
+	}
+
+
+	if ( `size $location` > 0 )
+	{
+
+		string $eval = (   "system ( \"explorer " + $location + "\" )"    );
+		eval $eval;
+
+	}
+
+	}
+
+}
+
+
+global proc svViewRecentBlast()
+{
+
+	global string $sVrecentPlayBlast, $global_svStrings[];
+
+	global int $global_Playblast[];
+
+	if ( $global_Playblast[5] == 0 )
+	{
+              svErrorWarning "Access to recent playblast is not available because you don't have the" "\"Save playblasts\" option switched on in the preferences window." " " " " "Ok" "deleteUI svWarnWindowsds";
+//nn
+	}
+	else
+	{
+
+	string $svTempPlayBlast;
+
+	$svTempPlayBlast = ( $sVrecentPlayBlast + ".avi" );
+
+	string $buffer[];
+
+	tokenize $svTempPlayBlast "/" $buffer;
+
+	string $location = "";
+	
+	for ( $c = 0; $c < `size $buffer`; $c ++ )
+	{
+
+			$location = ( $location + $buffer[$c] ); 
+
+
+			if ( $c < `size $buffer` - 1 )
+			{
+				$location = ( $location + "\\\\" ); 
+			}
+
+	}
+
+	tokenize $global_svStrings[2] "/" $buffer;
+
+	string $player = "";
+	
+	for ( $c = 0; $c < `size $buffer`; $c ++ )
+	{
+
+			$player = ( $player + $buffer[$c] );
+
+			if ( $c < `size $buffer` - 1 )
+			{
+				$player = ( $player + "\\\\" ); 
+			}
+
+	}
+
+	string $eval =  ( "system ( \"start " + $player + " \\\"" + $location + "\\\"\" )"  );
+
+	eval $eval;
+	}
+
+}
+
+
+global proc svCreateNavigator()
+{
+
+	global string $shotCam[];
+	global string $svNavCamera[], $controlSquare;
+	global int $global_ShotCamera[];
+
+	string $currentSelection[] = `ls -sl -fl`;
+
+	string $cameraShape[] = `listRelatives -s $shotCam[0]`;
+
+	string $outerSquare;
+
+	float $sX;
+	float $sZ;
+
+	select -cl;
+
+	global string $svError;
+
+	if ( `objExists $shotCam[0]` == 1 )
+	{
+ 		$svError = 0;
+	}
+	else
+	{
+		$svError = 1;
+              svErrorWarning "shotView can't find the main shot camera in the scene." "It may have been deleted or renamed. You will need to restart shotView." "Restart" "deleteUI svWarnWindowsds; shotView " "Cancel" "deleteUI svWarnWindowsds";
+	}
+
+
+	if ( `getAttr ( $cameraShape[0] + ".preScale" )` != 1 || `getAttr ( $cameraShape[0] + ".hfo" )` != 0 || `getAttr ( $cameraShape[0] + ".vfo" )` != 0  )
+	{
+		$svError = 1;
+		svErrorWarning "The navigator only works properly if your shot camera's pre scale value is set to 1" "the horizontal film offset is 0, and the vertical film offset is 0. Reset them now ? " "Yes" ( "deleteUI svWarnWindowsds; svCleanupShotViewCam " + $cameraShape[0] ) "Cancel" "deleteUI svWarnWindowsds";
+
+	}
+
+
+	if ( `objExists shotView_Navigator` == 1 && $svError == 0 )
+	{
+
+		svCleanupNavigatorCam $shotCam[0]; 
+		svCreateNavigator;
+    		
+	}
+
+
+	if ( `objExists shotView_Navigator` == 0 && $svError == 0 )
+	{
+
+		$outerSquare   = `curve -d 1 -p -0.5 0 -0.5 -p 0.5 0 -0.5 -p 0.5 0 0.5 -p -0.5 0 0.5 -p -0.5 0 -0.5 -n outer`;
+
+		setAttr -lock true ( $outerSquare + ".tx" );
+		setAttr -lock true ( $outerSquare + ".ty" );;
+		setAttr -lock true ( $outerSquare + ".tz" );
+		setAttr -lock true ( $outerSquare + ".rx" );
+		setAttr -lock true ( $outerSquare + ".ry" );
+		setAttr -lock true ( $outerSquare + ".rz" );
+
+		$sX = $global_ShotCamera[0] + 0.0001;
+		$sZ = $global_ShotCamera[1] + 0.0001 ;
+
+			setAttr ( $outerSquare + ".scaleX" ) ($sX / 1000);
+			setAttr ( $outerSquare + ".scaleZ" ) ($sZ / 1000);
+
+		setAttr -lock true ( $outerSquare + ".sx" );
+		setAttr -lock true ( $outerSquare + ".sy" );
+		setAttr -lock true ( $outerSquare + ".sz" );
+
+			setAttr  ( $outerSquare + ".overrideEnabled" ) 1;	
+			setAttr  ( $outerSquare + ".overrideColor" ) 1;
+
+
+	$controlSquare = `curve -d 1 -p -0.5 0 -0.5 -p 0.5 0 -0.5 -p 0.5 0 0.5 -p -0.5 0 0.5 -p -0.5 0 -0.5 -n inner`;
+
+
+		setAttr ( $controlSquare + ".displayHandle" ) 1;
+
+			addAttr -ln "range" -at double -dv 1 $controlSquare;
+			addAttr -ln "ohO" -at double -dv (`getAttr ( $shotCam[0] + ".hfo" )`) $controlSquare;
+			addAttr -ln "ovO" -at double -dv (`getAttr ( $shotCam[0] + ".vfo" )`) $controlSquare;
+			addAttr -ln "opS" -at double -dv (`getAttr ( $shotCam[0] + ".preScale" )`) $controlSquare;	
+			addAttr -ln "trx" -at double -dv 0 $controlSquare;
+			addAttr -ln "try" -at double -dv 0 $controlSquare;
+			addAttr -ln "trz" -at double -dv 0 $controlSquare;
+			addAttr -ln "scx" -at double -dv 1 $controlSquare;
+
+			setAttr  ( $controlSquare + ".overrideEnabled" ) 1;	
+			setAttr  ( $controlSquare + ".overrideColor" ) 13;
+
+			setAttr -lock true ( $controlSquare + ".rx");
+			setAttr -lock true ( $controlSquare + ".ry");
+			setAttr -lock true ( $controlSquare + ".rz");
+			setAttr -keyable false ( $controlSquare + ".tx");
+			setAttr -keyable false ( $controlSquare + ".ty");
+			setAttr -keyable false ( $controlSquare + ".tz");
+			setAttr -keyable false ( $controlSquare + ".sx");
+
+
+			setAttr( $controlSquare + ".scaleX" ) ($sX / 1000);
+			setAttr( $controlSquare + ".scaleZ" ) ($sZ / 1000);
+
+			makeIdentity -apply true -t 0 -r 0 -s 1 -n 0 $controlSquare;
+
+			$sXMinMax = $sX /2;
+			$sXMinMax = $sZ /2;
+
+		transformLimits -tx (( ( $sX / 1000 ) / 2 ) * -1 ) (( ( $sX / 1000 ) / 2 ) * 1 ) -etx 1 1 $controlSquare;
+		transformLimits -tz (( ( $sZ / 1000 ) / 2 ) * -1 ) (( ( $sZ / 1000 ) / 2 ) * 1 ) -etz 1 1 $controlSquare;
+		transformLimits -ty  0 0 -ety 1 1 $controlSquare;
+
+		transformLimits -sx 0.001 1 -esx 1 1 $controlSquare;
+		transformLimits -sz 0.001 1 -esz 1 1 $controlSquare;
+		transformLimits -sy 0.001 1 -esy 1 1 $controlSquare;
+
+
+	$svNavCamera = `camera -n "shotViewNavigatorCamera"`;
+
+			addAttr -ln "isSVNavCam" -at double -dv 1 $svNavCamera[0];
+
+		rotate -r -os 90 0 0 $svNavCamera[0];
+		move -r -os 0 0 1.5 $svNavCamera[0];
+
+		$svCameraShapeNode = `listRelatives -s $svNavCamera[0]`;
+
+		string $multiPly = `createNode multiplyDivide`;
+		string $multiPly2 = `createNode multiplyDivide`;
+		string $multiPly3 = `createNode multiplyDivide`;
+		string $plus1 = `createNode plusMinusAverage`;	
+		string $plus2 = `createNode plusMinusAverage`;
+		string $plus3 = `createNode plusMinusAverage`;
+		string $plus4 = `createNode plusMinusAverage`;
+
+
+			connectAttr -force ( $controlSquare + ".scaleX" ) ( $controlSquare + ".scaleY" );
+			connectAttr -force ( $controlSquare + ".scaleX" ) ( $controlSquare + ".scaleZ" );
+
+			connectAttr -force ( $controlSquare + ".translateX" ) ( $multiPly + ".input1X" );
+			connectAttr -force ( $controlSquare + ".range" ) ( $multiPly + ".input2X" );
+			connectAttr -force ( $controlSquare + ".ohO" ) ( $plus1 + ".input1D[0]" );
+			connectAttr -force ( $multiPly + ".outputX" ) ( $plus1 + ".input1D[1]" );
+
+				connectAttr -force ( $plus1 + ".output1D" ) ( $shotCam[0] + ".hfo" );	
+
+			connectAttr -force ( $controlSquare + ".translateZ" ) ( $multiPly + ".input1Y" );
+			connectAttr -force ( $controlSquare + ".range" ) ( $multiPly + ".input2Y" );	
+			connectAttr -force ( $controlSquare + ".ovO" ) ( $plus2 + ".input1D[0]" );
+			connectAttr -force ( $multiPly + ".outputY" ) ( $plus2 + ".input1D[1]" );
+
+				connectAttr -force ( $plus2 + ".output1D" ) ( $shotCam[0] + ".vfo" );
+
+			connectAttr -force ( $controlSquare + ".opS" ) ( $multiPly + ".input1Z" );
+			connectAttr -force ( $controlSquare + ".scaleX" ) ( $multiPly + ".input2Z" );
+			connectAttr -force ( $multiPly + ".outputZ" ) ( $multiPly2 + ".input1X" );
+			connectAttr -force ( $controlSquare + ".range" ) ( $multiPly2 + ".input2X" );
+
+			connectAttr -force ( $multiPly2 + ".outputX" ) ( $multiPly3 + ".input1X" );	
+			
+				setAttr ( $multiPly3 + ".input2X" ) -10;
+
+				connectAttr -force ( $multiPly3 + ".outputX" ) ( $plus4 + ".input1D[0]" );
+
+				setAttr ( $plus4 + ".input1D[1]" ) 11;
+
+					connectAttr -force ( $plus4 + ".output1D" ) ( $shotCam[0] + ".preScale" );
+
+		select -r $controlSquare $svNavCamera[0] $outerSquare;
+
+		group -n shotView_Navigator;
+
+		xform -ws -t 99999 99999 99999 shotView_Navigator;
+
+		sets -n shotView_NavigatorSet $multiPly $multiPly2 $multiPly3 $plus1 $plus2 $plus3 shotView_Navigator;
+
+		select -cl;
+
+		setAttr -lock true ( $svNavCamera[0] + ".tx");
+		setAttr -lock true ( $svNavCamera[0] + ".ty");
+		setAttr -lock true ( $svNavCamera[0] + ".tz");
+		setAttr -lock true ( $svNavCamera[0] + ".rx");
+		setAttr -lock true ( $svNavCamera[0] + ".ry");
+		setAttr -lock true ( $svNavCamera[0] + ".rz");
+		setAttr -lock true ( $svNavCamera[0] + ".sx");
+		setAttr -lock true ( $svNavCamera[0] + ".sy");
+		setAttr -lock true ( $svNavCamera[0] + ".sz");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".hfa");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".vfa");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".fl");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".lsr");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".fs");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".fd");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".sa");
+		setAttr -lock true ( $svCameraShapeNode[0] + ".coi");
+
+
+			// navigaotor GUI
+
+			if ( `window -exists SVNavigator` )
+			{
+				deleteUI -window SVNavigator;
+			}
+
+			if ( `windowPref -exists SVNavigator` )
+			{
+				windowPref -remove SVNavigator;
+			}
+
+			
+			window -t "shotView Navigator" -w 200 -h 200 -sizeable true -menuBarVisible false -titleBarMenu false SVNavigator;
+
+
+			formLayout svNavigatorForm;
+
+				paneLayout shotViewNavigatorPanel;
+				catchQuiet ( `deleteUI -pnl shotViewNavigatorWindow` );
+				modelPanel -mbv false -camera $svNavCamera[0] -p shotViewNavigatorPanel shotViewNavigatorWindow;
+
+			setParent svNavigatorForm;
+
+				rowColumnLayout -nc 2 -cw 1 93 -cw 2 93 svCompBut;
+
+				button -l "Compare" -h 20 -c ( "svNavigatorCompare " + $controlSquare );
+				button -l "Close" -h 20 -c ( ("deleteUI SVNavigator; setAttr \"" + $controlSquare + ".scaleX\" 1; setAttr \"" + $controlSquare + ".translateX\" 0; setAttr \"" + $controlSquare + ".translateY\" 0; setAttr \"" + $controlSquare + ".translateZ\" 0;  svCleanupNavigatorCam " +  $shotCam[0] + "; print \"\" ") );
+
+			setParent svNavigatorForm;
+
+				floatSlider -min 0.001 -max 2 -value 1 -step 0.001 svNavigatorSlide;
+
+				connectControl svNavigatorSlide ( $controlSquare + ".scaleX" );
+
+			formLayout -e
+
+				-af shotViewNavigatorPanel "top" 3
+				-af shotViewNavigatorPanel "left" 3
+				-af shotViewNavigatorPanel "right" 3
+				-af shotViewNavigatorPanel "bottom" 45
+
+
+				-ac svNavigatorSlide"top" 3 shotViewNavigatorPanel
+				-af svNavigatorSlide"left" 3
+				-af svNavigatorSlide"right" 3
+				-af svNavigatorSlide"bottom" 25
+
+
+				-ac svCompBut "top" 3 svNavigatorSlide
+				-af svCompBut "left" 3
+				-af svCompBut "right" 3
+				-af svCompBut "bottom" 3
+
+			svNavigatorForm;
+
+			showWindow;
+
+			modelEditor -e -av shotViewNavigatorWindow;	
+
+			select -r $outerSquare;	
+
+			viewFit;
+
+			// configure the navigator window display //
+
+	     string $editorName = "shotViewNavigatorWindow";
+            modelEditor -e 
+                -useInteractiveMode 0
+                -displayLights "default" 
+                -displayAppearance "smoothShaded" 
+                -activeOnly 0
+                -wireframeOnShaded 0
+                -headsUpDisplay 0
+                -selectionHiliteDisplay 1
+                -useDefaultMaterial 0
+                -bufferMode "double" 
+                -twoSidedLighting 1
+                -backfaceCulling 0
+                -xray 0
+                -jointXray 0
+                -activeComponentsXray 0
+                -displayTextures 0
+                -smoothWireframe 0
+                -lineWidth 1
+                -textureAnisotropic 0
+                -textureHilight 1
+                -textureSampling 2
+                -textureDisplay "modulate" 
+                -textureMaxSize 8192
+                -fogging 0
+                -fogSource "fragment" 
+                -fogMode "linear" 
+                -fogStart 0
+                -fogEnd 100
+                -fogDensity 0.1
+                -fogColor 0.5 0.5 0.5 1 
+                -maxConstantTransparency 1
+                -rendererName "base_OpenGL_Renderer" 
+                -colorResolution 256 256 
+                -bumpResolution 512 512 
+                -textureCompression 0
+                -transparencyAlgorithm "frontAndBackCull" 
+                -transpInShadows 0
+                -cullingOverride "none" 
+                -lowQualityLighting 0
+                -maximumNumHardwareLights 1
+                -occlusionCulling 0
+                -shadingModel 0
+                -useBaseRenderer 0
+                -useReducedRenderer 0
+                -smallObjectCulling 0
+                -smallObjectThreshold -1 
+                -interactiveDisableShadows 0
+                -interactiveBackFaceCull 0
+                -sortTransparent 1
+                -nurbsCurves 1
+                -nurbsSurfaces 0
+                -polymeshes 0
+                -subdivSurfaces 0
+                -planes 0
+                -lights 0
+                -cameras 0
+                -controlVertices 0
+                -hulls 0
+                -grid 0
+                -joints 0
+                -ikHandles 0
+                -deformers 0
+                -dynamics 0
+                -fluids 0
+                -hairSystems 0
+                -follicles 0
+                -nCloths 0
+                -nRigids 0
+                -dynamicConstraints 0
+                -locators 0
+                -manipulators 1
+                -dimensions 0
+                -handles 1
+                -pivots 0
+                -textures 0
+                -strokes 0
+                -shadows 0
+                $editorName;
+		   modelEditor -e -viewSelected 0 $editorName;
+
+			select -cl;
+		
+			select -r $currentSelection;
+
+			print " \n";
+
+	}
+					
+}
+
+
+global proc svNavigatorCompare( string $controlSquareObject )
+{
+
+	if ( `getAttr ( $controlSquareObject + ".translateX")` == 0 && `getAttr ($controlSquareObject + ".translateY")` == 0 && `getAttr ($controlSquareObject + ".translateZ")` == 0 && `getAttr ($controlSquareObject + ".scaleX")` == 1 )
+	{
+		setAttr ($controlSquareObject + ".translateX") ( `getAttr ($controlSquareObject + ".trx")` );
+		setAttr ($controlSquareObject + ".translateY") ( `getAttr ($controlSquareObject + ".try")` );
+		setAttr ($controlSquareObject + ".translateZ") ( `getAttr ($controlSquareObject + ".trz")` );
+
+		setAttr ($controlSquareObject + ".scaleX") ( `getAttr ($controlSquareObject + ".scx")` );
+	}
+	else
+	{
+
+		setAttr ($controlSquareObject + ".trx") ( `getAttr ($controlSquareObject + ".translateX")` ) ;
+		setAttr ($controlSquareObject + ".try") ( `getAttr ($controlSquareObject + ".translateY")` ) ;
+		setAttr ($controlSquareObject + ".trz") ( `getAttr ($controlSquareObject + ".translateZ")` ) ;
+
+		setAttr ($controlSquareObject + ".scx") ( `getAttr ($controlSquareObject + ".scaleX")` ); 
+
+		setAttr ($controlSquareObject + ".translateX") 0;
+		setAttr ($controlSquareObject + ".translateY") 0;
+		setAttr ($controlSquareObject + ".translateZ") 0;
+		setAttr ($controlSquareObject + ".scaleX") 1;
+		
+	}
+
+}
+
+global proc svErrorWarning ( string $warning1, string $warning2, string $buttonlabel1, string $buttonCommand1, string $buttonlabel2, string $buttonCommand2 )
+{
+
+		global int $global_Misc[];
+
+			if ( `window -exists svWarnWindowsds` )
+			{
+				deleteUI -window svWarnWindowsds;
+			}
+
+			if ( `windowPref -exists svWarnWindowsds` )
+			{
+				windowPref -remove svWarnWindowsds ;
+			}
+
+		window -t "shotView: warning" -w 470 -h 149 -menuBarVisible false -titleBarMenu false svWarnWindowsds;    
+
+		if ( $global_Misc[0] == 1 )
+		{
+			window -e -s true svWarnWindowsds; 
+		}
+
+		rowColumnLayout -nc 1 -cw 1 600;
+
+		text -l " ";
+		text -l ( "      " + $warning1 );
+		text -l ( "      " + $warning2 );
+		text -l " ";
+
+		text -l " ";
+
+		rowColumnLayout -nc 4 -cw 1 220 -cw 2 110 -cw 3 110 -cw 4 80;
+
+		if ( $buttonCommand1 == " " )
+		{
+				text -l " ";
+				text -l " ";
+				button -l $buttonlabel2 -c $buttonCommand2;
+				text -l " ";
+		}
+		else
+		{
+			text -l " ";
+			button -l $buttonlabel1 -c $buttonCommand1;
+			button -l $buttonlabel2 -c $buttonCommand2;
+			text -l " ";
+		}
+
+		text -l " ";
+
+		showWindow;
+
+}
+
+
+global proc svSwitchControlCam( string $cam )
+{
+
+	if ( `objExists $cam` == 1 )
+	{
+ 		modelPanel -e -camera $cam shotViewControlCamWindow;
+	}
+	else
+	{
+              svErrorWarning "shotView can't find this control camera in the scene." "It may have been deleted or renamed. You will need to restart shotView." "Restart" "deleteUI svWarnWindowsds; shotView " "cancel" "deleteUI svWarnWindowsds";
+	}
+
+}
+
+
+global proc svCleanupNavigatorCam( string $cam )
+{
+
+		float $oldValues[];
+
+		$oldValues[0] = `getAttr ( $cam + ".hfo" )`;
+		$oldValues[1] = `getAttr ( $cam + ".vfo" )`;
+		$oldValues[2] = `getAttr ( $cam + ".preScale")`;	
+
+		select shotView_NavigatorSet;
+
+		delete;
+
+		setAttr ( $cam + ".hfo" ) $oldValues[0];
+		setAttr ( $cam + ".vfo" ) $oldValues[1];
+		setAttr ( $cam + ".preScale" ) $oldValues[2];
+
+}
+
+
+global proc svCleanupShotViewCam( string $cam )
+{
+	
+		if ( `objExists shotView_NavigatorSet` == 1 )
+		{
+			select shotView_NavigatorSet;
+
+			delete;
+		}
+
+		setAttr ( $cam + ".hfo" ) 0;
+		setAttr ( $cam + ".vfo" ) 0;
+		setAttr ( $cam + ".preScale" ) 1;
+
+		svCreateNavigator;
+}

@@ -1,0 +1,10 @@
+// matchAnim
+global proc matchAnim () {
+	$sel = `ls -sl`;
+	$source = $sel[0];
+	copyKey $source;
+	for ($i =1;$i<size($sel);$i++){
+		
+		pasteKey -option fitReplace $sel[$i];
+	}
+}

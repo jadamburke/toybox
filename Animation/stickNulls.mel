@@ -1,0 +1,41 @@
+//select vertices on your favorite objects
+//run this and it will make locators and key them to the location of your vertices for every frame in the time slider.
+//if your scene is slow, make the graph editor or other non 3D displaying window full size for fastest results.
+
+
+
+global proc stickNulls(){
+	string $Selection[] = `ls -sl`;
+	string $Locs[];
+
+	int $start = `playbackOptions -q -min`;
+	int $end = `playbackOptions -q -max`;
+
+	int $j = 0;
+	for ($objects in $Selection){
+
+		string $loc[] = `spaceLocator -name "null_1"`;
+		$Locs[$j] = $loc[0];
+		$j++;
+	}
+
+	for ($i = $start; $i<=$end; $i++){
+		currentTime $i;
+		$k = 0;
+		for ($objects in $Selection){
+
+			float $CVPos[] = `xform -q -t -ws $objects`;
+			move -a $CVPos[0] $CVPos[1] $CVPos[2] $Locs[$k];
+
+			setKeyframe ($Locs[$k]+".translateX");
+			setKeyframe ($Locs[$k]+".translateY");
+			setKeyframe ($Locs[$k]+".translateZ");
+
+			$k++;
+		}
+
+	}
+
+	select -r $Selection;
+
+}

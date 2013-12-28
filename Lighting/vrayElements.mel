@@ -1,0 +1,20 @@
+// vrayElements
+// Created by: raphe
+// Date: 2012/03/09 11:17:18
+
+global proc vrayElements(){
+	if(! `pluginInfo -q -l "vrayformaya"`){
+		loadPlugin -addCallback "vrayPostLoadElem" "vrayformaya";
+	}else{
+		vrayPostLoadElem("vrayformaya");
+	}
+}
+
+global proc vrayPostLoadElem(string $pluginName){
+
+	evalDeferred ("setCurrentRenderer vray;");
+	evalDeferred ("unifiedRenderGlobalsWindow;");
+	
+	file -import -type "mayaAscii" -ra false -rpr "CLASH" -options "v=0" -pr -loadReferenceDepth "all" (`getenv MAYA_PPTOOLS`+"/sceneTemplates/import_VRay_elements_03.ma");
+
+}

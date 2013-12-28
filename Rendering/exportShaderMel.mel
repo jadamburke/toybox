@@ -1,0 +1,168 @@
+// exportShaderMel
+
+global proc exportShaderMel(){
+
+	string $shaderAssignCmds[];
+	string $createNodeCmds[];
+	string $addAttrCmds[];
+	string $setAttrCmds[];
+	string $connectAttrCmds[];
+	string $parsedNodeList[];
+
+
+	// get the SG nodes
+
+	// for each SG node
+
+		
+		// get the instObjGroups connections
+
+		// if shading group has members
+
+		// add the SG to the createNodesCmds
+
+		// add those connections to the shaderAssignCmds Array
+
+
+		// list user defined attributes
+
+		// for each user defined attribute 
+
+			// add attribute to addAttrCmds Array
+
+
+		// get incoming connections
+		string $sel[] = `ls -sl`;
+
+		// for each incoming connections
+		for ($shader in $sel){
+
+
+			// add connectAttrCmds between SG and incoming node
+
+			// list history of incoming node
+			string $shaderHistory[] = `listHistory $shader`;
+
+			// for each in history
+			for ($node in $shaderHistory){
+
+				// if node is not in parsedNodesList
+				if (!stringArrayContains($node, $parsedNodeList)){
+
+					// add createNode Cmd
+					$nodeType = `objectType $node`;
+					$createNodeCmds[size($createNodeCmds)] = ("createNode "+$nodeType+" -ss -name "+$node);
+					print ("createNode "+$nodeType+" -ss -name "+$node+";\n");
+
+					// list user defined attributes
+					string $userDefined[] = `listAttr -userDefined $node`;
+
+					// for each user defined attribute 
+					for ($attr in $userDefined){
+
+						string $attrType = `getAttr -type ($node+"."+$attr)`;
+
+						// add attribute to addAttrCmds Array
+						if ($attrType == "string"){
+							//addAttr -ln "test" -dt "string"  $node;
+
+							$addAttrCmds[size($addAttrCmds)] = ("addAttr -ln "+$attr+" -dt \"string\" "+$node);
+							print ("addAttr -ln "+$attr+" -dt \"string\" "+$node+";\n");
+						}
+						else {
+							//addAttr -ln "test2"  -at "enum" -en "Green:Blue:"  genericWideScreenVerizonChoice_geo_TV_black1;
+
+							$addAttrCmds[size($addAttrCmds)] = ("addAttr -ln "+$attr+" -at \""+$attrType+"\" "+$node);
+							print ("addAttr -ln "+$attr+" -at \""+$attrType+"\" "+$node+";\n");
+						}
+
+					}
+				
+
+
+					// get incoming connections
+
+					// for each incoming connection
+
+						// add connectAttr cmd
+
+
+				
+					// list settable attributes
+					string $settableAttrs[] = `listAttr -settable -multi $node`;
+
+					// for each settable attribute
+					for ($attr in $settableAttrs){
+
+						// if its has no incoming or outgoing connection
+						if(`connectionInfo -isDestination ($node+"."+$attr)` == 0){
+							//print ("getAttr -type "+$node+"."+$attr+";\n");
+							string $attrType = `getAttr -type ($node+"."+$attr)`;
+							
+							
+							
+							// add attribute to setAttrCmds Array
+							if ($attrType == "TdataCompound" || $attrType == "Compound" || $attrType == "message" || $attrType == "matrix"){
+
+							}
+							else if ($attrType == "double3" || $attrType == "float3" || $attrType == "double2" || $attrType == "float2"){
+								float $attrVal[] = `getAttr ($node+"."+$attr)`;
+								string $cmdBuilder = ("setAttr "+$node+"."+$attr+" -type "+$attrType+" ");
+								for ($element in $attrVal){
+									$cmdBuilder = ($cmdBuilder + $element+" ");
+								}
+								$setAttrCmds[size($setAttrCmds)] = $cmdBuilder;
+								print ($cmdBuilder+";\n");
+							}
+							else if ($attrType == "string"){
+								string $attrVal = `getAttr ($node+"."+$attr)`;
+								$setAttrCmds[size($setAttrCmds)] = ("setAttr "+$node+"."+$attr+" -type \"string\" \""+$attrVal+"\"");
+								print ("setAttr "+$node+"."+$attr+" -type \"string\" \""+$attrVal+"\";\n");
+							}
+							else {
+								$attrVal = `getAttr ($node+"."+$attr)`;
+								$setAttrCmds[size($setAttrCmds)] = ("setAttr "+$node+"."+$attr+" "+$attrVal);
+								print ("setAttr "+$node+"."+$attr+" "+$attrVal+";\n");
+								
+							}
+			
+							
+						}
+						else if (`connectionInfo -isDestination ($node+"."+$attr)`) {
+
+							string $source[] = `listConnections -p 1 ($node+"."+$attr)`;
+							
+							$connectAttrCmds[size($connectAttrCmds)] = ("connectAttr "+$source[0]+" "+$node+"."+$attr);
+							print ("connectAttr "+$source[0]+" "+$node+"."+$attr+";\n");
+
+
+						}
+					}
+
+					// add node to parsed list so its not recorded twice
+					$parsedNodeList[size($parsedNodeList)] = $node;
+				}
+
+			}
+			
+		// list settable attributes
+
+		// for each settable attribute
+
+			// if its has no incoming or outgoing connection
+			
+				// add attribute to setAttrCmds Array
+			
+					
+		// add node to parsed list so its not recorded twice
+
+
+
+		// open file save dialog
+
+		// open file for output
+
+		// print each array of mel commands to output file
+		}
+
+}

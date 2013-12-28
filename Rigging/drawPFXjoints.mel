@@ -1,0 +1,94 @@
+// drawPFXjoints
+
+global proc drawPFXjoints () {
+
+	$selStrokes = `ls -sl`;
+
+	for ($each in $sel) {
+	
+		// output a text file description of the paintFX stroke
+
+		// parse the text file for stroke information 
+
+		// iterate through the stroke description
+
+			// for each step number
+			
+				// if segment is root of branch
+
+					// draw joint at start position
+
+				//
+	}
+
+
+}
+
+
+
+global proc drawPFXJointsFunc(
+
+// current segment count on base brushstroke
+int	  $step,
+// this next variable is true if this is the first segment created 
+int   $isStartTube,
+
+// The following 3 vectors define a coordinate system
+// for the brushstroke, in a similar fashion to a matrix
+// One can use them to create forces and offsets that
+// are in the "brushstroke space"
+// Unlike a normal coordinate frame, these vectors change
+// along the brushstroke, and will mirror any deformations to
+// the base brushstroke( or curve on surface ).
+
+// vector in direction of brushstroke 
+float $vX, float $vY, float $vZ,
+// surface normal at current brushstroke segment
+float $nX, float $nY, float $nZ,
+// vector across direction of brushstroke ( crossProduct of v and n above )
+float $uX, float $uY, float $uZ,
+
+// a random seed that is unique for this tube 
+int   $randSeed,
+
+// the growth section: 0 branch, 1 twig, 2 leaf, 3 flower
+int	  $tubeType,	
+
+int	  $maxSegments,		// the number of segments the longest tubes have	
+int	  $segments,		// the number of segments this tube has	
+int	  $remainingSegments, // the number of segments yet to be created	
+int	  $branchDepth,		// The branching level this segment is on( 0 is the base )
+int   $branchId,        // Index for the segment, each segment on each level is unique (0..n)
+int   $parentId,        // BranchID for the parent of this segment
+int   $siblingCnt,      // The number of sibling segments at this level, n-1
+4
+// the start and end points of the current tube segment in worldspace
+float $sX, float $sY, float $sZ,	     
+float $eX, float $eY, float $eZ,	     
+
+// the current length per segment
+float $segmentLength,
+
+// the start and end widths of the current tube segment in worldspace
+float $startWidth, float $endWidth,
+
+float $flatness, // current flatness of tube
+// current twist vector perpendicular to tube segment
+float $twistX, float $twistY, float $twistZ,
+
+// color, transparency, and incandescence of current tube segment
+float $colorR, float $colorG, float $colorB,
+float $transparencyR, float $transparencyG, float $transparencyB,
+float $incandescenceR, float $incandescenceG, float $incandescenceB,
+                                                                                            
+// name of brush and stroke
+string $brushName, string $strokeName
+)
+{
+	
+
+
+
+
+
+}

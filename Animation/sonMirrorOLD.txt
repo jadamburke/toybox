@@ -1,0 +1,349 @@
+// sonMirror.mel
+// Created by: jason
+// Date: 2012/07/06 15:20:58
+
+
+
+
+
+
+
+/*global proc vk_mirror()
+{
+    string $mySel[]=`ls -sl`;
+    string $myNameSpace="";
+    string $mySide="";
+    string $myOpositSide="";
+    int $mySelSize=`size($mySel)`;
+    if ($mySelSize)
+    {
+        for ($obj in $mySel)
+        {
+            //check for namespace
+            //check for side
+            string $myBuffer[];
+            $myTokens = `tokenize $obj ":" $myBuffer`;
+            print ($myBuffer[0]+"\n");
+            print ($mySel[0]+"\n");
+            if ($myBuffer[0] != $mySel[0])
+            {
+                int $myBufferSize = size($myBuffer);
+               
+                if ($myBufferSize == 2)
+                {
+                    $myNameSpace=($myBuffer[0]+":");
+                    //side
+                    string $mySideBuffer[];
+                    $mySideTokens = `tokenize $myBuffer[1] "_" $mySideBuffer`;
+                    $mySide=$mySideBuffer[0];
+                    
+                }
+                if ($myBufferSize == 3)
+                {
+                    $myNameSpace=($myBuffer[0]+":"+$myBuffer[1]+":");
+                    //side
+                    string $mySideBuffer[];
+                    $mySideTokens = `tokenize $myBuffer[2] "_" $mySideBuffer`;
+                    $mySide=$mySideBuffer[0];
+                }
+                if ($myBufferSize == 4)
+                {
+                    $myNameSpace=($myBuffer[0]+":"+$myBuffer[1]+":"+$myBuffer[2]+":");
+                    //side
+                    string $mySideBuffer[];
+                    $mySideTokens = `tokenize $myBuffer[3] "_" $mySideBuffer`;
+                    $mySide=$mySideBuffer[0];
+                 }
+            }
+            if ($myBuffer[0] == $mySel[0])
+            {
+                 //side
+                 string $mySideBuffer[];
+                 $mySideTokens = `tokenize $myBuffer[0] "_" $mySideBuffer`;
+                 $mySide=$mySideBuffer[0];
+            }
+            if($mySide=="left")
+                $myOpositSide="right";
+            if($mySide=="right")
+                $myOpositSide="left";
+                
+            int $whatType = `getAttr ($obj+".type")`;
+            print $whatType;
+                
+            
+
+            if ($whatType == 1)
+            {
+                string $oppositeObj=`substitute $mySide $obj $myOpositSide`;
+                //translation
+                if (`getAttr -k ($obj+".tx")`)
+                {
+                    float $myTx=`getAttr ($obj+".tx")`;
+                    setAttr ($oppositeObj+".tx") (-1*$myTx);
+                }
+                if (`getAttr -k ($obj+".ty")`)
+                {
+                    float $myTy=`getAttr ($obj+".ty")`;
+                    setAttr ($oppositeObj+".ty") (-1*$myTy);
+                }
+                if (`getAttr -k ($obj+".tz")`)
+                {
+                    float $myTz=`getAttr ($obj+".tz")`;
+                    setAttr ($oppositeObj+".tz") (-1*$myTz);
+                }
+                //rotaion
+                if (`getAttr -k ($obj+".rx")`)
+                {
+                    float $myRx=`getAttr ($obj+".rx")`;
+                    setAttr ($oppositeObj+".rx") $myRx;
+                }
+                if (`getAttr -k ($obj+".ry")`)
+                {
+                    float $myRy=`getAttr ($obj+".ry")`;
+                    setAttr ($oppositeObj+".ry") $myRy;
+                }
+                if (`getAttr -k ($obj+".rz")`)
+                {
+                    float $myRz=`getAttr ($obj+".rz")`;
+                    setAttr ($oppositeObj+".rz") $myRz;
+                }
+               //scale
+                if (`getAttr -k ($obj+".sx")`)
+                {
+                    float $mySx=`getAttr ($obj+".sx")`;
+                    setAttr ($oppositeObj+".sx") $mySx;
+                }
+                if (`getAttr -k ($obj+".sy")`)
+                {
+                    float $mySy=`getAttr ($obj+".sy")`;
+                    setAttr ($oppositeObj+".sy") $mySy;
+                }
+                if (`getAttr -k ($obj+".sz")`)
+                {
+                    float $mySz=`getAttr ($obj+".sz")`;
+                    setAttr ($oppositeObj+".sz") $mySz;
+                }
+            }//end of $foundFliped
+                
+               
+             //
+
+             if ($whatType == 0)
+             {//start $foundWorldList
+                string $oppositeObj=`substitute $mySide $obj $myOpositSide`;
+                //translation
+                if (`getAttr -k ($obj+".tx")`)
+                {
+                    float $myTx=`getAttr ($obj+".tx")`;
+                    setAttr ($oppositeObj+".tx") (-1*$myTx);
+                }
+                if (`getAttr -k ($obj+".ty")`)
+                {
+                    float $myTy=`getAttr ($obj+".ty")`;
+                    setAttr ($oppositeObj+".ty") $myTy;
+                }
+                if (`getAttr -k ($obj+".tz")`)
+                {
+                    float $myTz=`getAttr ($obj+".tz")`;
+                    setAttr ($oppositeObj+".tz") $myTz;
+                }
+                //rotaion
+                if (`getAttr -k ($obj+".rx")`)
+                {
+                    float $myRx=`getAttr ($obj+".rx")`;
+                    setAttr ($oppositeObj+".rx") (-1*$myRx);
+                }
+                if (`getAttr -k ($obj+".ry")`)
+                {
+                    float $myRy=`getAttr ($obj+".ry")`;
+                    setAttr ($oppositeObj+".ry") (-1*$myRy);
+                }
+                if (`getAttr -k ($obj+".rz")`)
+                {
+                    float $myRz=`getAttr ($obj+".rz")`;
+                    setAttr ($oppositeObj+".rz") (-1*$myRz);
+                }
+               //scale
+                if (`getAttr -k ($obj+".sx")`)
+                {
+                    float $mySx=`getAttr ($obj+".sx")`;
+                    setAttr ($oppositeObj+".sx") $mySx;
+                }
+                if (`getAttr -k ($obj+".sy")`)
+                {
+                    float $mySy=`getAttr ($obj+".sy")`;
+                    setAttr ($oppositeObj+".sy") $mySy;
+                }
+                if (`getAttr -k ($obj+".sz")`)
+                {
+                    float $mySz=`getAttr ($obj+".sz")`;
+                    setAttr ($oppositeObj+".sz") $mySz;
+                }
+             }//end $foundWorldList      
+         }
+    }
+}
+vk_mirror();
+
+
+
+//give the controllers the attribute to identify if they are world or behavior
+
+
+global proc setWorld()
+{
+    string $mySel[] = `ls -sl`;
+    for($tmp in $mySel)
+    {
+        addAttr -ln "type"  -at double  -min 0 -max 1 -dv 0 $tmp;
+        setAttr ($tmp+".type") 0;
+    }
+}
+
+global proc setFlip()
+{
+    string $mySel[] = `ls -sl`;
+    for($tmp in $mySel)
+    {
+        addAttr -ln "type"  -at double  -min 0 -max 1 -dv 0 $tmp;
+        setAttr ($tmp+".type") 1;
+    }
+
+}
+*/
+
+
+global proc sonMirror()
+{
+       string $mySel[]=`ls -sl`;
+    string $myNameSpace="";
+    string $mySide="";
+    string $myOpositSide="";
+    int $mySelSize=`size($mySel)`;
+    if ($mySelSize)
+    {
+        for ($obj in $mySel)
+        {
+            //check for namespace
+            //check for side
+            string $myBuffer[];
+            $myTokens = `tokenize $obj ":" $myBuffer`;
+            print ($myBuffer[0]+"\n");
+            print ($mySel[0]+"\n");
+            if ($myBuffer[0] != $mySel[0])
+            {
+                int $myBufferSize = size($myBuffer);
+               
+                if ($myBufferSize == 2)
+                {
+                    $myNameSpace=($myBuffer[0]+":");
+                    //side
+                    string $mySideBuffer[];
+                    $mySideTokens = `tokenize $myBuffer[1] "_" $mySideBuffer`;
+                    $mySide=$mySideBuffer[0];
+                    
+                }
+                if ($myBufferSize == 3)
+                {
+                    $myNameSpace=($myBuffer[0]+":"+$myBuffer[1]+":");
+                    //side
+                    string $mySideBuffer[];
+                    $mySideTokens = `tokenize $myBuffer[2] "_" $mySideBuffer`;
+                    $mySide=$mySideBuffer[0];
+                }
+                if ($myBufferSize == 4)
+                {
+                    $myNameSpace=($myBuffer[0]+":"+$myBuffer[1]+":"+$myBuffer[2]+":");
+                    //side
+                    string $mySideBuffer[];
+                    $mySideTokens = `tokenize $myBuffer[3] "_" $mySideBuffer`;
+                    $mySide=$mySideBuffer[0];
+                 }
+            }
+            if ($myBuffer[0] == $mySel[0])
+            {
+                 //side
+                 string $mySideBuffer[];
+                 $mySideTokens = `tokenize $myBuffer[0] "_" $mySideBuffer`;
+                 $mySide=$mySideBuffer[0];
+            }
+            if($mySide=="left")
+                $myOpositSide="right";
+            if($mySide=="right")
+                $myOpositSide="left";
+                
+            int $whatType = `getAttr ($obj+".type")`;
+            print $whatType;
+            string $oppositeObj = substitute ($mySide,$obj,$myOpositSide);
+            string $sameAtts[];
+            string $flipAtts[];
+            if($whatType ==2)
+            {
+                string $atts[] = {".tx", ".ty", ".tz", ".rx", ".ry", ".rz", ".sx", ".sy", ".sz"};
+                for($tmp in $atts)
+                {
+                    float $myAtt=`getAttr ($obj+$tmp)`;
+                    setAttr ($oppositeObj+$tmp) $myAtt;
+                }
+            }
+            else
+            {
+                if ($whatType == 1)
+                {
+                    
+                    $sameAtts = { ".rx", ".ry", ".rz", ".sx", ".sy", ".sz"};
+                    $flipAtts = {".tx", ".ty", ".tz"};
+                }
+                
+                if ($whatType == 0)
+                {
+                    $sameAtts = { ".ty", ".tz", ".rx", ".sx", ".sy", ".sz"};
+                    $flipAtts = {".tx", ".ry", ".rz"};
+                }
+                
+                for($tmp in $sameAtts)
+                {
+                      if (`getAttr -k ($obj+$tmp)`)
+                        {
+                        float $myAtt=`getAttr ($obj+$tmp)`;
+                        setAttr ($oppositeObj+$tmp) $myAtt;
+                        }
+                }
+                
+                for($tmp in $flipAtts)
+                {
+                      if (`getAttr -k ($obj+$tmp)`)
+                        {
+                        float $myAtt=`getAttr ($obj+$tmp)`;
+                        setAttr ($oppositeObj+$tmp) ($myAtt*-1);
+                }
+            }
+            }
+   }   }   } 
+   
+   
+
+//give the controllers the attribute to identify if they are world or behavior
+
+
+global proc setWorld()
+{
+    string $mySel[] = `ls -sl`;
+    for($tmp in $mySel)
+    {
+        addAttr -ln "type"  -at double  -min 0 -max 1 -dv 0 $tmp;
+        setAttr ($tmp+".type") 0;
+    }
+}
+
+global proc setFlip()
+{
+    string $mySel[] = `ls -sl`;
+    for($tmp in $mySel)
+    {
+        addAttr -ln "type"  -at double  -min 0 -max 1 -dv 0 $tmp;
+        setAttr ($tmp+".type") 1;
+    }
+
+}
+      

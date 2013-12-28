@@ -1,0 +1,10 @@
+// fillWithCubes
+global proc fillWithCubes(){
+	$selected = `ls -sl`;
+	$cubeScale = .25;
+	$Surface = $selected[0];
+	
+	
+
+
+}

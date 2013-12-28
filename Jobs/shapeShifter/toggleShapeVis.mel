@@ -1,0 +1,22 @@
+// toggleShapeVis
+
+global proc toggleShapeVis () {
+
+	$sel = `ls -sl`;
+	for ($each in $sel){
+		$shapeNodes = `listRelatives -shapes`;
+		for ($every in $shapeNodes){
+			$state = `getAttr ($every+".visibility")`;
+			if ($state == 0){
+				setAttr ($every+".visibility") 1;
+			}
+			else{
+				setAttr ($every+".visibility") 0;
+			}
+
+		}
+	
+	}
+
+
+}

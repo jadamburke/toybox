@@ -1,0 +1,56 @@
+// swapRigProxy
+// Created by: adam
+// Date: 2012/04/19 16:35:58
+
+// searches each reference for a proxy version of the ref or swaps them out.
+global proc swapRigProxy(){
+	
+	
+	//string $refFiles[] = `file -q -r`;
+	string $sel[] = `ls -sl`;
+	string $refFiles[] ;
+	for ($each in $sel){
+		string $refFile = `referenceQuery -f $each`;
+		if ($refFile != ""){
+			$refFiles[size($refFiles)] = $refFile;
+		}
+	}
+	string $uniqueRefFiles[] = `stringArrayRemoveDuplicates $refFiles`;
+	
+	//string $deferredRefNodes[];
+	
+
+	for ($i=0;$i<size($uniqueRefFiles);$i++){
+		string $each = $refFiles[$i];
+		string $refNode = `referenceQuery -rfn $each`;
+		if (`referenceQuery -isLoaded $each`){
+			$filepath = `referenceQuery -f -wcn $refNode`;
+			$ext = `fileExtension $filepath`;
+			$basename = `basenameEx $filepath`;
+			$dirname = `dirname $filepath`;
+			
+			if (!`gmatch $basename "*_proxy"`){
+				$proxyRigPath = ($dirname+"/"+$basename+"_proxy."+$ext);
+				if (`filetest -r $proxyRigPath`){
+					print ("ProxyPath="+$proxyRigPath+"\n");
+					file -loadReference $refNode $proxyRigPath;
+				}
+			}
+			else {
+				int $end = size($basename) - 6;
+				$basename = `substring $basename 1 $end`;
+				$proxyRigPath = ($dirname+"/"+$basename+"."+$ext);
+				if (`filetest -r $proxyRigPath`){
+					print ("RegularPath="+$proxyRigPath+"\n");
+					file -loadReference $refNode $proxyRigPath;
+				}
+			}
+		}
+		else {
+			//$deferredRefNodes[size($deferredRefNodes)] = $each;
+		}		
+	}
+
+
+
+}

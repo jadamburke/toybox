@@ -1,0 +1,17 @@
+// AnimLib.mel
+// Created by: rafael
+// Date: 2012/07/02 16:53:17
+
+global proc AnimLib(){
+
+python("import PAIE2");
+python("reload(PAIE2)");
+python("PAIE2.GUI()");
+
+
+
+
+
+}
+
+

@@ -1,0 +1,54 @@
+// snapUVtoVertex
+
+global proc snapUVtoVertex () {
+
+	string $selectedUV[] = `ls -fl -sl`;
+	float $originalUVCoord[] = `polyEditUV -q $selectedUV[0]`;
+	print ("UV Coords: "+$selectedUV[0]+":"+$originalUVCoord[0]+" "+$originalUVCoord[1]+"\n");
+	ConvertSelectionToVertices;
+	string $vertices[] = `ls -fl -sl`;
+	print ("Vertices: ");
+	print ($vertices);
+	ConvertSelectionToUVs;
+	string $vertexUVs[] = `ls -fl -sl`;
+	print ("Vertex UVs: ");
+	print ($vertexUVs);
+	int $positionToNext = 0;
+	int $done = 0;
+
+	for ($each in $vertexUVs){
+
+		float $polyUVs[] =  `polyEditUV -q $each`;
+		
+		if ($polyUVs[0] != $originalUVCoord[0] && $polyUVs[1] != $originalUVCoord[1] &&  $positionToNext == 1 && $done == 0){
+			print ("Setting To:"+$each+"\n");
+			polyEditUV -relative false -uValue $polyUVs[0] -vValue $polyUVs[1] $selectedUV[0];
+			print ("polyEditUV -relative false -uValue "+$polyUVs[0]+" -vValue "+$polyUVs[1]+" "+$selectedUV[0]+"\n");
+			$done = 1;
+			
+		}
+		
+		if ($polyUVs[0] == $originalUVCoord[0] && $polyUVs[1] == $originalUVCoord[1] && $done == 0 && $positionToNext == 0){
+			$positionToNext = 1;
+		}
+		print ("PositionToNext:"+$positionToNext+"\n");
+		// polyMoveUV
+	}
+	
+	// cycle to the first uv in list if none was found
+	if ($done == 0){
+			float $polyUVs[] =  `polyEditUV -q $vertexUVs[0]`;
+			polyEditUV -relative false -uValue $polyUVs[0] -vValue $polyUVs[1] $selectedUV[0];
+			print ("polyEditUV -relative false -uValue "+$polyUVs[0]+" -vValue "+$polyUVs[1]+" "+$selectedUV[0]+"\n");		
+	}
+
+	select $selectedUV;
+
+	// convert selected UV to vertex
+
+	// convert vertex back to UV
+	// get UV coordinates
+	// check if UV is at coord any vertex coord
+	// if its at coord then snap to next coord in list
+
+}

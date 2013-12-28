@@ -1,0 +1,26 @@
+// extrudeMulti
+// Created by: adambu
+// Date: 2011/11/29 11:47:21
+
+global proc extrudeMulti(){
+
+	$sel = `ls -sl`;
+	$profile = $sel[0];
+	for ($i=1;$i<size($sel);$i++){
+		createNode -ss -name ($sel[$i]+"_SubCurve") subCurve;
+		//setAttr ($sel[$i]+"_SubCurve.relative 1");
+		
+		connectAttr ($sel[$i]+".worldSpace[0]") ($sel[$i]+"_SubCurve.inputCurve");
+		$newExtrude = `extrude -name ($sel[$i]+"_ExtrudeSurf") -ch true -rn false -po 0 -et 2 -ucp 1 -fpt 1 -upn 1 -rotation 0 -scale 1 -rsp 1 $profile $sel[$i] `;
+		$extrudeNode = `listConnections -s 1 ($newExtrude[0]+"Shape.create")`;
+		connectAttr -f ($sel[$i]+"_SubCurve.outputCurve") ($extrudeNode[0]+".path");
+		addAttr -ln "minValue"  -at double  -min 0 -max 1 -dv 0 $newExtrude[0];
+		addAttr -ln "maxValue"  -at double  -min 0 -max 1 -dv 1 $newExtrude[0];
+		setAttr -e-keyable true ($newExtrude[0]+".minValue");
+		setAttr -e-keyable true ($newExtrude[0]+".maxValue");
+		connectAttr -f ($newExtrude[0]+".minValue") ($sel[$i]+"_SubCurve.minValue");
+		connectAttr -f ($newExtrude[0]+".maxValue") ($sel[$i]+"_SubCurve.maxValue");
+	
+	}
+
+}

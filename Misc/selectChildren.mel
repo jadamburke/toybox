@@ -1,0 +1,10 @@
+// selectChildren
+// Created by: freelanceny18
+// Date: 2013/12/10 22:00:56
+
+global proc selectChildren(){
+
+
+	$children = `listRelatives -children -fullPath`;
+	select $children;
+}

@@ -1,0 +1,59 @@
+// removeUnusedAnimCurves
+
+global proc removeUnusedAnimCurves () {
+
+	$allAnimCurves = `lsType animCurveTU`;
+
+	for ($each in $allAnimCurves){
+		if ($each != "<done>"){
+			string $outConnections[] = `listConnections -d 1 ($each+".output")`;
+			if (size($outConnections) == 0){
+				print ("Deleting "+$each+"\n");
+				delete $each;
+			}
+		}
+
+	}
+
+	$allAnimCurves = `lsType animCurveTA`;
+
+	for ($each in $allAnimCurves){
+		if ($each != "<done>"){
+			string $outConnections[] = `listConnections -d 1 ($each+".output")`;
+			if (size($outConnections) == 0){
+				print ("Deleting "+$each+"\n");
+				delete $each;
+			}
+		}
+
+	}
+
+
+	$allAnimCurves = `lsType animCurveTL`;
+
+	for ($each in $allAnimCurves){
+		if ($each != "<done>"){
+			string $outConnections[] = `listConnections -d 1 ($each+".output")`;
+			if (size($outConnections) == 0){
+				print ("Deleting "+$each+"\n");
+				delete $each;
+			}
+		}
+
+	}
+
+
+	$allAnimCurves = `lsType animCurveTU`;
+
+	for ($each in $allAnimCurves){
+		if ($each != "<done>"){
+			string $outConnections[] = `listConnections -d 1 ($each+".output")`;
+			if (size($outConnections) == 0){
+				print ("Deleting "+$each+"\n");
+				delete $each;
+			}
+		}
+
+	}
+
+}

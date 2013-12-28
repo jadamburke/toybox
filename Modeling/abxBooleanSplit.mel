@@ -1,0 +1,41 @@
+// abxBooleanSplit
+global proc abxBooleanSplit() {
+
+$sel = `ls -sl`;
+
+$newObj = `duplicate $sel[0]`;
+$splitObj = $newObj[0] ;
+string $splitObjShape[] = `listRelatives -shapes $newObj`;
+$obj = $sel[1];
+string $objShape[] = `listRelatives -shapes $obj`;
+$polyBoolName = ($obj+"_boolA");
+$polyBoolNameB = ($obj+"_boolB");
+$cutObjA = ($obj+"_pieceA");
+$cutObjB = ($obj+"_pieceB");
+
+createNode polyBoolOp -name $polyBoolName;
+setAttr ($polyBoolName+".op") 3;
+connectAttr ($objShape[0]+".outMesh") ($polyBoolName+".inputPoly[0]");
+connectAttr ($objShape[0]+".worldMatrix[0]") ($polyBoolName+".inputMat[0]");
+connectAttr ($splitObjShape[0]+".outMesh") ($polyBoolName+".inputPoly[1]");
+connectAttr ($splitObjShape[0]+".worldMatrix[0]") ($polyBoolName+".inputMat[1]");
+createNode mesh -name $cutObjA;
+connectAttr ($polyBoolName+".output") ($cutObjA+".inMesh");
+//connectAttr -na ($polyBoolName+".instObjGroups[0]") "initialShadingGroup.dagSetMembers";
+
+createNode polyBoolOp -name $polyBoolNameB;
+setAttr ($polyBoolNameB+".op") 2;
+connectAttr ($objShape[0]+".outMesh") ($polyBoolNameB+".inputPoly[0]");
+connectAttr ($objShape[0]+".worldMatrix[0]") ($polyBoolNameB+".inputMat[0]");
+connectAttr ($splitObjShape[0]+".outMesh") ($polyBoolNameB+".inputPoly[1]");
+connectAttr ($splitObjShape[0]+".worldMatrix[0]") ($polyBoolNameB+".inputMat[1]");
+createNode mesh -name $cutObjB;
+connectAttr ($polyBoolNameB+".output") ($cutObjB+".inMesh");
+//connectAttr -na ($polyBoolNameB+".instObjGroups[0]") "initialShadingGroup.dagSetMembers";
+
+setAttr ($splitObj+".visibility") 0;
+setAttr ($obj+".visibility") 0;
+
+
+
+}

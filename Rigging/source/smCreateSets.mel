@@ -1,0 +1,75 @@
+//
+// create  sets  to be used for rigging, and rig switching
+// by stephenkmann@yahoo.com
+//
+//  ALLKEYABLE is created and should contain all Cntrols or animatable objects
+//
+//  RES:HIRES
+//      MEDRES
+//      LORES
+//              are created to hold geometry of those resolutions
+//              can then be hidden and shown using smResSwitch
+
+global proc smCreateSets()
+{
+// check if the sets already exist
+if (`objExists ALLKEYABLE`)
+        error "the ALLKEYABLE set already exists";
+
+sets -name HIRES -empty;
+sets -name MEDRES -empty;
+sets -name LORES -empty;
+sets -name DXRES -empty;
+sets -name RES -empty;
+sets -name deleteForHiRes -empty;
+sets -name SMOOTH_GEO -empty;
+
+	sets -in RES HIRES;
+	sets -in RES MEDRES;
+	sets -in RES LORES;
+	sets -in RES DXRES;
+	sets -in RES deleteForHiRes;
+
+sets -name ALLKEYABLE -empty;
+sets -name Body -empty;
+sets -name Head -empty;
+sets -name Misc -empty;
+     sets -in ALLKEYABLE Body;
+     sets -in ALLKEYABLE Head;
+     sets -in ALLKEYABLE Misc;
+
+
+sets -name RIGSet -empty;
+sets -name bndJnts -empty;
+        sets -in RIGSet bndJnts;
+        sets -in RIGSet SMOOTH_GEO;
+
+sets -name MAIN -empty;
+	sets -in MAIN ALLKEYABLE;
+ 	sets -in MAIN RIGSet;
+	sets -in MAIN RES;
+	
+// lock the sets from deletion
+//
+
+lockNode -l 1 MAIN;
+
+lockNode -l 1 RES;
+lockNode -l 1 HIRES;
+lockNode -l 1 MEDRES;
+lockNode -l 1 LORES;
+lockNode -l 1 DXRES;
+lockNode -l 1 deleteForHiRes;
+
+lockNode -l 1 ALLKEYABLE;
+lockNode -l 1 Body;
+lockNode -l 1 Head;
+lockNode -l 1 Misc;
+
+lockNode -l 1 RIGSet;
+
+}
+
+//
+//
+

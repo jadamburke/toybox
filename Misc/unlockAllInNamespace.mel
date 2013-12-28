@@ -1,0 +1,26 @@
+// unlockAllInNamespace
+// Created by: adam
+// Date: 2013/04/09 23:49:34
+
+
+
+
+global proc unlockAllInNamespace (){
+    string $namespace = "";
+    if ($namespace == ""){
+        string $sel[] = `ls -sl`;
+        string $tokenBuffer[];
+        tokenize $sel[0] ":" $tokenBuffer;
+        if (size($tokenBuffer)>1)
+            $namespace = $tokenBuffer[0];
+    }
+       print $namespace;
+    if ($namespace != ""){
+        select -ne -r ($namespace+":*");
+        $sel = `ls -sl`;
+        for ($each in $sel){
+            catch(`lockNode -l 0 $each`);
+            //catch(`delete $each`);
+        }
+    }
+}

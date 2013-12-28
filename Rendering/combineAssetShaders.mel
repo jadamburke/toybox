@@ -1,0 +1,69 @@
+// combineAssetShaders
+
+global proc combineAssetShaders () {
+
+	string $selectedObjs[] = `ls -sl`;
+	string $sourceObj = $selectedObjs[size($selectedObjs)-1];
+
+	string $tokenBuffer[];
+	tokenize $sourceObj ":" $tokenBuffer;
+		
+	$sourceNamespace = "";
+	
+	if (size($tokenBuffer) > 1){
+		$sourceNamespace = ($tokenBuffer[0]+":");
+		if (size($tokenBuffer)>2){
+			for ($i=1;$i<size($tokenBuffer)-1;$i++){
+				$sourceNamespace += ($tokenBuffer[$i]+":");
+			}
+		}
+	}
+
+	
+	for ($i=0;$i<(size($selectedObjs)-1);$i++){
+		
+		string $targetObj = $selectedObjs[$i];
+		string $targetNamespace = "";
+
+
+		string $tokenBuffer2[];
+		tokenize $targetObj ":" $tokenBuffer2;
+		
+		if (size($tokenBuffer2) > 1){
+			$targetNamespace = ($tokenBuffer2[0]+":");
+			if (size($tokenBuffer2)>2){
+				for ($j=1;$j<size($tokenBuffer2)-1;$j++){
+					$targetNamespace += ($tokenBuffer2[$j]+":");
+				}
+			}
+		}
+	
+		evalEcho("doCombineAssetShaders \""+$sourceNamespace+"\" \""+$targetNamespace+"\"");
+	}
+
+
+}
+
+global proc doCombineAssetShaders(string $sourceNamespace, string $targetNamespace){
+
+	$sourceGeo  = `ls -type mesh -noIntermediate ($targetNamespace+"*")`;
+	for ($each in $sourceGeo){
+		string $sgName = "";
+		if (`attributeExists "shadingGroupName" $each`){
+			$sgName = `getAttr ($each+".shadingGroupName")`;
+			if ($sgName != "initialShadingGroup"){
+				if (`objExists ($sourceNamespace+$sgName)`)
+					evalEcho("sets -forceElement \""+$sourceNamespace+$sgName+"\" \""+$each+"\"");
+				else 
+					print ($sourceNamespace+$sgName+" does not exist, skipping");
+			}
+			
+		}
+
+		
+
+
+	}
+
+
+}

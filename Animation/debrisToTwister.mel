@@ -1,0 +1,23 @@
+// debrisToTwister.mel
+// Created by: jason
+// Date: 2012/06/25 18:14:41
+
+global proc debrisToTwister(){
+
+}
+
+
+
+string $mp1 = `pathAnimation -c "tornado:middle_CRV" -su 0 "TornadoDebris:tonado_clip_01_LOC"`;
+
+
+string $mp2 = `pathAnimation -c "tornado:middle_CRV" -su 12.5 "TornadoDebris:tonado_clip_02_LOC"`;
+
+
+string $mp1 = `pathAnimation -c "tornado:middle_CRV" -su 25 "TornadoDebris:tonado_clip_03_LOC"`;
+
+
+string $mp1 = `pathAnimation -c "tornado:middle_CRV" -su 37.5 "TornadoDebris:tonado_clip_04_LOC"`;
+
+
+string $mp1 = `pathAnimation -c "tornado:middle_CRV" -su 50 "TornadoDebris:tonado_clip_05_LOC"`;

@@ -1,0 +1,392 @@
+//	Animation Toolbox v1.2 by Mikael Hakansson (miggy_stardust@yahoo.com).
+
+global proc animToolbox()
+{
+if (`window -q -ex animToolboxUI`==0)
+{
+window -t "Animation Toolbox v1.2 by Mikael Hakansson" -in "AnimToolbox" animToolboxUI;
+	string $tabs = `tabLayout -innerMarginWidth 5 -innerMarginHeight 5`;
+	string $tab1 = `columnLayout`;
+			text "Randomize with Offset Mode (relative)";
+
+			floatFieldGrp -v1 0 -en 1 -nf 1 -l "Time" timeOffset;
+			floatFieldGrp -v1 0 -en 1 -nf 1 -l "Value" valueOffset;
+
+			radioButtonGrp -nrb 3 -l "Act on" -l1 "Keys" -l2 "Curves" -l3 "Nodes" -sl 1 actRandOffset;
+
+			rowLayout -numberOfColumns 3
+				-columnWidth3 80 80 80
+				-columnAttach 1 "both" 0
+				-columnAttach 2 "both" 0
+				-columnAttach 3 "both" 0;
+
+			button -w 50 -l "Rand Time" 
+				-c "randKeyOffset(`floatFieldGrp -q -v1 timeOffset`,0,(((`radioButtonGrp -q -sl actRandOffset`)-1)*10 + 1))";
+			button -w 50 -l "Rand Value" 
+				-c "randKeyOffset(0,`floatFieldGrp -q -v1 valueOffset`,(((`radioButtonGrp -q -sl actRandOffset`)-1)*10 + 2))";
+			button -w 50 -l "Rand Both" 
+				-c "randKeyOffset(`floatFieldGrp -q -v1 timeOffset`,`floatFieldGrp -q -v1 valueOffset`,(((`radioButtonGrp -q -sl actRandOffset`)-1)*10 + 0))";
+		setParent ..;
+setParent ..;
+
+	string $tab2 = `columnLayout`;
+		
+		text "Randomize with Box Mode (absolute)";
+		floatFieldGrp -v1 0 -v2 0 -en 1 -en1 1 -nf 2 -l "Min/Max Time" timeBox;
+		floatFieldGrp -v1 0 -v2 0 -en 1 -en1 1 -nf 2 -l "Min/Max Value" valueBox;
+ 		
+		rowLayout -numberOfColumns 3
+			-columnWidth3 80 80 80
+			-columnAttach 1 "both"  0
+			-columnAttach 2 "both"  0
+			-columnAttach 3 "both"  0;
+		
+		button -l "Rand Time" 
+			-c "randKeyBox(`floatFieldGrp -q -v1 timeBox`,0,`floatFieldGrp -q -v2 timeBox`,0,1)";
+		button -l "Rand Val" 
+			-c "randKeyBox(0,`floatFieldGrp -q -v1 valueBox`,0,`floatFieldGrp -q -v2 valueBox`,2)";
+		button -l "Rand Both" 
+			-c "randKeyBox(`floatFieldGrp -q -v1 timeBox`,`floatFieldGrp -q -v1 valueBox`,`floatFieldGrp -q -v2 timeBox`,`floatFieldGrp -q -v2 valueBox`,0)";
+
+		setParent ..;
+	setParent ..;
+
+	string $tab2b = `columnLayout`;
+			text "Random scaling of curves";
+
+			floatFieldGrp -v1 1 -v2 1 -en 1 -en1 1 -nf 2 -l "Amount min/max" amount;
+			floatFieldGrp -v1 1 -en 1 -nf 1 -l "Pivot" pivot;
+
+			radioButtonGrp -nrb 3 -l "Act on" -l1 "Keys" -l2 "Curves" -l3 "Nodes" -sl 1 actRandScale;
+
+			rowLayout -numberOfColumns 3
+				-columnWidth3 80 80 80
+				-columnAttach 1 "both" 0
+				-columnAttach 2 "both" 0
+				-columnAttach 3 "both" 0;
+
+			button -w 50 -l "Scale Time" 
+				-c "randScale(`floatFieldGrp -q -v1 amount`,`floatFieldGrp -q -v2 amount`,`floatFieldGrp -q -v1 pivot`,(((`radioButtonGrp -q -sl actRandScale`)-1)*10 + 1))";
+			button -w 50 -l "Scale Value" 
+				-c "randScale(`floatFieldGrp -q -v1 amount`,`floatFieldGrp -q -v2 amount`,`floatFieldGrp -q -v1 pivot`,(((`radioButtonGrp -q -sl actRandScale`)-1)*10 + 2))";
+			button -w 50 -l "Scale Both" 
+				-c "randScale(`floatFieldGrp -q -v1 amount`,`floatFieldGrp -q -v2 amount`,`floatFieldGrp -q -v1 pivot`,(((`radioButtonGrp -q -sl actRandScale`)-1)*10 + 0))";
+		setParent ..;
+setParent ..;
+
+
+	string $tab3 = `columnLayout`;
+		
+		text "Offsetscale Animation Curves";
+		floatFieldGrp -v1 1 -v2 1 -en 1 -en1 1 -nf 2 -l "Scale pivot/value" scales;
+ 		
+		rowLayout -numberOfColumns 3
+			-columnWidth3 80 80 80
+			-columnAttach 1 "both"  0
+			-columnAttach 2 "both"  0
+			-columnAttach 3 "both"  0;
+		
+		button -l "Scale Time" 
+			-c "doScaleCurves(`floatFieldGrp -q -v1 scales`,`floatFieldGrp -q -v2 scales`,1)";
+		button -l "Scale Value" 
+			-c "doScaleCurves(`floatFieldGrp -q -v1 scales`,`floatFieldGrp -q -v2 scales`,2)";
+		button -l "Scale Both" 
+			-c "doScaleCurves(`floatFieldGrp -q -v1 scales`,`floatFieldGrp -q -v2 scales`,0)";
+
+		setParent ..;
+	setParent ..;
+
+	string $tab4 = `columnLayout`;
+		
+		text "Offset Animation";
+		floatFieldGrp -v1 1 -nf 1 -l "Value" offsetVal;
+ 		floatFieldGrp -v1 1 -nf 1 -l "Degree" degree;
+		
+		radioButtonGrp -nrb 3 -l "Act on" -l1 "Keys" -l2 "Curves" -l3 "Nodes" -sl 1 actOffset;
+
+		rowLayout -numberOfColumns 3
+			-columnWidth3 80 80 80
+			-columnAttach 1 "both"  0
+			-columnAttach 2 "both"  0
+			-columnAttach 3 "both"  0;
+		
+		button -l "Offset Time" 
+			-c "doOffsetCurves(`floatFieldGrp -q -v1 offsetVal`,`floatFieldGrp -q -v1 degree`,(((`radioButtonGrp -q -sl actOffset`)-1)*10 + 1))";
+		button -l "Offset Value" 
+			-c "doOffsetCurves(`floatFieldGrp -q -v1 offsetVal`,`floatFieldGrp -q -v1 degree`,(((`radioButtonGrp -q -sl actOffset`)-1)*10 + 2))";
+		button -l "Offset Both" 
+			-c "doOffsetCurves(`floatFieldGrp -q -v1 offsetVal`,`floatFieldGrp -q -v1 degree`,(((`radioButtonGrp -q -sl actOffset`)-1)*10 + 0))";
+
+		setParent ..;
+	setParent ..;
+
+	string $tab5 = `columnLayout`;
+		
+		text "Insert Keys";
+		intFieldGrp -v1 0 -nf 1 -l "Insert Key after Index" insertKey;
+ 		floatFieldGrp -v1 0.5 -nf 1 -l "Bias" bias;
+		
+		button -l "Insert Key(s)" 
+			-c "doInsertKeys(`intFieldGrp -q -v1 insertKey`,`floatFieldGrp -q -v1 bias`)";
+
+                tabLayout -edit
+                        -tabLabel $tab1 "RandOffset" -tabLabel $tab2 "RandBox" -tabLabel $tab2b "RandScale" -tabLabel $tab3 "OffsetScale" -tabLabel $tab4 "Offset" -tabLabel $tab5 "EditKeys"
+                        $tabs;
+showWindow;
+}
+}
+
+global proc randKeyOffset(float $randValT, float $randValV, int $mode)
+{
+float $newPosT, $newPosV, $keyIndex[];
+
+if ($mode < 3)
+	{
+	string $channel[] = `keyframe -q -n`;
+	for ($i=0; $i<size($channel); $i++)
+		{
+		$keyIndex = `keyframe -sl -q $channel[$i]`;
+		for ($keyCount=0; $keyCount<(size($keyIndex)); $keyCount++)
+			{
+			if (($mode==0) || ($mode==2))
+				{
+				$newPosV = rand(-$randValV, $randValV);
+				keyframe -e -o over -r -vc $newPosV -t $keyIndex[$keyCount] $channel[$i];
+				}
+			if (($mode==0) || ($mode==1))
+				{
+				$newPosT = rand(-$randValT, $randValT);
+				keyframe -e -o over -r -tc $newPosT -t $keyIndex[$keyCount] $channel[$i];
+				}
+
+			}
+		}
+	}
+
+if (($mode>9) && ($mode<13))
+	{
+	string $selcurves[] = `keyframe -q -n -sl`;
+	for ($obj in $selcurves)
+		{
+		if (($mode == 10) || ($mode == 11))
+			{
+			$newPosT = rand(-$randValT, $randValT);
+			keyframe -option over -r -tc $newPosT $obj;
+			}
+		if (($mode == 10) || ($mode == 12))
+			{
+			$newPosV = rand(-$randValV, $randValV);
+			keyframe -option over -r -vc $newPosV $obj;
+			}
+		}	
+	}
+
+
+if ($mode > 19)
+	{
+	string $sel[] = `ls -sl`;
+	for ($i=0; $i<size($sel); $i++)
+		{
+		$newPosT = rand(-$randValT, $randValT);
+		$newPosV = rand(-$randValV, $randValV);
+
+		if (($mode == 20) || ($mode == 21))
+			keyframe -an objects -hi below -o over -r -tc $newPosT $sel[$i];
+		if (($mode == 20) || ($mode == 22))
+			keyframe -an objects -hi below -o over -r -vc $newPosV $sel[$i];
+		
+		}
+	}
+}
+
+
+global proc randKeyBox(float $minTime, float $minValue, float $maxTime, float $maxValue, int $mode)
+{
+string $channel[] = `keyframe -q -n`;
+float $newPosT, $newPosV, $keyIndex[];
+
+for ($i=0; $i<size($channel); $i++)
+	{
+	$keyIndex = `keyframe -sl -q $channel[$i]`;
+	for ($keyCount=0; $keyCount<(size($keyIndex)); $keyCount++)
+		{
+		if (($mode==0) || ($mode==2))
+			{
+			$newPosV = rand($minValue, $maxValue);
+			keyframe -e -o over -a -vc $newPosV -t $keyIndex[$keyCount] $channel[$i];
+			}
+
+		if (($mode==0) || ($mode==1))
+			{	
+			$newPosT = rand($minTime, $maxTime);
+			keyframe -e -o over -a -tc $newPosT -t $keyIndex[$keyCount] $channel[$i];
+			}
+		}
+	}
+}
+
+
+
+
+
+
+global proc randScale(float $amountMin, float $amountMax, float $pivot, int $mode)
+{
+float $newScaleT, $newScaleV, $keyIndex[];
+
+if ($mode < 3)
+	{
+	string $channel[] = `keyframe -q -n`;
+	for ($i=0; $i<size($channel); $i++)
+		{
+		$keyIndex = `keyframe -sl -q $channel[$i]`;
+		$newScaleV = rand($amountMin, $amountMax);
+		$newScaleT = rand($amountMin, $amountMax);
+
+		for ($keyCount=0; $keyCount<(size($keyIndex)); $keyCount++)
+			{
+			if (($mode==0) || ($mode==1))
+				scaleKey -ts $newScaleT -tp $pivot -t $keyIndex[$keyCount] $channel[$i];
+			if (($mode==0) || ($mode==2))
+				scaleKey -vs $newScaleV -vp $pivot -t $keyIndex[$keyCount] $channel[$i];
+			}
+		}
+	}
+
+
+if (($mode>9) && ($mode<13))
+	{
+	string $selcurves[] = `keyframe -q -n -sl`;
+	for ($obj in $selcurves)
+		{
+		if (($mode == 10) || ($mode == 11))
+			{
+			$newScaleT = rand($amountMin, $amountMax);
+			scaleKey -ts $newScaleT -tp $pivot $obj;
+			}
+		if (($mode == 10) || ($mode == 12))
+			{
+			$newScaleV = rand($amountMin, $amountMax);
+			scaleKey -vs $newScaleV -vp $pivot $obj;
+			}
+		}	
+	}
+
+
+if ($mode > 19)
+	{
+	string $sel[] = `ls -sl`;
+	for ($i=0; $i<size($sel); $i++)
+		{
+		$newScaleT = rand($amountMin, $amountMax);
+		$newScaleV = rand($amountMin, $amountMax);
+
+		if (($mode == 20) || ($mode == 21))
+			scaleKey -hi below -ts $newScaleT -tp $pivot $sel[$i];
+		if (($mode == 20) || ($mode == 22))
+			scaleKey -hi below -vs $newScaleV -vp $pivot $sel[$i];
+		}
+	}
+}
+
+
+
+
+
+
+
+global proc doScaleCurves(float $pivot, float $scale, int $mode)
+{
+string $selCurves[] = `keyframe -q -n -sl`;
+float $time[], $shiftKeys;
+
+for ($i=0; $i<size($selCurves); $i++)
+	{
+	if (($mode==0) || ($mode==1))
+		{
+		$time = `keyframe -in 0 -q $selCurves[$i]`;
+		$shiftKeys = ($time[0] - $pivot)*($scale-1);
+		keyframe -e -r -tc $shiftKeys $selCurves[$i];
+		}
+	if (($mode==0) || ($mode==2))
+		{
+		$value = `keyframe -in 0 -q -vc $selCurves[$i]`;
+		$shiftValue = ($value[0] - $pivot)*($scale-1);
+		keyframe -e -r -vc $shiftValue $selCurves[$i];
+		}
+	}
+}
+
+
+global proc doOffsetCurves(float $offsetVal, float $degree, int $mode)
+{
+//float $newPosT, $newPosV, $keyIndex[];
+float $time[], $shiftKeys;
+float $counter=0;
+
+if ($mode < 3)
+	{
+	string $channel[] = `keyframe -q -n`;
+	for ($i=0; $i<size($channel); $i++)
+		{
+		$keyIndex = `keyframe -sl -q $channel[$i]`;
+		$shiftKeys = (`pow $counter $degree`)*$offsetVal;
+		for ($keyCount=0; $keyCount<(size($keyIndex)); $keyCount++)
+			{
+			if (($mode==0) || ($mode==1))
+				keyframe -e -o over -r -tc $shiftKeys -t $keyIndex[$keyCount] $channel[$i];
+
+			if (($mode==0) || ($mode==2))
+				keyframe -e -o over -r -vc $shiftKeys -t $keyIndex[$keyCount] $channel[$i];
+			}
+		$counter++;
+		}
+	}
+
+if (($mode>9) && ($mode<13))
+	{
+	string $selCurves[] = `keyframe -q -n -sl`;
+	for ($i=0; $i<size($selCurves); $i++)
+		{
+		$shiftKeys = (`pow $i $degree`)*$offsetVal;
+
+		if (($mode==10) || ($mode==11))
+			keyframe -e -r -tc $shiftKeys $selCurves[$i];
+		if (($mode==10) || ($mode==12))
+			keyframe -e -r -vc $shiftKeys $selCurves[$i];
+
+		}
+	}
+
+if ($mode > 19)
+	{
+	string $sel[] = `ls -sl`;
+	for ($i=0; $i<size($sel); $i++)
+		{
+		$shiftKeys = (`pow $i $degree`)*$offsetVal;
+
+		if (($mode == 20) || ($mode == 21))
+			keyframe -an objects -hi below -o over -r -tc $shiftKeys $sel[$i];
+
+		if (($mode == 20) || ($mode == 22))
+			keyframe -an objects -hi below -o over -r -vc $shiftKeys $sel[$i];
+
+		}
+
+	}
+}
+
+
+
+global proc doInsertKeys(int $insertIndex, float $percentage)
+{
+string $channel[] = `keyframe -q -n`;
+float $keyIndexA[], $keyIndexB[];
+
+for ($i=0; $i<size($channel); $i++)
+	{
+	$keyIndexA = `keyframe -in $insertIndex -q $channel[$i]`;
+	$keyIndexB = `keyframe -in ($insertIndex+1) -q $channel[$i]`;
+	setKeyframe -insert -t ((($keyIndexB[0]-$keyIndexA[0])*$percentage)+$keyIndexA[0]) $channel[$i];
+	}
+}

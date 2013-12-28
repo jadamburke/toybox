@@ -1,0 +1,113 @@
+// ppPlayblast
+// Created by: adam
+// Date: 2012/03/08 14:50:03
+
+// playblasts the current scene using assumptions about the open scene to guess where to save the playblast. Otherwise it playblasts to a temp location
+global proc ppPlayblast(){
+	
+	// determine the shot
+	string $currentScene = `file -q -sn`;
+	
+	string $shotNameGuess = "";
+	string $shotTakeGuess = "";
+	string $shotDeptGuess = "";
+	string $shotSubDeptGuess = "";
+	string $shotSequenceGuess = "";
+	string $shotFolderGuess = "";
+	string $extension = `fileExtension $currentScene`;
+	string $currentSceneName = `basenameEx $currentScene`;
+	
+	string $tokenBuffer[];
+	tokenize $currentScene "/" $tokenBuffer;
+	if (size($tokenBuffer) > 1){
+		$subDeptGuess = $tokenBuffer[size($tokenBuffer)-2];
+		if (size($tokenBuffer) > 2 ) {
+			$shotDeptGuess = tolower($tokenBuffer[size($tokenBuffer)-3]);
+			if (size($tokenBuffer) > 3 ) {
+				$shotNameGuess = $tokenBuffer[size($tokenBuffer)-4];
+				if (size($tokenBuffer) > 4){
+					if ($tokenBuffer[size($tokenBuffer)-5] != "_ALL_SHOTS" && $tokenBuffer[size($tokenBuffer)-5] != "_PREVIS"){
+						$shotSequenceGuess = $tokenBuffer[size($tokenBuffer)-5];
+						if ($tokenBuffer[size($tokenBuffer)-6] == "_ALL_SHOTS" || $tokenBuffer[size($tokenBuffer)-6] == "_PREVIS" ){
+							$shotFolderGuess = $tokenBuffer[size($tokenBuffer)-6];
+						}	
+					}
+					else{
+						$shotFolderGuess = $tokenBuffer[size($tokenBuffer)-5];
+					}
+				}
+			}
+		}
+	}	
+	print ("sceneFileName="+$currentSceneName+" shotNameGuess="+$shotNameGuess+" deptGuess ="+$shotDeptGuess+" shotSequenceGuess="+$shotSequenceGuess+"\n");
+	// set the playblast variables
+	//string $renderPath = (`workspace -q -rd`+"../../RENDER/"+$shotFolderGuess+"/");
+	string $renderPath = (`workspace -q -rd`+"images/RENDERS/"+$shotFolderGuess+"/");
+	// 
+	
+	if ($shotSequenceGuess == ""){
+		string $pbPath  = ($renderPath+$shotNameGuess+"/playblasts/"+$currentSceneName+"/"+$currentSceneName);
+		ppPlayblastDoBlast $pbPath;
+	}
+	else {
+		string $pbPath  = ($renderPath+$shotSequenceGuess+"/"+$shotNameGuess+"/playblasts/"+$currentSceneName+"/"+$currentSceneName);
+		ppPlayblastDoBlast $pbPath;
+	}
+	
+}
+
+global proc ppPlayblastDoBlast (string $pbPath){
+
+	int $imgWidth = 960;
+	int $imgHeight = 540;
+
+	string $cameraName = "renderCam";
+	string $cameraShape = "renderCamShape";
+
+	// get the active viewport and set it to the correct camera
+	string $activePanel = `getPanel -withFocus`;  
+	select -clear;
+	//int $filmFit = `getAttr stereoCameraCenterCamShape.filmFit`;
+	$imgWidth =1920;
+
+	if (`modelPanel -q -exists $activePanel`){
+
+		if (!`objExists $cameraName`)
+			error ($cameraName+" does not exist. Please conform your scene or make your main camera named "+$cameraName+"\n");
+
+		setAttr ($cameraShape+".overscan") 1;
+
+		lookThroughModelPanel $cameraName $activePanel;
+		modelEditor -e -allObjects false -ignorePanZoom true $activePanel;
+		modelEditor -e -nurbsSurfaces true -polymeshes true -dynamics true -fluids true -locators false -nParticles true -grid false $activePanel;
+		// print (`playblast -ae`+"\n");
+
+		// setup the playblast as a command string for deferred evaluation
+		string $cmd = ("playblast -format iff -filename \""+$pbPath+"\" -sequenceTime 0 -clearCache 1 -offScreen -viewer 1 -showOrnaments 1 -fp 4 -percent 100 -compression \"png\" -quality 100 -widthHeight "+$imgWidth+" "+$imgHeight+";");
+
+		$cmd += "ppPlayblastsCommitToEditor;";
+		
+		// run the playblast command as deferred evaluation
+		evalDeferred ($cmd);
+		
+	}
+	else {
+			print ("Please select a viewport to playblast\n");
+	}
+}
+
+// this procedure is called when the animator approves of the last playblast viewed.
+// calling this procedure will process the playblast sequence in quicktime and generate a h264 QT File, as well as dump a copy to the editors inbox
+global proc ppPlayblastsCommitToEditor(){
+
+	$result = `confirmDialog -title "Commit Playblast" -message "Submit the playblast to editors?" -button "Yes" -button "No" -defaultButton "Yes" -cancelButton "No" -dismissString "No"`;
+	if ($result == "Yes"){
+		// call the QT movie conversion jscript on monkey passing it the sequence name. have the script copy the file to the editor drop box
+		if (`about -os` == "win64"){
+			string $scriptPath = "";
+			string $sysCmd = ("cscript \""+$scriptPath+"\" \""+$sourcePath+"\" \"+$destPath+\"");
+			system ($sysCmd);
+		}
+	}
+
+}

@@ -1,0 +1,21 @@
+// listMissingTextures
+
+
+global proc listMissingTextures () {
+
+	string $mayaFiles[] = `ls -type file -type psdFileTex -type mentalrayTexture`;
+	select -clear;
+	for ($each in $mayaFiles){
+		string $texPath = `getAttr ($each+".ftn")`;
+		if ($texPath != ""){
+			if (!`filetest -r $texPath`){
+				select -add $each;
+				print ($texPath+" "+$each+" Missing: \n");	
+			}
+			else{
+				print ($texPath+" "+$each+" Found: \n");
+			}
+		}
+	}
+
+}

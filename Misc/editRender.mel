@@ -1,0 +1,43 @@
+// editRender
+
+
+global proc editRender () {
+	// get path to project temp folder
+	string $sceneName = `file -q -shn -sn`;
+	if ($sceneName == "")
+		$sceneName = "untitled";
+	string $tokenBuffer[];
+	
+	tokenize $sceneName "." $tokenBuffer;
+
+	$filePrefix = $tokenBuffer[0];
+
+	$imagePath = (`workspace -q -rd`+`workspace -q -fre image`+"/"+$filePrefix); 
+
+	int $suffix=0;
+	$fileId = `filetest -f ($imagePath+".psd")`;
+	while ($fileId !=0){
+		$suffix++;
+		$fileId = `filetest -f ($imagePath+$suffix+".psd")`;
+	}
+
+	if ($suffix>0)
+		$imagePath = ($imagePath+$suffix);
+
+	$oldFormat = `getAttr "defaultRenderGlobals.imageFormat"`;
+	setAttr "defaultRenderGlobals.imageFormat" 31;
+	
+	
+	renderWindowEditor -e -writeImage $imagePath renderView;
+	
+	setAttr "defaultRenderGlobals.imageFormat" $oldFormat;
+
+	$imageEditorPath = `optionVar -q "EditImageDir"`;
+	
+
+	$cmdString = ("open -a \""+$imageEditorPath+"\" \""+toNativePath($imagePath)+".psd\"");
+	//$cmdString = ("start \""+toNativePath($imagePath)+".psd\"");
+	exec $cmdString;
+	print ($cmdString+"\n");
+
+}

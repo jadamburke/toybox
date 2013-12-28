@@ -1,0 +1,14 @@
+//
+//
+ global proc showDXRES ()
+ {
+ source "smResSwitch.mel";
+ string $sel[] =`ls -sl`;
+ for ($each in $sel)
+        {
+        select -r $each;
+        smResSwitch "" "DXRES";
+       }
+ if (`size $sel` <= 0)
+smResSwitch "" "DXRES";
+ }

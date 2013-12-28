@@ -1,0 +1,11 @@
+// mergeOBJVertSets
+
+global proc mergeOBJVertSets () {
+
+	$sel = `ls -sl`;
+	for ($each in $sel){
+   		 select $each;
+   		polyMergeVertex  -d 0.0001 -am 1 -ch 1;
+	}
+
+}

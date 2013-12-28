@@ -1,0 +1,3 @@
+hotkey -k "8" -n "OutlinerWindowNameCommand";
+hotkey -k "9" -n "HypershadeWindowNameCommand";
+hotkey -k "0" -n "GraphEditorNameCommand";

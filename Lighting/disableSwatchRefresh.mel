@@ -1,0 +1,7 @@
+// disableSwatchRefresh
+global proc disableSwatchRefresh () {
+
+
+    optionVar -intValue "ppSwatchUpdate" false;
+    renderThumbnailUpdate `optionVar -q "ppSwatchUpdate"`;
+}

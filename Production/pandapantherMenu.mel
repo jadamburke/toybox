@@ -1,0 +1,110 @@
+// pandapantherMenu.mel
+// version 1.0
+
+// description:
+// creates the studio's main menu for maya production tools
+
+
+global proc pandapantherMenu () {
+
+	global string $gPPScripts; // = "//MONKEY/Resources/Maya/2012-x64/scripts";
+
+	global string $gMainWindow;
+
+
+	if (`menu -q -exists  ppMainMenu`){
+    		menu -e -dai  ppMainMenu;
+    	}
+	else {
+		setParent $gMainWindow ;
+    		menu -l "PandaPanther" -p MayaWindow -to true ppMainMenu ;
+    	}
+
+	setParent -menu ppMainMenu ;
+
+	menuItem -label "New Scene" -sm true;
+
+		menuItem -l "New HD Scene 24fps" -c "ppDoNewScene \"hd24fps\"";
+
+		menuItem -l "New SD Scene 24fps" -c "ppDoNewScene \"hd24fps\"";
+	
+		menuItem -divider true ;
+	
+		menuItem -l "New Empty Scene" -c "ppDoNewScene \"empty\"";
+
+		menuItem -l "New Rig Scene" -c "ppDoNewScene \"rig\"";
+
+	setParent -menu ppMainMenu;
+	menuItem -en 0 -l  "New Camera";
+	menuItem -en 1 -l "Save Increment" -c ("if (`exists abxShots`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/abxShots.mel\";if (`exists abxShots`) abxShotsIncrementalSave \"auto\" \"\" \"\"");
+
+	menuItem -divider true ;
+
+	menuItem -l  "Playblast HUD" -c ("if (`exists playblastHUD`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/playblastHUD.mel\";if (`exists playblastHUD`) playblastHUD");
+	menuItem -l "Anim Playblast..." -sm true ppAnimPBMenu;
+
+		menuItem -parent ppAnimPBMenu -l "Playblast renderCam" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";ppStereoCamAnmPlayblast \"center\"  \"parallel\"0");
+		menuItem -divider true;
+		menuItem -parent ppAnimPBMenu -l "Playblast Left" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";ppStereoCamAnmPlayblast \"left\"  \"parallel\"0");
+		menuItem -parent ppAnimPBMenu -l "Playblast Right" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";ppStereoCamAnmPlayblast \"right\"  \"parallel\"0"); 
+		 
+		setParent -menu ..;
+
+	menuItem -l "StereoCam Tools" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";if (`exists ppStereoCam`) ppStereoCam");
+	menuItem -divider true ;
+
+
+	// Project Window
+	//menuItem -en 1 -l "Project Manager" -c ("if (`exists abxProject`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/abxProject.mel\";if (`exists abxProject`) abxProject");
+	menuItem -en 1 -l "Project Manager" -c "abxProject";
+
+	// Assets Window
+	//menuItem  -l "Asset Manager" -c ("if (`exists abxAssets`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/abxAssets.mel\";if (`exists abxAssets`) abxAssets");
+	menuItem  -l "Asset Manager" -c "abxAssets";
+
+	// Shots Window
+	//menuItem -en 1 -l "Shots Manager" -c ("if (`exists abxShots`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/abxShots.mel\";if (`exists abxShots`) abxShots");
+	menuItem -en 1 -l "Shots Manager" -c "abxShots";
+
+	menuItem -divider true ;
+	
+	// Toybox Window
+	//menuItem -l "Scripts" -c ("if (`exists abxToybox`==0) source \""+$gPPScripts+"/production/abxToybox.mel\";if (`exists abxToybox`) abxToybox");
+	menuItem -l "Scripts" -c "abxToybox";
+
+
+
+	menuItem -divider true ;
+	menuItem -label "Auto Master Scene" -c ("if (`exists abxShots`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/abxShots.mel\";if (`exists abxShots`) abxShotsMaster \"auto\" \"\" \"\"");
+	
+
+	// Passes Tool
+	menuItem -en 0 -l "Passes Tool";
+
+	menuItem -divider true ;
+
+	menuItem -en 0 -l "Render Farm Submit";
+
+	// smedge renderer
+	menuItem -l "Render Farm Manager" -c "system \"start \\\"C:/Program Files (x86)/Smedge 2011/SmedgeGui.exe\\\"\"";
+
+	// 
+
+	//menuItem -divider true ;
+
+	//menuItem -l "Panda";
+	//menuItem -l "Panther" -c "system \"start \\\"C:/Program Files (x86)/Mozilla Firefox/firefox.exe\\\" \\\"http://www.youtube.com/watch?v=m099vK9CSDk&feature=youtu.be&t=28s\\\"\"";
+	
+	menuItem -divider true ;
+
+	menuItem -l "Browse Job" -c "ppBrowseJob";
+	menuItem -l "Browse Maya Project" -c "ppBrowseProject";
+
+	menuItem -divider true ;
+	menuItem -l "PandaPanther Wiki" -c "system \"start \\\"C:/Program Files (x86)/Mozilla Firefox/firefox.exe\\\" \\\"http://wiki.pandapanther.com/groups/pandapantherproductionwiki/\\\"\"";
+
+	
+}
+
+
+

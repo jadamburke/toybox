@@ -1,0 +1,604 @@
+/*  This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: Image Planer v2.1
+''    Author: Robin Scher
+''    Last Updated: December 5, 2000
+''    Update/Change this file at:
+''    http://www.highend3d.com/maya/mel/?section=interface#746
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+
+/*  imagePlaner.mel
+
+Creation Date:       7-2-99
+Author:              robin
+                     http://browse.to/mel
+
+Description:
+	a wizard for easy addition of image planes
+
+Usage:
+	imagePlaner;
+	
+	Fill in the filename and set any additional parameters, then press OK.
+
+Notes:
+	See the help window for full usage notes.
+
+Version 1.0a: 7-6-99
+	- Set the current time to the first frame. (why not?)
+	- Help text typos fixed.
+
+Version 2.0: 5-7-00
+	- Changed sizing to actually make the image plane and rendered image
+	  line up, now that i finally understand how it works. Now always fits to
+	  film back, but will set the film back to the size selected. Currently
+	  only has NTSC and TV ratio film back.
+
+Version 2.1: 8-25-00
+	- Added 2 HD projections and cleaned up code a bit.
+	
+Limitations:
+	- The autodetection logic doesn't work with movie files.
+	
+	- The autodetection logic requires a number by itself separated by the "."
+	  character. Any filename structure common to Alias|Wavefront products
+	  should work (e.g., name.1, name.0001.rla, name.iff.1, etc...) Extra
+	  numbers in the file won't matter unless they are surrounded by periods
+	  like a frame number (e.g. name.1.iff.1)
+	  
+Disclaimer:
+	Use and modify at your own risk!
+*/
+
+// this is necessary for us, but isn't necessarily sourced at startup.
+source AEimagePlaneTemplate.mel;
+
+// the help window
+global proc ip_help()
+{
+	string $tabs[];
+	string $text[];
+		
+	$tabs[0] = "Basic";
+	$text[0] = "The Image Planer automates a lot of the work of adding\n" +
+			"image planes to your scene.\n\n" +
+			"Use the \"Camera\" menu to select which camera you want\n" +
+			"to add the image plane to.\n\n" +
+			"Next, click the \"Browse\" button and select an image. If\n" +
+			"you have an image sequence, you can select any image in that\n" +
+			"sequence, and it will find the first and last frames automatically.\n\n" +
+			"Use the \"Fit to\" buttons to have the image plane fit to either\n" +
+			"the film gate or the resolution gate.\n\n"+
+			"Finally, click \"OK\" to add the image plane.";
+	$tabs[1] = "Sequences";
+	$text[1] = "If you use the \"Browse\" button, the frame numbers are\n" +
+			"filled in automatically, and the \"Use Frame Extension\"\n" +
+			"button is checked if the program finds a sequence of images.\n" +
+			"Of course, you can always check or uncheck the box or\n" +
+			"modify the first and last frames by hand.\n\n" +
+			"Image Planer can use one of two different methods for frame\n" +
+			"control in a sequence. \"Expression\" writes an expression,\n" +
+			"which can simplify your life, because the image plane will\n" +
+			"always have one frame per Maya frame, no matter what your\n" +
+			"current time unit is. \"Keyframe\" uses traditional keyframes\n" +
+			"on the frameExtension attribute of the image plane for more\n" +
+			"flexibility.\n\n"+
+			"If you are using an expression, be aware that you can easily\n" +
+			"adjust the sequence without touching the expression. A \n" +
+			"\"First Frame\" attribute is added to the image plane node.\n" +
+			"This tells the expression which frame of the image plane is\n" +
+			"frame 1 in your animation.\n\n"+
+			"  Note that if you go past an end, Maya will issue a warning that\n" +
+			"  the image for the image plane could not be found. If you need\n" +
+			"  this functionality, use keyframes.\n\n" +
+			"If you use keyframes, you should make sure that your time units\n" +
+			"in Maya match the frame rate of your sequence. The \"Time Unit\"\n" +
+			"menu can set this for you. Warning: if you have any animation in\n" +
+			"your scene, the curves will be scaled if you change this value.\n\n"+
+			"The \"Match Maya Frames\" box tells the script that you want Maya\n"+
+			"to render the images with the same frame numbers as your image\n" +
+			"sequence. This can be handy if you're kind of lazy about numbers.";
+	$tabs[2] = "Notes";
+	$text[2] = "The autodetection logic is not perfect (yet). It will only\n" +
+			"believe that a sequence exists if it finds files with a frame\n" +
+			"number separated by the \".\" character. Any of the standard\n" +
+			"Alias|Wavefront image naming styles should work (e.g. \"file.1\",\n" +
+			"\"file.0001.rla\", \"file.iff.1\", etc.)\n\n" +
+			"Please note that if your file name has another number separated\n" +
+			"only by periods (e.g. \"file.1.iff.1\"), it will get confused.\n\n" +
+			"It can't determine the range from movie files.\n\n" +
+			"Of course, you can always set the options by hand!\n\n";
+	$tabs[3] = "About";
+	$text[3] = "Image Planer 2.0\n" +
+			"7 May 2000\n\n" +
+			"by Robin Scher\n" +
+			"rscher@ringoffire.com\n" +
+			"http://browse.to/mel\n\n\n" +
+			"Works with Maya NT and IRIX";
+	
+	window
+		-title "Image Planer 2.0 Help"
+		-iconName "Help"
+		-wh 450 400
+		ip_helpWindow;
+		
+		// ooh, cool tab layout, robin.
+		tabLayout -scr true -imw 5 -imh 5 -cr true ipHelpTabs;
+			
+			for ($i=0; $i<size($text);$i++)
+			{
+				// for each tab, add the text from the array
+				string $lay = `columnLayout -adj true -cat "both" 0`;
+					separator -style "none" -height 10;
+					text -align "left" -l $text[$i];
+					setParent ..;
+				// and set the tab label
+				tabLayout -edit -tabLabel $lay $tabs[$i] ipHelpTabs;
+			}
+	
+	// make the help window go away when the imagePlanerWin goes away
+	scriptJob -p ip_helpWindow -uiDeleted imagePlanerWin "deleteUI ip_helpWindow";
+	
+	showWindow ip_helpWindow;
+}
+
+// here's the actual processing
+global proc ip_doImagePlane()
+{
+	float $horizontalApetures[] = {
+		.816,		// 35mm NTSC projection
+		.945,		// Super35 4-perf HD projection
+		.910		// Super35 3-perf HD projection
+	};
+	float $verticalApetures[] = {
+		.612,		// 35mm NTSC projection
+		.531,		// Super35 4-perf HD projection
+		.511		// Super35 3-perf HD projection
+	};
+	// get our variables and make an image plane node
+	string $ipNode = `createNode imagePlane`;
+	string $camNode = `optionMenu -q -v camera`;
+	int $start = `intField -q -v startFrame`;
+	int $end = `intField -q -v endFrame`;
+	int $timeUnit = `optionMenu -q -sl timeOpts`;
+	int $useExt = `checkBox -q -v useFrameExtension`;
+	int $len = $end - $start + 1;
+	int $matchFrames = `checkBox -q -v matchFrames`;
+	int $size = `optionMenu -q -sl size`;
+	int $mode = `radioButton -q -sl keyframeMode`;
+	
+	// easy way to connect the image plane to the camera
+	defaultNavigation -connectToExisting -force true -source $ipNode -destination $camNode;
+	// set the image plane filename
+	setAttr -type "string" ($ipNode+".imageName") `textField -q -text imageName`;
+	// fit the image plane as directed
+	setAttr ($camNode + ".horizontalFilmAperture") $horizontalApetures[$size-1];
+	setAttr ($camNode + ".verticalFilmAperture") $verticalApetures[$size-1];
+	setAttr ($ipNode+".fit") 4;
+	AEinvokeFitFilmGate ($ipNode+".sizeX") ($ipNode+".sizeY");
+
+	// the rest only happens if we have a sequence
+	if ($useExt)
+	{
+		// tell the node it's a sequence
+		setAttr ($ipNode+".useFrameExtension") 1;
+		
+		if ($mode)
+		{
+			// keyframe mode
+			
+			// set the time units if needed
+			if ($timeUnit==1)
+				currentUnit -time film;
+			else if ($timeUnit==2)
+				currentUnit -time pal;
+			else if ($timeUnit==3)
+				currentUnit -time ntsc;
+			
+			// set the keyframes
+			// use frames 1 and $len for normal use or
+			// the same numbers as our image plane for match use
+			setKeyframe -at "fe" -t ($matchFrames ? $start : 1) -v $start $ipNode;
+			setKeyframe -at "fe" -t ($matchFrames ? $end : $len) -v $end $ipNode;
+		}
+		else
+		{
+			// expression mode
+			
+			string $exp;
+			if ($matchFrames)
+				// match mode has frame = currentTime
+				$exp = "fe = \`currentTime -q\`;";
+			else
+			{
+				// normal mode adds a first frame attribute to the image plane
+				// the -1 is to account for the fact that we start counting at 1
+				$exp = "fe = \`currentTime -q\` + firstFrame - 1;";
+				addAttr -ln firstFrame -sn ff -at double  $ipNode;
+				setAttr -e -keyable true ($ipNode+".firstFrame");
+				setAttr ($ipNode+".firstFrame") $start;
+			}
+			// add the expression
+			expression -s $exp  -o $ipNode -n "frameExtension";
+		}
+		// set the playback range to the new start and end
+		playbackOptions -edit -minTime ($matchFrames ? $start : 1);
+		playbackOptions -edit -maxTime ($matchFrames ? $end : $len);
+	
+		// i decided to set the current time since i'm setting the playback range
+		// maybe both of these should be options, but the window has too many
+		// options already, and this is how i use it, so there.
+		currentTime -edit `playbackOptions -q -minTime`;
+	}
+	// save our preferences
+	optionVar -iv "ip_size" $size
+		-iv "ip_mode" $mode
+		-iv "ip_match" $matchFrames;
+	
+	// kill the window
+	deleteUI imagePlanerWin;
+}
+
+// helper proc that finds which of the parts of the filename has the
+// number. Note: requires that the number be by itself and that no
+// other part of the file is just a number!
+// returns -1 if it couldn't find it.
+proc int ip_findFrameNumber(string $parts[])
+{
+	int $return = 0;
+	int $found = false;
+	
+	for ($part in $parts)
+	{
+		string $match = match ("[0-9]*", $part);
+		if ($match==$part)
+		{
+			$found = true;
+			break;
+		}
+		$return++;
+	}
+	if (!$found)
+		$return = -1;
+
+	return $return;
+}
+
+// helper proc that rebuilds the filename from the parts using
+// the given frame instead of the original frame. Should properly
+// pad and everything
+proc string ip_buildFileName(string $parts[], int $changeMe, int $frame, int $pad)
+{
+	string $return;
+	for ($i=0; $i<size($parts); $i++)
+	{
+		if ($i)
+			$return += ".";
+		if ($i==$changeMe)
+		{
+			if ($pad)
+			{
+				if ($frame<1000)
+					$return += "0";
+				if ($frame<100)
+					$return += "0";
+				if ($frame<10)
+					$return += "0";
+			}
+			$return += $frame;
+		}
+		else
+			$return += $parts[$i];
+	}
+	return $return;
+}
+
+// helper proc determines if the filename has padded numbers
+// Note: only works with four digit padding.
+proc int ip_isPadded (string $frameStr, int $frame)
+{
+	if (size($frameStr)==4 && $frame<1000)
+		return 1;
+	else
+		return 0;
+}
+
+// this proc searches for the beginning or end frame in a sequence
+// given any starting frame, and a direction to search.
+// $direction must be either -1 to search for the beginning or
+// 1 to search for the end. 0 will cause an infinite loop!
+// the parts of the file must be separated by "." currently.
+proc int ip_findStartEnd(string $file, int $direction)
+{
+	string $parts[];
+	int $return = 0;
+	// add more characters to if you use something else
+	int $numParts = tokenize($file, ".", $parts);
+	// if there's only one part, assume it's not a sequence
+	if ($numParts > 1)
+	{
+		// find out which part has the frame number
+		int $theNumber = `ip_findFrameNumber $parts`;
+		// couldn't find it? assume it's not a sequence
+		if ($theNumber < 0)
+			return $return;
+		int $frame = int($parts[$theNumber]);
+		// is it padded?
+		int $isPadded = `ip_isPadded $parts[$theNumber] $frame`;
+		// a do...while() loop would be more logical, but who cares?
+		int $exists = 1;
+		while ($exists)
+		{
+			// we know the current frame is ok
+			$return = $frame;
+			// so we check the next one
+			$frame += $direction;
+			string $name = `ip_buildFileName $parts $theNumber $frame $isPadded`;
+			$exists = `file -q -ex $name`;
+		}
+	}
+	// returns the last file found (or zero if nothing was found)
+	return $return;
+}
+
+// updates the enable state of the various controls on our window
+global proc ip_updateWindow()
+{
+	// the frame extension controls should only be available if
+	// you have useFrameExtension selected!
+	int $state = `checkBox -q -v useFrameExtension`;
+	int $keyframes = `radioButton -q -sl keyframeMode`;
+	string $file = `textField -q -text imageName`;
+	
+	text -edit -enable $state startFrameLabel;
+	intField -edit -enable $state startFrame;
+	text -edit -enable $state endFrameLabel;
+	intField -edit -enable $state endFrame;
+	text -edit -enable $state extModeLabel;
+	radioButton -edit -enable $state expressionMode;
+	radioButton -edit -enable $state keyframeMode;
+	checkBox -edit -enable $state matchFrames;
+	// the time unit is only necessary in keyframe mode
+	text -edit -enable ($state && $keyframes) timeUnitLabel;
+	optionMenu -edit -enable ($state && $keyframes) timeOpts;
+	// only allow an OK if the file listed actually exists!
+	button -edit -enable `file -q -exists $file` okButton;
+}
+
+// the callback when you click Open in the file browser
+global proc int ip_fileCallback(string $path, string $type)
+{
+	// set the text field
+	textField -edit -text $path imageName;
+	
+	// update the start and end to see if it's a sequence
+	int $start = `ip_findStartEnd $path -1`;
+	int $end = `ip_findStartEnd $path 1`;
+	intField -edit -value $start startFrame;
+	intField -edit -value $end endFrame;
+	// if they're not the same assume a sequence
+	checkBox -edit -value ($start!=$end) useFrameExtension;
+	// update the window
+	ip_updateWindow;
+	// true means close the browser window
+	return true;
+}
+
+// the hero proc
+// long and complex, but just makes the window
+global proc imagePlaner()
+{
+	if (`window -ex imagePlanerWin`)
+		deleteUI imagePlanerWin;
+	
+	window
+		-title "Image Planer 2.0"
+		-iconName "Image Planer"
+		-rtf true
+		-s 0
+		imagePlanerWin;
+				
+		formLayout -numberOfDivisions 3 theLayout;
+			text -l "Camera" -align "right" cameraLabel;
+			// add the camera shape nodes
+			optionMenu -label "" camera;
+				string $cameras[] = `ls -ca`;
+				for ($cam in $cameras)
+					menuItem -label $cam;
+				setParent ..;
+			optionMenu -edit -select 2 camera;
+			text -l "Image Name" -align "right" imageNameLabel;
+			textField 
+				-changeCommand "ip_updateWindow"
+				-width 250 
+				imageName;
+			button 
+				-l "Browse" 
+				-align "center" 
+				// use AEimagePlaneBrowser to simplify setup of the browser
+				// (a.k.a. laziness)
+				-command "AEimagePlaneBrowser ip_fileCallback"
+				browseButton;
+			text -l "Film Back Size" -align "right" sizeLabel;
+			optionMenu -label "" size;
+				menuItem -label "35mm NTSC Projection";
+				menuItem -label "Super35 4-perf HD Projection";
+				menuItem -label "Super35 3-perf HD Projection";
+				setParent ..;
+
+			// eventually add more backs and select the last chosen one
+
+			separator -style "out" middleSep;
+			checkBox 
+				-label "Use Frame Extension"
+				-changeCommand "ip_updateWindow"
+				useFrameExtension;
+			text -enable false -l "Start Frame" -align "right" startFrameLabel;
+			intField -enable false startFrame;
+			text -enable false -l "End Frame" -align "right" endFrameLabel;
+			intField -enable false endFrame;
+			text -enable false -l "Frame Extension Mode" -align "right" extModeLabel;
+			radioCollection;
+			radioButton
+				-enable false 
+				-label "Expression" 
+				-onCommand "ip_updateWindow"
+				expressionMode;
+			radioButton 
+				-enable false 
+				-label "Keyframe" 
+				-onCommand "ip_updateWindow"
+				keyframeMode;
+			// select the one last used
+			if (`optionVar -q ip_mode`)
+				radioButton -edit -sl keyframeMode;
+			else
+				radioButton -edit -sl expressionMode;
+			checkBox 
+				-enable false 
+				-label "Match Maya Frames" 
+				-value `optionVar -q ip_match`
+				matchFrames;
+			text -enable false -l "Time Unit" -align "right" timeUnitLabel;
+			// i'm only showing the ones i use commonly
+			optionMenu -enable false -label "" timeOpts;
+				menuItem -l "Film (24 fps)";
+			    menuItem -l "PAL (25 fps)";
+			    menuItem -l "NTSC (30 fps)";
+			    menuItem -l "Leave Alone";
+				setParent ..;
+			// select the one currently stored in your prefs
+			string $type = `currentUnit -q -t`;
+			int $which;
+			switch ($type)
+			{
+			case "film":
+				$which = 1;
+				break;
+			case "pal":
+				$which = 2;
+				break;
+			case "ntsc":
+				$which = 3;
+				break;
+			default:
+				$which = 4;
+				break;
+			}
+			optionMenu -edit -select $which timeOpts;
+							
+			separator -style "in" theSep;
+			
+			button 
+				-enable false 
+				-align "center" 
+				-label "OK" 
+				-command "ip_doImagePlane"
+				okButton;
+			button 
+				-align "center" 
+				-label "Cancel" 
+				-command "deleteUI imagePlanerWin"
+				cancelButton;
+			button 
+				-align "center" 
+				-label "Help" 
+				-command "ip_help"
+				helpButton;
+		
+		// very long layout command!
+		formLayout -edit
+			-attachForm				cameraLabel "top" 8
+			-attachForm				cameraLabel "left" 0
+			-attachOppositeForm		cameraLabel "right" -150
+			
+			-attachForm				camera "top" 5
+			-attachControl			camera "left" 5 cameraLabel
+			
+			-attachControl 			imageNameLabel "top" 8 camera
+			-attachForm				imageNameLabel "left" 0
+			-attachOppositeForm		imageNameLabel "right" -150
+
+			-attachControl			imageName "top" 4 camera
+			-attachControl			imageName "left" 5 imageNameLabel
+			-attachControl			imageName "right" 0 browseButton
+			
+			-attachControl			browseButton "top" 4 camera
+			-attachOppositeForm		browseButton "left" -80
+			-attachForm				browseButton "right" 5
+			
+			-attachControl 			sizeLabel "top" 5 imageName
+			-attachForm				sizeLabel "left" 0
+			-attachOppositeForm		sizeLabel "right" -150
+			
+			-attachControl			size "top" 5 imageName
+			-attachControl			size "left" 5 sizeLabel
+			
+			-attachControl 			middleSep "top" 5 size
+			-attachForm 			middleSep "left" 50
+			-attachForm 			middleSep "right" 50
+			
+			-attachControl			useFrameExtension "top" 5 middleSep
+			-attachForm				useFrameExtension "left" 150
+			-attachForm				useFrameExtension "right" 0
+			
+			-attachControl			startFrameLabel "top" 4 useFrameExtension
+			-attachOppositeForm		startFrameLabel "right" -150
+			
+			-attachControl			startFrame "top" 1 useFrameExtension
+			-attachControl			startFrame "left" 5 startFrameLabel
+			
+			-attachControl			endFrameLabel "top" 4 useFrameExtension
+			-attachControl			endFrameLabel "left" 5 startFrame
+			
+			-attachControl			endFrame "top" 1 useFrameExtension
+			-attachControl			endFrame "left" 5 endFrameLabel
+			
+			-attachControl			extModeLabel "top" 5 startFrame
+			-attachOppositeForm		extModeLabel "right" -150
+			
+			-attachControl			expressionMode "top" 2 startFrame
+			-attachControl			expressionMode "left" 5 extModeLabel
+			
+			-attachControl			keyframeMode "top" 2 startFrame
+			-attachControl			keyframeMode "left" 5 expressionMode
+			
+			-attachControl			timeUnitLabel "top" 5 keyframeMode
+			-attachOppositeForm		timeUnitLabel "right" -150
+			
+			-attachControl			timeOpts "top" 2 keyframeMode
+			-attachControl			timeOpts "left" 5 timeUnitLabel
+			
+			-attachControl			matchFrames "top" 2 keyframeMode
+			-attachControl			matchFrames "left" 5 timeOpts
+			-attachForm				matchFrames "right" 5
+			
+			-attachControl			theSep "top" 10 timeOpts
+			-attachForm				theSep "left" 5
+			-attachForm				theSep "right" 5
+			
+			-attachControl			okButton "top" 10 theSep
+			-attachForm				okButton "left" 10
+			-attachPosition			okButton "right" 5 1
+			-attachForm				okButton "bottom" 5
+			
+			-attachControl			cancelButton "top" 10 theSep
+			-attachPosition			cancelButton "left" 5 1
+			-attachPosition			cancelButton "right" 5 2
+			-attachForm				cancelButton "bottom" 5
+			
+			-attachControl			helpButton "top" 10 theSep
+			-attachPosition			helpButton "left" 5 2
+			-attachForm				helpButton "right" 10
+			-attachForm				helpButton "bottom" 5
+			theLayout;
+	
+	showWindow imagePlanerWin;
+		
+}

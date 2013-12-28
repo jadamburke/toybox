@@ -1,0 +1,91 @@
+// this will create a set and a scriptNode
+// to delete everything in the set. and then some....
+// test for break out scripts
+// stephenkmann@yahoo.com | smann@yahoo.com
+global proc createDeleteSet(string $name)
+{
+
+if(`objExists ($name + "Sx")` && `objExists ($name + "Set")`)
+	print "deleteSet already exists\n";
+else
+	{
+        string $exp = "";
+
+          $exp += ("string $objs[] = `sets -q " + $name + "Set`;catch(`select -r -ne $objs`);\n");
+          $exp += ("catch(`delete`);\n");
+          $exp += ("catch(`select -ne " + $name + "Set`);\n");
+          $exp += ("catch(`delete`);\n");
+          
+          
+         if ($name == "deleteRig")
+                {
+                $exp += "string $tgts[] = `sets -q MEDRES`;\n";
+                $exp += "for ($tgt in $tgts) \n";
+                $exp += "	{   \n";
+                $exp += "	string $base =`match \"[^_]*$\" $tgt`;  \n";
+                $exp += "        if (`objExists (\"geo_\" + $base)`)     \n";
+                $exp += "	       {                              \n";
+                $exp += "	       string $bss[] = `blendShape -n (\"geo_\" + $base + \"_blendShape\") $tgt (\"geo_\" + $base)`; \n";
+                $exp += "	       setAttr ($bss[0] + \".w[0]\") 1 ; \n";
+                $exp += "	       }  \n";
+                $exp += "	} \n";
+                }
+          $exp += ("catch(`delete " + $name + "Sx`);\n");
+          $exp += "print \" delete set execution: DONE\";\n";
+
+
+
+	if (`objExists ($name + "Set")` == false)
+		sets -em -n ($name + "Set");
+	if (`objExists ($name + "Sx")` == false)
+	scriptNode  -beforeScript  $exp -n ($name + "Sx");
+	}
+}
+// this will find all the scripts with a 2 char suffix
+// that have matching sets
+// ie:   deleteForMeSx deleteForMeSet
+global proc string[] findScripts ()
+{
+string $node[];
+string $scripts[] = `ls -type "script"`;
+
+for ($s in $scripts)
+{
+if (`gmatch $s "*Sx*"` == 1)
+        {
+        // strip off the Sx;
+        string $set = "";
+        int $i = 1;
+        for ($i=1;$i<= (`size $s` - 2);$i++)
+                {
+                $set += `substring $s $i $i`;
+                }
+        if (`objExists ($set + "Set")`)
+                $node[`size$node`] = $s;
+        }
+}
+return $node;
+}
+///
+//
+global proc deleteForWin ()
+{
+if (`window -exists deleteForWin`)
+        deleteUI deleteForWin;
+string $w = `window -rtf 1 -t deleteMeSets deleteForWin`;
+columnLayout;
+string $sets[] = `findScripts`;
+for ($s in $sets)
+        {
+        rowLayout
+        -numberOfColumns 2 -cw2 150 100
+        -columnAlign 1 "right"
+        -columnAttach 1 "both" 0
+        -columnAttach 2 "both" 10;
+        checkBox -v 0 -l $s ($s + "Box");
+        button -l "runScript" -c ("scriptNode -executeBefore " + $s );
+         setParent ..;
+        }
+showWindow $w;
+
+}

@@ -1,0 +1,610 @@
+/*  This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: jsIkFkSnap.mel v0.3
+''    Author: Judd Simantov
+''    Last Updated: September 7, 2004
+''    Update/Change this file at:
+''    http://www.highend3d.com/maya/mel/?section=animation#3101
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+
+
+//------------------------------------------------------------------------------------------------------------//
+//------------------------------------------------------------------------------------------------------------//
+//	SCRIPT:	jsIkFkSnap.mel
+//	VERSION: 0.3
+//	AUTHOR:	Judd Simantov
+//			judd@cgmuscle.com
+//	WEBSITE:	www.cgmuscle.com
+//	DATE:		September 05, 2004
+//	
+//
+//	DESCRIPTION:	This script is used to snap an IK arm to an FK arm
+//
+//	INSTRUCTIONS:	The GUI will start up with the IK interface, but if you go into the main menu
+//			you can change it to the FK interface. The IK interface will snap from IK to FK
+//			and the FK interface will snap from FK to IK. Each interface will have a textField
+//			with a button next to it, you can either type the name of the control/joint in the
+//			textField or select the control/joint and click the add button. Do this for all the 
+//			textFields and then click the "snap to" button at the bottom. This should snap your 
+//			IK arm to your FK arm or vica-versa. 
+//
+//			In the main menu there is also an option to save your control layout. All this will do 
+//			is save the current names you have in the textField, so the next time you open the tool
+//			you wont need to retype this. Try to keep the same naming convention throughout and 
+//			you'll never need to change this. 
+//
+//			In the next version I will put an update that has a field for namespaces.
+//
+//	LIMITATIONS:	There is no support for wrist rotations. I will add this in the next release ;-)
+//
+//	UPDATES:	There is now added functionality for left and right. This isn't really an update
+//			but more just a stupid mistake on my part :) 
+//
+//------------------------------------------------------------------------------------------------------------//	
+//------------------------------------------------------------------------------------------------------------//
+
+
+//------------------------------------------------------------------------------------------------------------//
+//	PROC:	jsIkFkSnap
+//	
+//		This is the main procedure that will call the snap functions 
+//------------------------------------------------------------------------------------------------------------//
+
+
+
+global proc jsIkFkSnap()
+{
+	
+	
+	//window name
+	string $winName = "jsIkFkSnapWin";
+	
+	//check if window exist
+	//if it does delete it
+	if (`window -ex $winName`==true)
+		deleteUI $winName; 
+	
+	//creates window
+	window -t "jsIkFkSnapWin" -wh 513 210 -mb 1 $winName;
+	
+	//create main menu
+	menu -l "jsMenu" -p $winName mainMenu;	
+	//menuItems for choosing your GUI layout
+	menuItem -p mainMenu -l "IK GUI" -c "jsSetIK" jsSetIKMenu;
+	menuItem -p mainMenu -l "FK GUI" -c "jsSetFK" jsSetFKMenu;
+	menuItem -d 1;
+	//menuItems for saving the current layouts
+	menuItem -p mainMenu -l "Save Current IK Controls" -c "jsSaveIkCtrls" saveIkCtrlsMenu;
+	menuItem -p mainMenu -l "Save Current FK Controls" -c "jsSaveFkCtrls" saveFkCtrlsMenu;
+	menuItem -d 1;
+	//menuItems for loading the saved layouts
+	menuItem -p mainMenu -l "Load Saved IK Controls" -c "jsLoadIkCtrls" loadIkCtrlsMenu;
+	menuItem -p mainMenu -l "Load Saved FK Controls" -c "jsLoadFkCtrls" loadFkCtrlsMenu;
+	menuItem -d 1;
+	//main rowColumnLayout
+	rowColumnLayout -nc 7 -cw 1 80 -cw 2 120 -cw 3 40 -cw 4 20 -cw 5 80 -cw 6 120 -cw 7 40 mainRCLayout;
+	
+	
+	//show window
+	showWindow $winName;
+	
+	//set IK interface at startup
+	jsSetIK;
+	
+}
+
+//------------------------------------------------------------------------------------------------------------//
+//	PROC:	jsIkSnap
+//	
+//		This is the main procedure that will snap the IK to the FK. 
+//------------------------------------------------------------------------------------------------------------//
+
+
+global proc jsIkSnap(string $side)
+{
+	
+	//query ik elbow control name
+	string $ikElbowControlName = `textField -q -tx ($side+"ikElbowCtrlTextField")`;
+	//query ik arm control name
+	string $ikArmControlName = `textField -q -tx ($side+"ikArmCtrlTextField")`;
+	
+	//query fk elbow joint name
+	string $fkElbowName = `textField -q -tx ($side+"fkElbowJntTextField_01")`;
+	//query  fk wrist joint name
+	string $fkWristName = `textField -q -tx ($side+"fkWristJntTextField")`;
+	
+	if ((`objExists $ikElbowControlName`) && (`objExists $ikArmControlName`) && (`objExists $fkElbowName`) && (`objExists $fkWristName`))
+	{
+	
+		//get the position of the fk elbow
+		float $fkElbowPos[] = `xform -q -ws -t $fkElbowName`;
+		//get the position of the fk wrist
+		float $fkWristPos[] = `xform -q -ws -t $fkWristName`;
+		
+		//move the ik elbow control to the fk elbow
+		move -ws -rpr $fkElbowPos[0] $fkElbowPos[1] $fkElbowPos[2] $ikElbowControlName; 
+		
+		//move the ik arm control to the fk wrist
+		move -ws -rpr $fkWristPos[0] $fkWristPos[1] $fkWristPos[2] $ikArmControlName; 
+	}
+	else error "please check to make sure all the objects specified in the gui exist in your scene.\n";
+	
+}
+
+//------------------------------------------------------------------------------------------------------------//
+//	PROC:	jsFkSnap
+//	
+//		This is the main procedure that will snap the FK to the IK. 
+//------------------------------------------------------------------------------------------------------------//
+
+	
+global proc jsFkSnap(string $side)
+{
+	
+	//query fk elbow joint name
+	string $fkElbowName = `textField -q -tx ($side+"fkElbowJntTextField_02")`;
+	//query fk shoulder joint name
+	string $fkShoulderName = `textField -q -tx ($side+"fkShoulderJntTextField")`;
+	
+	//query ik elbow joint name
+	string $ikElbowName = `textField -q -tx ($side+"ikElbowJntTextField")`;
+	//query ik shoulder joint name
+	string $ikShoulderName = `textField -q -tx ($side+"ikShoulderJntTextField")`;
+	
+	if ((`objExists $ikElbowName`) && (`objExists $ikShoulderName`) && (`objExists $fkElbowName`) && (`objExists $fkShoulderName`))
+	{
+		//get rotation values of the ik elbow
+		float $ikElbowPos[] = `xform -q -ro $ikElbowName`;
+		//get rotation values of the ik shoulder
+		float $ikShoulderPos[] = `xform -q -ro $ikShoulderName`;
+	
+	
+		//rotate the fk elbow to the same position as the ik elbow
+		rotate -a $ikElbowPos[0] $ikElbowPos[1] $ikElbowPos[2] $fkElbowName; 
+		//rotate the fk shoulder to the same position as the ik shoulder
+		rotate -a $ikShoulderPos[0] $ikShoulderPos[1] $ikShoulderPos[2] $fkShoulderName; 
+	}
+	else error "please check to make sure all the objects specified in the gui exist in your scene.\n";
+	
+}
+
+//------------------------------------------------------------------------------------------------------------//
+//	PROC:	jsSetIK
+//	
+//		This is the main procedure that setting the GUI to IK. 
+//------------------------------------------------------------------------------------------------------------//
+
+
+global proc jsSetIK()
+{
+	
+	//enable and disable the apropriate menus
+	menuItem -e -en 0 saveFkCtrlsMenu;
+	menuItem -e -en 0 loadFkCtrlsMenu;
+	
+	menuItem -e -en 1 saveIkCtrlsMenu;
+	menuItem -e -en 1 loadIkCtrlsMenu;
+	
+	//get the children of the main rowColumnLayout.
+	string $childArrayUI[] = `rowColumnLayout -q -ca mainRCLayout`;
+	string $child;
+	//loop through and delete all the children UI's.
+	for ($child in $childArrayUI)
+	{
+		//delete the UI.
+		deleteUI $child;
+	}
+	
+	//create the neccesary controls.
+	text  -p mainRCLayout -fn "boldLabelFont" -l " Left:" leftText;
+	
+	text -p mainRCLayout -l "" ;
+	text -p mainRCLayout -l "" ;
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	text  -p mainRCLayout -fn "boldLabelFont" -l " Right:" rightText;
+	text -p mainRCLayout -l "" ;
+	text -p mainRCLayout -l "" ;
+	
+	
+	//create the neccesary controls.
+	text -p mainRCLayout  -w 20 -l " IK Arm Ctrl:" l_ikArmCtrlTxt;
+	textField -p mainRCLayout -tx "" l_ikArmCtrlTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected l_ikArmCtrlTextField" -l "Add" l_ikArmCtrlButton;
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout  -w 20 -l " IK Arm Ctrl:" r_ikArmCtrlTxt;
+	textField -p mainRCLayout -tx "" r_ikArmCtrlTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected r_ikArmCtrlTextField" -l "Add" r_ikArmCtrlButton;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -w 20 -l " IK Elbow Ctrl:" l_ikElbowCtrlTxt;
+	textField -p mainRCLayout -tx "" l_ikElbowCtrlTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected l_ikElbowCtrlTextField" -l "Add" l_ikElbowCtrlButton;
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -w 20 -l " IK Elbow Ctrl:" r_ikElbowCtrlTxt;
+	textField -p mainRCLayout -tx "" r_ikElbowCtrlTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected r_ikElbowCtrlTextField" -l "Add" r_ikElbowCtrlButton;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	
+	
+	//create the neccesary controls.
+	text -p mainRCLayout  -w 20 -l " FK Wrist Jnt:" l_fkWristJntTxt;
+	textField -p mainRCLayout -tx "" l_fkWristJntTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected l_fkWristJntTextField" -l "Add" l_fkWristJntButton;
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout  -w 20 -l " FK Wrist Jnt:" r_fkWristJntTxt;
+	textField -p mainRCLayout -tx "" r_fkWristJntTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected r_fkWristJntTextField" -l "Add" r_fkWristJntButton;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -w 20 -l " FK Elbow Jnt:" l_fkElbowJntTxt_01;
+	textField -p mainRCLayout -tx "" l_fkElbowJntTextField_01;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected l_fkElbowJntTextField_01" -l "Add" l_fkElbowJntButton;
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -w 20 -l " FK Elbow Jnt:" r_fkElbowJntTxt_01;
+	textField -p mainRCLayout -tx "" r_fkElbowJntTextField_01;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected r_fkElbowJntTextField_01" -l "Add" r_fkElbowJntButton;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	text -p mainRCLayout -l "";
+	
+	//create the neccesary controls.
+	
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	
+	//button to snap the IK to FK.
+	button -p mainRCLayout -bgc .5 .9 .5 -w 20 -c "jsIkSnap l_" -l "Snap IK to FK" l_snapIkToFkButton;
+	
+	
+	text -p mainRCLayout -l "";
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	
+	//create the neccesary controls.
+	
+	text -p mainRCLayout -l "";
+	
+	//button to snap the IK to FK.
+	button -p mainRCLayout -bgc .5 .9 .5 -w 20 -c "jsIkSnap r_" -l "Snap IK to FK" r_snapIkToFkButton;
+	
+	
+	//load the IK layout that was saved.
+	jsLoadIkCtrls;
+
+}
+
+//------------------------------------------------------------------------------------------------------------//
+//	PROC:	jsSetFK
+//	
+//		This is the main procedure that setting the GUI to FK. 
+//------------------------------------------------------------------------------------------------------------//
+
+
+global proc jsSetFK()
+{
+	
+	//enable and disable the apropriate menus
+	menuItem -e -en 0 saveIkCtrlsMenu;
+	menuItem -e -en 0 loadIkCtrlsMenu;
+	
+	menuItem -e -en 1 saveFkCtrlsMenu;
+	menuItem -e -en 1 loadFkCtrlsMenu;
+	
+	//get the children of the main rowColumnLayout.
+	string $childArrayUI[] = `rowColumnLayout -q -ca mainRCLayout`;
+	string $child;
+	//loop through and delete all the children UI's.
+	for ($child in $childArrayUI)
+	{
+		//delete the UI.
+		deleteUI $child;
+	}
+	
+	//create the neccesary controls.
+	text  -p mainRCLayout -fn "boldLabelFont" -l " Left:" leftText;
+	
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text  -p mainRCLayout -fn "boldLabelFont" -l " Right:" rightText;
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	
+	//create the neccesary controls.
+	text -p mainRCLayout  -w 20 -l " FK Shoulder Jnt:" l_fkShoulderJntTxt;
+	textField -p mainRCLayout -tx "" l_fkShoulderJntTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20  -c "jsAddSelected l_fkShoulderJntTextField" -l "Add" l_fkShoulderJntButton;
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout  -w 20 -l " FK Shoulder Jnt:" r_fkShoulderJntTxt;
+	textField -p mainRCLayout -tx "" r_fkShoulderJntTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20  -c "jsAddSelected r_fkShoulderJntTextField" -l "Add" r_fkShoulderJntButton;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -w 20 -l " FK Elbow Jnt:" l_fkElbowJntTxt_02;
+	textField -p mainRCLayout -tx "" l_fkElbowJntTextField_02;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected l_fkElbowJntTextField_02" -l "Add" l_fkElbowJntButton;
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -w 20 -l " FK Elbow Jnt:" r_fkElbowJntTxt_02;
+	textField -p mainRCLayout -tx "" r_fkElbowJntTextField_02;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected r_fkElbowJntTextField_02" -l "Add" r_fkElbowJntButton;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	
+	//create the neccesary controls.
+	text -p mainRCLayout  -w 20 -l " IK Shoulder Jnt:" l_ikShoulderJntTxt;
+	textField -p mainRCLayout -tx "" l_ikShoulderJntTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected l_ikShoulderJntTextField" -l "Add" l_ikShoulderJntButton;
+	
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout  -w 20 -l " IK Shoulder Jnt:" r_ikShoulderJntTxt;
+	textField -p mainRCLayout -tx "" r_ikShoulderJntTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected r_ikShoulderJntTextField" -l "Add" r_ikShoulderJntButton;
+	
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -w 20 -l " IK Elbow Jnt:" l_ikElbowJntTxt;
+	textField -p mainRCLayout -tx "" l_ikElbowJntTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected l_ikElbowJntTextField" -l "Add" l_ikElbowJntButton;
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -w 20 -l " IK Elbow Jnt:" r_ikElbowJntTxt;
+	textField -p mainRCLayout -tx "" r_ikElbowJntTextField;
+	button -p mainRCLayout -bgc 1 .7 .7 -w 20 -c "jsAddSelected r_ikElbowJntTextField" -l "Add" r_ikElbowJntButton;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	
+	
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	text -p mainRCLayout -l "";
+	
+	
+	//button to snap FK to IK.
+	button -p mainRCLayout -bgc .6 .6 1 -w 20 -c "jsFkSnap l_" -l "Snap FK to IK" l_snapFkToIkButton;
+
+	//create the neccesary controls.
+	text -p mainRCLayout -l "";
+	text -fn "boldLabelFont" -p mainRCLayout -l "  ||" ;
+	
+	//create the neccesary controls.
+	
+	text -p mainRCLayout -l "";
+	
+	//button to snap FK to IK.
+	button -p mainRCLayout -bgc .6 .6 1 -w 20 -c "jsFkSnap r_" -l "Snap FK to IK" r_snapFkToIkButton;
+	
+	//load the FK layout that was saved.
+	jsLoadFkCtrls;
+	
+}
+
+//------------------------------------------------------------------------------------------------------------//
+//	PROC:	jsAddSelected
+//	
+//		This is the main procedure that will add the selected controls to the specified textField. 
+//------------------------------------------------------------------------------------------------------------//
+
+global proc jsAddSelected(string $textField)
+{
+	//list selected objects
+	string $sel[] = `ls -sl`;
+	
+	//check if an object is selected
+	if (size($sel) > 0)
+	{
+		//edit the textfield and add the selected object
+		textField -e -tx $sel[0] $textField;
+	}
+	//if not print error message
+	else error "No object selected to add, please select an object.\n";
+	
+}
+
+//------------------------------------------------------------------------------------------------------------//
+//	PROC:	jsSaveIkCtrls
+//	
+//		This is the main procedure that will save the controls of the IK textField 
+//------------------------------------------------------------------------------------------------------------//
+
+global proc jsSaveIkCtrls()
+{
+	//clear the optionVar
+	optionVar -ca "jsIkCtrlsList";
+	
+	//query all the textfields
+	string $l_ikArmTextFieldName = `textField -q -tx l_ikArmCtrlTextField`;
+	string $l_ikElbowTextFieldName = `textField -q -tx l_ikElbowCtrlTextField`;
+	string $l_fkWristTextFieldName = `textField -q -tx l_fkWristJntTextField`;
+	string $l_fkElbowTextFieldName_01 = `textField -q -tx l_fkElbowJntTextField_01`;
+	
+	
+	string $r_ikArmTextFieldName = `textField -q -tx r_ikArmCtrlTextField`;
+	string $r_ikElbowTextFieldName = `textField -q -tx r_ikElbowCtrlTextField`;
+	string $r_fkWristTextFieldName = `textField -q -tx r_fkWristJntTextField`;
+	string $r_fkElbowTextFieldName_01 = `textField -q -tx r_fkElbowJntTextField_01`;
+	
+	//add the queried textFields to the optionVar list
+	optionVar -sva "jsIkCtrlsList" $l_ikArmTextFieldName;
+	optionVar -sva "jsIkCtrlsList" $l_ikElbowTextFieldName;
+	optionVar -sva "jsIkCtrlsList" $l_fkWristTextFieldName;
+	optionVar -sva "jsIkCtrlsList" $l_fkElbowTextFieldName_01;
+	
+	optionVar -sva "jsIkCtrlsList" $r_ikArmTextFieldName;
+	optionVar -sva "jsIkCtrlsList" $r_ikElbowTextFieldName;
+	optionVar -sva "jsIkCtrlsList" $r_fkWristTextFieldName;
+	optionVar -sva "jsIkCtrlsList" $r_fkElbowTextFieldName_01;
+	
+}
+
+//------------------------------------------------------------------------------------------------------------//
+//	PROC:	jsSaveFkCtrls
+//	
+//		This is the main procedure that will save the controls of the FK textField. 
+//------------------------------------------------------------------------------------------------------------//
+
+global proc jsSaveFkCtrls()
+{
+	//clear the optionVar
+	optionVar -ca "jsFkCtrlsList";
+	
+	//query all the textfields
+	string $l_fkShoulderJntTextFieldName = `textField -q -tx l_fkShoulderJntTextField`;
+	string $l_fkElbowJntTextFieldName_02 = `textField -q -tx l_fkElbowJntTextField_02`;
+	string $l_ikShoulderJntTextFieldName = `textField -q -tx l_ikShoulderJntTextField`;
+	string $l_ikElbowJntTextFieldName = `textField -q -tx l_ikElbowJntTextField`;
+	
+	
+	string $r_fkShoulderJntTextFieldName = `textField -q -tx r_fkShoulderJntTextField`;
+	string $r_fkElbowJntTextFieldName_02 = `textField -q -tx r_fkElbowJntTextField_02`;
+	string $r_ikShoulderJntTextFieldName = `textField -q -tx r_ikShoulderJntTextField`;
+	string $r_ikElbowJntTextFieldName = `textField -q -tx r_ikElbowJntTextField`;
+	
+	
+	//add the queried textFields to the optionVar list
+	optionVar -sva "jsFkCtrlsList" $l_fkShoulderJntTextFieldName;
+	optionVar -sva "jsFkCtrlsList" $l_fkElbowJntTextFieldName_02;
+	optionVar -sva "jsFkCtrlsList" $l_ikShoulderJntTextFieldName;
+	optionVar -sva "jsFkCtrlsList" $l_ikElbowJntTextFieldName;
+	
+	optionVar -sva "jsFkCtrlsList" $r_fkShoulderJntTextFieldName;
+	optionVar -sva "jsFkCtrlsList" $r_fkElbowJntTextFieldName_02;
+	optionVar -sva "jsFkCtrlsList" $r_ikShoulderJntTextFieldName;
+	optionVar -sva "jsFkCtrlsList" $r_ikElbowJntTextFieldName;
+	
+}
+
+
+
+//------------------------------------------------------------------------------------------------------------//
+//	PROC:	jsLoadIkCtrls
+//	
+//		This is the main procedure that will load the IK control layout saved. 
+//------------------------------------------------------------------------------------------------------------//
+
+
+global proc jsLoadIkCtrls()
+{
+	
+	
+	
+	
+	if (`optionVar -ex "jsIkCtrlsList"`)
+	{
+		//get the list from the optionVar saved
+		string $ikList[] = `optionVar -q "jsIkCtrlsList"`;
+		
+		//add the names from the list to the appropriate textFields
+		textField -e -tx $ikList[0] l_ikArmCtrlTextField;
+		textField -e -tx $ikList[1] l_ikElbowCtrlTextField;
+		textField -e -tx $ikList[2] l_fkWristJntTextField;
+		textField -e -tx $ikList[3] l_fkElbowJntTextField_01;
+		
+		textField -e -tx $ikList[4] r_ikArmCtrlTextField;
+		textField -e -tx $ikList[5] r_ikElbowCtrlTextField;
+		textField -e -tx $ikList[6] r_fkWristJntTextField;
+		textField -e -tx $ikList[7] r_fkElbowJntTextField_01;
+	}
+	
+}
+
+
+//------------------------------------------------------------------------------------------------------------//
+//	PROC:	jsLoadFkCtrls
+//	
+//		This is the main procedure that will load the FK control layout saved. 
+//------------------------------------------------------------------------------------------------------------//
+
+global proc jsLoadFkCtrls()
+{
+	
+	
+	
+	if (`optionVar -ex "jsFkCtrlsList"`)
+	{
+		
+		//get the list from the optionVar saved
+		string $fkList[] = `optionVar -q "jsFkCtrlsList"`;
+		
+		//add the names from the list to the appropriate textFields	
+		textField -e -tx $fkList[0] l_fkShoulderJntTextField;
+		textField -e -tx $fkList[1] l_fkElbowJntTextField_02;
+		textField -e -tx $fkList[2] l_ikShoulderJntTextField;
+		textField -e -tx $fkList[3] l_ikElbowJntTextField;
+		
+		textField -e -tx $fkList[4] r_fkShoulderJntTextField;
+		textField -e -tx $fkList[5] r_fkElbowJntTextField_02;
+		textField -e -tx $fkList[6] r_ikShoulderJntTextField;
+		textField -e -tx $fkList[7] r_ikElbowJntTextField;
+	}
+	
+}
+
+

@@ -1,0 +1,72 @@
+// restoreDeformedShader
+
+
+// when you deform a referenced piece of geo, it makes the ref geo an intermediateObj, then creates a new geo to deform.
+// but sometimes this shader assignment to the new "deformed" geo is lost so you must get it back from the now intermediate geo
+// this script does that
+
+
+global proc restoreDeformedShader () {
+
+	//$selectedGeo = `ls -rn -r 1 -long "geo_*"`;
+	
+	$selectedGeo = `ls -sl -long`;
+	
+	for ($each in $selectedGeo){
+		$childrenShapes = `listRelatives -shapes -fullPath $each`;
+		if (size($childrenShapes) > 1){
+			// find the shape that has a reference edit that turns it into an intermediate object and use this as the source of the shader assignment
+			string $shapeTurnedIntermediate = "";
+			for ($every in $childrenShapes){
+				string $editStrings[] = `referenceQuery -editStrings $every`;
+				string $es;
+				for ($es in $editStrings){
+					if (`gmatch $es "*intermediate*"`){
+						$shapeTurnedIntermediate  = $every;
+					}
+				}
+			}
+			// if there was an instanced geo turned intermediate get its shader and assign it to the other shape nodes
+			if ($shapeTurnedIntermediate != ""){
+				string $shadingGroups[] = `listConnections -s 1 ($shapeTurnedIntermediate+".instObjGroups[0]")`;
+				if (size($shadingGroups) > 0){
+					for ($i=1;$i<size($childrenShapes);$i++){
+						evalEcho("sets -e -forceElement "+$shadingGroups[0]+" "+$childrenShapes[$i]);
+					}
+				}
+			}
+		}
+	}
+}
+/*
+global proc restoreDeformedShader () {
+
+	$selectedGeo = `ls -sl -long`;
+
+	for ($each in $selectedGeo){
+		$childrenShapes = `listRelatives -shapes -fullPath $each`;
+		string $originalShape  = $childrenShapes[0];
+		string $shadingGroups[] = `listConnections -s 1 ($originalShape+".instObjGroups[0]")`;
+		if (size($shadingGroups) != 0){
+			
+			for ($every in $childrenShapes){
+				evalEcho("sets -e -forceElement "+$shadingGroups[0]+" "+$every);
+			}
+		}
+		else {
+			print ("Nothing Found\n");
+		}
+
+			//string $shader[] = `listConnections -s 1 ($each+".miMaterialShader")`;
+			//if (size($shader)==0){
+			//	$shader = `listConnections -s 1 ($each+".surfaceShader")`;
+				
+			//}
+
+
+		
+	}
+
+
+}
+*/

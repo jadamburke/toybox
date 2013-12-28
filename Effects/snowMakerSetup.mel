@@ -1,0 +1,47 @@
+//###### Snow Maker v1.0 for Maya 5 ########
+// Copyright (C) 2003 Stephen DeLuca
+// www.stevedeluca.com
+// steve@stevedeluca.com
+//
+// Creation Date:	( Nov/Dec 2003)
+// Last Update:		( )
+//
+// Description:
+// This script generates different types of snow storms using particles that you can then modify
+// You can create only one snow plane, not multiple ones, later versions may allow multiple generators
+//
+// Installation: 
+// - Copy snowMaker.mel and snowMakerSetup.mel into your Maya script directory
+// - Copy snowMaker.bmp into the Maya icon folder
+// - Copy the snow flake image sequence to any directory you choose, most likely in your 'sourceimages' folder for your current project
+// - In Maya type in the command line: snowMakerSetup
+//   This only needs to be done once then you can create snow in any project and continue to modify it with this button
+// - Once snow is created, click the `Image Source Location` button and select the first image in the sequence from your source directory
+//
+// Known Bugs: 
+// - When selecting image sequence for snow if the sequence is < or > 8 images 
+//   you have to manually change the frame extensions in the texture file
+// - Not so much a bug, but there is currently a problem w/ the color of the sprite particles
+//   The script compensates for this by making their default color white. You can change it with sliders or
+//   comment out everything in this script with: //SPRITE COLORING after the line of code. This will be fixed!
+//
+// 
+// Thank You:
+// Jeff Bernstein, Melscripting.com, and everyone in online forums that helped me out!
+// 
+
+
+/////////////////////////////////////////////////////////////////////
+
+global proc snowMakerSetup()
+{  
+	global string $gShelfTopLevel;
+	if (`tabLayout -exists $gShelfTopLevel`)
+	shelfButton -annotation "snowMaker UI"
+		-parent ($gShelfTopLevel + "|" + `tabLayout -q -st $gShelfTopLevel`)
+		-command "snowMaker"
+		-image1 "snowMaker.bmp"
+		-label "snowMaker UI";
+	else
+		error "Create a shelf for setup to work.";
+}

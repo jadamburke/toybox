@@ -1,0 +1,302 @@
+//abxSmartKey v3.0 by J.Adam Burke
+//mod. Apr 30, 2010 
+//J. Adam Burke ©2010
+//http://www.adamburke.net
+
+// Smart Key auto detects if you have a channel item selected, if so the 's' key
+// will set keys only on selected channels and only the selected channels keyticks 
+// are displayed on the timeline. If no channels are selected, maya switches back to
+// setting all keyable attributes when pressing the 's' key and displaying all
+// keys on the selected object on the timeline.
+
+// New in 2.5
+// Added automatic highlighting of selectd channels in the graph editor
+// Fixed bug that ignored channels selected before activating smart key
+
+// New in 3.0
+// Compatible with Maya 2011
+// Handles Maya 2011 automatically unselected channels between object selection changes
+// Handles Bug in Maya 2011 that prevents the timeControl (timeSlide) from finding the channelBox
+// set curve colors based on channel
+
+// TO INSTALL
+// Copy file to any maya script path (to auto source script) 
+// type "abxSmartKey" in the script editor to enable dynamic keys
+
+
+global proc string abxSmartKey () {
+	string $smartKeyJobNum;
+	int $i;
+	int $foundJob = 0;
+	int $jobNum = 0;
+	string $smartKeyStatus="Unknown";
+	string $listArray[] = `scriptJob -lj`;
+	string $tokenBuffer[];
+	string $selectedChnl[];
+	$selectedChnl = `channelBox -q -sma mainChannelBox`;
+	$channelBoxExists = `channelBox -q -ex mainChannelBox`;
+	$mayaVersion = `about -version`;
+	
+
+	// kill any script jobs if they are found
+	for ($i=0;$i<size($listArray);$i++){
+		// if the script jobs are found Kill them
+		if (`gmatch $listArray[$i] "*dispTimeKey*"`){
+			tokenize $listArray[$i] ":" $tokenBuffer;
+			$smartKeyJobNum = $tokenBuffer[0];
+			scriptJob -k (int($smartKeyJobNum));
+			$foundJob = 1;
+		}
+		else if (`gmatch $listArray[$i] "*dispKeySelChange*"`){
+			tokenize $listArray[$i] ":" $tokenBuffer;
+			string $smartKeyJobNum = $tokenBuffer[0];
+			scriptJob -k (int($smartKeyJobNum));
+			print ("Killed script job:"+$smartKeyJobNum+"\n");
+			$foundJob = 1;
+		}
+		else if (`gmatch $listArray[$i] "*exitSmartKey*"`){
+			tokenize $listArray[$i] ":" $tokenBuffer;
+			string $smartKeyJobNum = $tokenBuffer[0];
+			scriptJob -k (int($smartKeyJobNum));
+			print ("Killed script job:"+$smartKeyJobNum+"\n");
+			$foundJob = 1;
+		}
+	}
+
+	// if no script jobs were found then start new ones
+	if ($foundJob == 0) {
+
+
+		// if the channelbox has no selections set the keyframes to key all keyable
+
+
+		$jobNum = `scriptJob -e "ToolChanged" "dispTimeKey"`;
+		$jobNum = `scriptJob -e "SelectionChanged" "dispKeySelChange"`;
+		$jobNum = `scriptJob -e "quitApplication" "exitSmartKeySafe"`;
+		$smartKeyStatus = "Smart Key Enabled";	
+
+		// add menuItem to Shelf
+		if ($mayaVersion != "2010")
+			setParent "MayaWindow|MainChannelsLayersLayout|ChannelsLayersPaneLayout|ChannelBoxForm|menuBarLayout1";
+		else 
+			setParent "MayaWindow|mayaMainWindowForm|formLayout3|formLayout11|formLayout32|formLayout33|ChannelsLayersPaneLayout|formLayout36|menuBarLayout1";
+		// old 2010 channel menu form
+		// setParent "MayaWindow|mayaMainWindowForm|formLayout3|formLayout11|formLayout32|formLayout33|ChannelsLayersPaneLayout|formLayout36|menuBarLayout1";
+		menu -label "SK" abxSmartKeyMenu;
+		menuItem -label "SmartKey Menu";
+		menuItem -d true;
+		menuItem -label "Sync GraphEditor" -cb true -c "dispTimeKey" abxSmartKeySyncGE;
+		menuItem -label "Sync Timeline" -cb true -c "dispTimeKey" abxSmartKeySyncTL; // found way around 2011 bug by calling setParent before changing time control
+		menuItem -d true;
+		menuItem -subMenu true -label "Set Selected Color" abxSmartKeyColorMenu;
+		menuItem -label "Default" -c "setSelectedChannelColor 2 2 2";
+		menuItem -d true;
+		menuItem -label "Red" -c "setSelectedChannelColor 1 0 0";
+		menuItem -label "Green" -c "setSelectedChannelColor 0 1 0";
+		menuItem -label "Blue" -c "setSelectedChannelColor 0 0 1";
+		menuItem -label "Cyan" -c "setSelectedChannelColor 0 1 1";
+		menuItem -label "Yellow" -c "setSelectedChannelColor 1 1 0";
+		menuItem -label "Magenta" -c "setSelectedChannelColor 1 0 1";
+		menuItem -label "Orange" -c "setSelectedChannelColor 1 .75 0";
+		menuItem -label "Fuschia" -c "setSelectedChannelColor 1 0 .75";
+		menuItem -label "Lime" -c "setSelectedChannelColor .75 1 0";
+		menuItem -label "Mint" -c "setSelectedChannelColor 0 1 .75";
+		menuItem -label "SkyBlue" -c "setSelectedChannelColor 0 .75 1";
+		menuItem -label "Purple" -c "setSelectedChannelColor .75 0 1";
+
+		setParent -menu abxSmartKeyMenu;
+		menuItem -d true;
+		menuItem -label "Disable SmartKey" -c "abxSmartKey";
+
+
+		// if the channelbox has selections set keyframes to key only channels
+		if ($selectedChnl[0] != "") {
+			if (`menuItem -q -cb abxSmartKeySyncTL` == true)
+				catchQuiet(`timeControl -e -sk "mainChannelBox" timeControl1`);
+			optionVar -intValue setKeyframeWhich 1; //all keyable
+			optionVar -intValue keyUseChannelBox 1;
+
+		}
+		else {
+			timeControl -e -sk "active" timeControl1;
+			optionVar -intValue keyUseChannelBox 0;
+			optionVar -intValue setKeyframeWhich 4; //everything
+  		}
+
+		// add color menu to menu item
+		
+
+		
+
+
+	}
+	// reset setKey and timleline options to default before exiting
+	else {
+		timeControl -e -sk "active" timeControl1;
+		optionVar -intValue keyUseChannelBox 0;
+		optionVar -intValue setKeyframeWhich 4; //everything
+		$smartKeyStatus = "Smart Key Disabled";
+		deleteUI -menu abxSmartKeyMenu;
+		if ($mayaVersion != "2010"){
+			menuBarLayout -e -vis false "MayaWindow|MainChannelsLayersLayout|ChannelsLayersPaneLayout|ChannelBoxForm|menuBarLayout1";
+			menuBarLayout -e -vis true "MayaWindow|MainChannelsLayersLayout|ChannelsLayersPaneLayout|ChannelBoxForm|menuBarLayout1";
+		}
+		else {
+			menuBarLayout -e -vis false "MayaWindow|mayaMainWindowForm|formLayout3|formLayout11|formLayout32|formLayout33|ChannelsLayersPaneLayout|formLayout36|menuBarLayout1";
+			menuBarLayout -e -vis true "MayaWindow|mayaMainWindowForm|formLayout3|formLayout11|formLayout32|formLayout33|ChannelsLayersPaneLayout|formLayout36|menuBarLayout1";
+		}
+		
+		
+
+	}
+  	return $smartKeyStatus;
+}
+
+// if selection has changed
+global proc dispKeySelChange () {
+
+	
+	optionVar -intValue keyUseChannelBox 0;
+	optionVar -intValue setKeyframeWhich 4; //everything
+	timeControl -e -sk "active" timeControl1;
+
+	// setCurve Colors and channel colors
+	// channel colors not supported yet. causes crash if you edit channel colors in 2011;
+
+		// gather all attributes on current Node in channel box;
+		// get the connected animation curves if any
+		// check the curves for custom colors
+		// if custom color exists set the attr color to the custom color
+	
+
+}
+
+global proc dispTimeKey () {
+
+	//$windowWithFocus = `window -q -fw $gMainWindow`;
+	$selNodes = `ls -sl`;
+	global string $lastSelChannels[];
+	$channelBoxExists = `channelBox -q -ex mainChannelBox`;
+
+	// get the list of selected channels from the mainChannelBox
+	string $selectedChnl[];
+	$selectedChnl = `channelBox -q -sma mainChannelBox`;
+	$selSSAChnl = `channelBox -q -ssa mainChannelBox`;
+	$selectedChnl = stringArrayCatenate($selectedChnl,$selSSAChnl);
+	$selSHAChnl = `channelBox -q -sha mainChannelBox`;
+	$selectedChnl = stringArrayCatenate($selectedChnl,$selSHAChnl);
+	$selSOAChnl = `channelBox -q -soa mainChannelBox`;
+	$selectedChnl = stringArrayCatenate($selectedChnl,$selSOAChnl);
+	
+
+	// if the channelbox has selections set keyframes to key only channels
+	if ($selectedChnl[0] != "") {
+		if (`menuItem -q -cb abxSmartKeySyncTL`){
+			channelBox -q -ex mainChannelBox;
+			if (`timeControl -q -sk timeControl1` == "active"){
+				setParent "MayaWindow|MainChannelsLayersLayout|ChannelsLayersPaneLayout|ChannelBoxForm|menuBarLayout1";
+				catchQuiet(`timeControl -e -sk "mainChannelBox" timeControl1`);
+			}
+			//evalEcho("timeControl -e -sk \"mainChannelBox\" timeControl1");
+		}
+		else{
+			timeControl -e -sk "active" timeControl1;
+		}
+		optionVar -intValue setKeyframeWhich 1; //all keyable
+		optionVar -intValue keyUseChannelBox 1;
+		// edit the selection connection of the graph editor and dopesheet to match
+		if (`menuItem -q -cb abxSmartKeySyncGE`){
+			for ($i=0;$i < size($lastSelChannels);$i++){
+				if (size($selectedChnl) == size($lastSelChannels)){
+					if ($selectedChnl[$i] == $lastSelChannels[$i]){
+						$lastSelChannels = $selectedChnl;
+						return;
+					}
+				}
+			}
+			selectionConnection -e -clear graphEditor1FromOutliner;
+			for ($currentNode in $selNodes){
+				for ($channelItm in $selectedChnl){
+					string $channelFullName = $currentNode + "." + $channelItm;
+					if ( `objExists $channelFullName` ) {
+						selectionConnection -e -select $channelFullName graphEditor1FromOutliner;
+					}
+				}
+			}
+		}
+		$lastSelChannels = $selectedChnl;
+	}
+
+	// if the channelbox has no selections set the keyframes to key all keyable
+	else {
+		timeControl -e -sk "active" timeControl1;
+		optionVar -intValue keyUseChannelBox 0;
+		optionVar -intValue setKeyframeWhich 4; //everything
+  	}
+}
+
+global proc exitSmartKeySafe () {
+	string $listArray[] = `scriptJob -lj`;	
+	string $tokenBuffer[];
+	// kill any script jobs if they are found
+	for ($i=0;$i<size($listArray);$i++){
+		// if the script jobs are found Kill them
+		if (`gmatch $listArray[$i] "*dispTimeKey*"`){
+			tokenize $listArray[$i] ":" $tokenBuffer;
+			$smartKeyJobNum = $tokenBuffer[0];
+			scriptJob -k (int($smartKeyJobNum));
+			$foundJob = 1;
+		}
+		else if (`gmatch $listArray[$i] "*dispKeySelChange*"`){
+			tokenize $listArray[$i] ":" $tokenBuffer;
+			string $smartKeyJobNum = $tokenBuffer[0];
+			scriptJob -k (int($smartKeyJobNum));
+			print ("Killed script job:"+$smartKeyJobNum+"\n");
+			$foundJob = 1;
+		}
+	}
+
+	timeControl -e -sk "active" timeControl1;
+	optionVar -sv "timeSliderShowKeys" "active";
+	optionVar -intValue keyUseChannelBox 0;
+	optionVar -intValue setKeyframeWhich 4; //everything
+
+	// without this save preference, maya will restart with an buggy timeSlider option that causes maya to fail to launch
+	SavePreferences;
+}
+
+global proc setSelectedChannelColor (float $r, float $g, float $b){
+
+	string $selectedChnl[];
+	$selectedChnl = `channelBox -q -sma mainChannelBox`;
+	$selSSAChnl = `channelBox -q -ssa mainChannelBox`;
+	$selectedChnl = stringArrayCatenate($selectedChnl,$selSSAChnl);
+	$selSHAChnl = `channelBox -q -sha mainChannelBox`;
+	$selectedChnl = stringArrayCatenate($selectedChnl,$selSHAChnl);
+	$selSOAChnl = `channelBox -q -soa mainChannelBox`;
+	$selectedChnl = stringArrayCatenate($selectedChnl,$selSOAChnl);
+
+	$selectedNodes = `ls -sl`;
+	for ($each in $selectedNodes ){
+		for ($every in $selectedChnl){
+			string $sourceNode[] = `listConnections -s true ($each+"."+$every)`;
+			if (`attributeExists "useCurveColor" $sourceNode[0]`){
+				if ($r>1){
+					setAttr ($sourceNode[0]+".useCurveColor") 0;
+				}
+				else{
+					setAttr ($sourceNode[0]+".useCurveColor") 1;
+					setAttr ($sourceNode[0]+".curveColor") -type double3 $r $g $b ;
+				}
+			}
+			
+		}
+
+	}
+
+
+}
+
+
+
+

@@ -1,0 +1,42 @@
+// clearFileNodeRefEdits
+global proc clearFileNodeRefEdits () {
+	$sel = `ls -sl`;
+	select -clear;
+	for ($referenceNode in $sel){
+
+
+		int $initialRefLoadState = `file -rfn $referenceNode -q -deferReference`;
+
+		if ($initialRefLoadState == 0){
+			file -unloadReference $referenceNode;
+		}
+
+		string $editCommands[] = `referenceQuery -editStrings $referenceNode`;
+	
+
+		for ($each in $editCommands){
+			// if it is an edit to a file node
+			if (`gmatch $each "*file*"`){
+				// parse out strings to get edit destination
+				string $tokenBuffer[];
+				tokenize $each "\"" $tokenBuffer;
+				if (size($tokenBuffer) > 1){
+					string $editCmdTokenBuffer[];
+					tokenize $tokenBuffer[0] " " $editCmdTokenBuffer;
+					string $editCommand = $editCmdTokenBuffer[0];
+					string $destination = $tokenBuffer[1];
+					if ($destination !=""){
+						print ("referenceEdit -failedEdits true -successfulEdits true -editCommand "+$editCommand+" -removeEdits "+$destination+"\n");
+						referenceEdit -failedEdits true -successfulEdits true -editCommand $editCommand -removeEdits $destination;
+					}
+				}
+		
+			}
+		}
+		if ($initialRefLoadState == 0){	
+			file -loadReference $referenceNode;
+		}
+	}
+
+
+}

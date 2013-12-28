@@ -1,0 +1,154 @@
+/*  This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: particleMotion2Curve v1.0
+''    Author: Carsten Kolve
+''    Last Updated: October 14, 2002
+''    Update/Change this file at:
+''    http://www.highend3d.com/maya/mel/?section=dynamics#1953
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+
+//
+// particleMotion2Curve.mel v1.0
+// (c) 10.2002 by Carsten Kolve, carsten@kolve.com, www.kolve.com
+// comments, critics, job offers welcome ;)
+//
+//   description:
+//   script converts the motion of particles to curves, which can be used as motion paths afterwards
+//
+//   usage:
+//   - source the script
+//   - select particle object (in object mode) or individual particles (in component mode)
+//   - start the script by typing 
+//     particleMotion2Curve <startTime> <endTime> <sampleStep> <curveDegree>;
+//     where:
+//     <startTime> 	 frame at which you want to start the sampling of the motion
+// 	   <endTime>   	 frame at which you want to stop the sampling of the motion
+// 	   <sampleStep>	 frame step which indicates how often the motion will be sampled
+//					 eg. "1" samples every frame, "2" every second frame etc.
+//	   <curveDegree> degree of the curves to be created
+//
+//	 example:
+//	 particleMotion2Curve 50 180 5 2;
+//	 (this will create degree 2 curves by sampling every 5th frame of the 
+//   particles motion from frame 50 to 180)
+//
+//   notes:
+//	 - the last particle position at frame endFrame will always be taken into consideration
+//   - using a particle cache will ensure particles are sampled at the correct position
+//	 - experiment with the sampleStep and curveDegree to get smooth curves with a small amount of points
+//     to save memory and performance or to smooth the particles motion
+//	 - in the current version, all particles must exist between startTime and endTime (so watch out for
+//     dying or newly emmitted particles)
+//	 - curves are (currently) created in the local space of the particle object, a world space option 
+//	   will follow in a future release
+//
+//	 Thanks to the unknown stranger who wrote "jms_pr.mel" (available at Highend3D) 
+// 	 for some inspiration on the code
+//
+global proc particleMotion2curve(){
+	particleMotion2CurveDoIt `playbackOptions -q -min` `playbackOptions -q -max` 1 1;
+}
+global proc particleMotion2CurveDoIt(int $startTime, int $endTime, int $sampleStep, int $curveDegree)
+{
+  // parse arguments, error checking
+  if ($startTime > $endTime)
+  	error("startTime > endTime, startTime must be smaller than endTime!");
+  	
+  if ($sampleStep > ($endTime - $startTime))
+  	error("sampleStep is too big, choose a smaller value >= 1!");
+  	
+  if ($sampleStep <1)
+  	error("sampleStep is too small, choose a bigger value >= 1!");
+  	
+  if (($curveDegree < 1)||($curveDegree >7))
+    error("curveDegree needs to be >= 1 and <= 7!");
+    
+  // parse selection
+  string $selection[] = `ls -sl -fl`;
+  
+  int $selSize = size($selection);
+  
+  if ($selSize==0)
+   	error("nothing selected, select particle object or individual particles!");
+  
+  // check if one of the selected items is not of type particle
+  int $i;
+  
+  for ($i=0; $i<$selSize; $i++)
+  {
+	   // if node = transform, get the shape
+	  $selection[$i] = getShape( $selection[$i]);
+		  
+	   // check if node type = particle
+	  if(!(((eval ("nodeType " + $selection[$i]))=="particle" || (eval ("nodeType " + $selection[$i]))=="nParticle")))
+	   	error("node > " + $selection[$i] +" < is not of type \"particle\"!");
+  }	
+  
+  // update the list of particles based on selectMode
+  
+  if (`selectMode -q -object`)
+  {
+  	// if in object mode, get a list of all the particles in the particleObject
+  	// if we're in component mode everythings fine  
+  	string $particleObject = $selection[0];
+  	$selSize = `getAttr ($particleObject + ".count")`;
+  	for ($i=0; $i < $selSize; $i++)
+  	  $selection[$i] = ($particleObject + ".pt[" + $i + "]");
+  }
+ 
+  float $v[];
+  string $createCurvesCommands[];
+  
+  for ($i=0; $i<$selSize; $i++)
+    $createCurvesCommands[$i] = ("curve -d "+$curveDegree); 
+   
+  int $time;
+  for ($time = $startTime; $time <= $endTime; $time++) 
+  {
+  	 currentTime $time;
+	if ($time != $startTime)
+	{
+  	 if (($time == $startTime)||($time==$endTime)||(0==(fmod(($time-$startTime),$sampleStep))))
+  	 {
+	 	for($i=0;$i<$selSize;$i++)
+	 	{
+	 		eval("select -r " + $selection[$i]); 
+		 	$v = `getParticleAttr -at position $selection[$i]`;
+		 	$createCurvesCommands[$i] = $createCurvesCommands[$i] + ("-p " + $v[0] + " " + $v[1] + " " + $v[2] + " ");
+		}
+	 }
+	}
+  }	
+  
+  // generate a group for the curves
+  string $group = `group -em -n particleCurves`;
+
+  // generate the curves and parent them to the group
+  for ($i=0; $i<$selSize; $i++)
+  {
+	 string $curve = eval($createCurvesCommands[$i]);
+  	 parent -relative $curve $group;
+  }
+
+}
+
+global proc string getShape( string $xform )
+{
+  string $shapes[];
+  $shapes[0] = $xform;
+  
+  // If given node is not a transform, assume it is a shape 
+  // and pass it through.
+  if ( "transform" == `nodeType $xform` )
+  {
+    $shapes = `listRelatives  -shapes $xform`;
+  }
+  
+  return $shapes[0];
+}

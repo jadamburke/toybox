@@ -1,0 +1,17 @@
+// vrayHI
+// Created by: raphe
+// Date: 2012/03/09 11:17:18
+
+global proc vrayHI(){
+	
+	if(! `pluginInfo -q -l "vrayformaya"`){
+		loadPlugin "vrayformaya";
+	}
+	
+	setCurrentRenderer vray;
+	evalDeferred("unifiedRenderGlobalsWindow;");
+	
+	evalDeferred("applyPresetToNode \"vraySettings\" \"\" \"\" \"//monkey/resources/maya/2012-x64/presets/attrPresets/VRaySettingsNode/HI.mel\" 1");
+	evalDeferred("applyPresetToNode \"defaultRenderGlobals\" \"\" \"\" \"//monkey/resources/maya/2012-x64/presets/attrPresets/renderGlobals/HI.mel\" 1");
+	//evalDeferred("deleteUI -window unifiedRenderGlobalsWindow");
+}

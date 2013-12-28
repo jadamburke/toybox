@@ -1,0 +1,13 @@
+// slateMake
+
+global proc slateMake () {
+
+	if (`objExists renderCam`)
+
+
+	// makes a generic text curve;
+	textCurves -ch 0 -f "Courier New|h-13|w400|c0" -t "9";
+	planarSrf -name "Trim Char_x_10 #" -ch 1 -tol 0.01 -o on -po 0 Char_x_10;
+
+
+}

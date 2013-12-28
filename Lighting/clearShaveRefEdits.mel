@@ -1,0 +1,61 @@
+global proc clearShaveRefEdits (){
+    // remove any edits to objects with "Shape" in their name (horrible i know. needs to test object for type)
+    editRenderLayerGlobals -currentRenderLayer defaultRenderLayer;
+    string $excludeEditRemoveAttributes[] = {"uvSet","instObjGroups","objectGroups","uvSetName","objectGroupId","scale", "rootThickness","rootSplay", "disableDynamics","enableCollision","stiffness","rootStiffness","dampening","blindShaveData"};
+
+    $allowableMultiAttrTypes = { "double2", "double3", "double4", "float2", "float3", "float4", "short2", "short3", "long2", "long3", "stringArray", "doubleArray", "floatArray" };
+    $allowableAttrTypes = {"float","long","double","short","int","bool","enum"};
+
+
+    
+
+    // removes setAttr edits on any node found to be an intermediate object thats a shape node
+    string $refNodes[] = `file -q -r`;
+    for ($each in $refNodes){
+        string $rmvEditCmds[];
+        $isUnloaded = false;
+        string $refNodeName = `referenceQuery -rfn $each`;
+        string $namespace = `file -q -namespace $each`;
+        string $editCommands[] = `referenceQuery -failedEdits false -successfulEdits true -editCommand "setAttr" -editNodes -editAttrs $each`;
+        for ($every in $editCommands){
+            //print ("// Checking Edit Command "+$every+"\n");
+            // if its a geo and a parent command then its probably a deformed shape
+            if (`gmatch $every "*Shape*"`){
+                if (!`gmatch $every "*intermediate*"` && !`gmatch $every "*.pt*"`){
+                    /*
+                    if ($isUnloaded == false){
+                        evalEcho("file -unloadReference \""+$refNodeName+"\"");
+                        $isUnloaded = true;
+                    }
+                    */
+
+                    string $tokenBuffer[];
+                    tokenize $every "." $tokenBuffer;
+                    
+                    if (`nodeType $tokenBuffer[0]` == "shaveHair"){
+                        if (!stringArrayContains($tokenBuffer[size($tokenBuffer)-1], $excludeEditRemoveAttributes))
+                            $rmvEditCmds[size($rmvEditCmds)] = ("referenceEdit -failedEdits false -successfulEdits true -removeEdits  \""+$every+"\"");
+                            //evalEcho("referenceEdit -failedEdits false -successfulEdits true -removeEdits  \""+$every+"\"");
+                    }
+                }
+            }
+        }
+    
+        
+        // unload then remove the edits that have been marked for removal then reload the reference
+        if ($isUnloaded == false){
+            evalEcho("file -unloadReference \""+$refNodeName+"\"");
+            $isUnloaded = true;
+        }
+        
+        for ($every in $rmvEditCmds){
+            evalEcho($every);
+            //print ($every+"\n");
+        }
+        
+        if ($isUnloaded == true){
+            evalEcho("file -loadReference \""+$refNodeName+"\"");
+        }
+        
+    }
+}

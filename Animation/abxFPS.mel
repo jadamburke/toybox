@@ -1,0 +1,253 @@
+// frameRateChange
+global proc abxFPS () {
+
+	if (`window -ex abxframeRateChangeWindow` != true)
+	{
+		window -w 274 -h 135 -t "abxframeRateChange" -in "abxframeRateChange" -s true -tb true abxframeRateChangeWindow;
+			
+
+		columnLayout -rs 1 -w 400 -cal "center" -cat "both" 0 -adj true abxframeRateChangeColLyt;
+
+		
+		string $lbl = ("Currently "+`fpsNumeric`+" FPS to ");
+		floatFieldGrp -numberOfFields 1 -label $lbl -extraLabel "FPS" -v1 30 abxframeRateChangeFPS;
+		
+		
+
+		/*optionMenu -l "Node:" -w 300 abxTimeWarpListMenu;
+		string $nodes[] = `ls -type "geometryVarGroup" "timeWarp*"`;
+		if (size($nodes)>0){
+			for ($each in $nodes){
+				menuItem -l $each;
+			}
+		}
+		setParent ..;
+		*/
+		
+		floatFieldGrp -numberOfFields 1 -label "Start Frame" -v1 `playbackOptions -q -ast` abxframeRateChangeSF;
+		checkBoxGrp -numberOfCheckBoxes 2 -l "Adjust Keys" -cw 2 30 -l2 "Snap" -v1 1 -v2 1 abxframeRateChangeAK;
+		checkBoxGrp -numberOfCheckBoxes 2 -l "Adjust Timeline" -cw 2 30 -l2 "Snap" -v1 1 -v2 1 abxframeRateChangeAT;
+		
+		separator -style "in" -h 3 sep0 ;
+
+		button -label "Change" -h 20 -w 60 -c "frameRateChangeProc `floatFieldGrp -q -v1 abxframeRateChangeFPS` `floatFieldGrp -q -v1 abxframeRateChangeSF` `checkBoxGrp -q -v1 abxframeRateChangeAK` `checkBoxGrp -q -v1 abxframeRateChangeAT` `checkBoxGrp -q -v2 abxframeRateChangeAK` `checkBoxGrp -q -v2 abxframeRateChangeAT`;window -e -vis 0 abxframeRateChangeWindow;";
+
+
+		window -e -w 274 -h 135 abxframeRateChangeWindow;
+		showWindow abxframeRateChangeWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 274 -h 135 abxframeRateChangeWindow;
+		showWindow abxframeRateChangeWindow;
+    	}
+
+
+}
+
+global proc frameRateChangeProc (float $targetFPS, float $framePivot, int $moveKeys, int $moveRange, int $snapKeys, int $snapRange) {
+	
+	// get list of all animation curves
+	string $animNodeList[] = `ls -type animCurve`;
+
+	// find current frameRate
+
+	float $oldFrameRate = `fpsNumeric`;
+
+	float $cTime= `currentTime -q`;
+
+
+	// get the playback range before unit change
+	float $rangeStart = `playbackOptions -q -min`;
+	float $rangeEnd = `playbackOptions -q -max`;
+	float $animStart = `playbackOptions -q -ast`;
+	float $animEnd = `playbackOptions -q -aet`;
+
+
+	// change the playback speed without moving keyframes
+
+	currentUnit -ua false -t `fpsNumericToUnit $targetFPS `;
+
+	print ($animStart+":"+$animEnd+":"+$rangeStart+":"+$rangeEnd +"\n");
+
+	// move the keyframes based on pivot frame
+	float $scaleAmt =  ($targetFPS-1) / ($oldFrameRate-1);
+	//print ($scaleAmt+"\n");
+
+	if ($moveKeys) {
+		for ($each in $animNodeList){
+			// special exception for motion path twist values which somehow are connected so only one needs scaling
+			if (`gmatch $each "*_sideTwist" ` || `gmatch $each "*_upTwist" `){
+				// do nothing they are auto scaled when _frontTwist is scaled			
+			}
+			else {
+				scaleKey -tp $framePivot -ts $scaleAmt $each;
+				if ($snapKeys){
+					snapKey $each;
+				}
+				if (`gmatch $each "timeWarp*"`){
+					scaleKey -vp $framePivot -vs $scaleAmt $each;
+				}
+			}
+		}
+	}
+
+
+	// set the new playback range
+	float $newAnimStart = ($animStart - $framePivot) * $scaleAmt + $framePivot;
+	float $newAnimEnd = ($animEnd - $framePivot) * $scaleAmt + $framePivot;
+	float $newRangeStart = ($rangeStart - $framePivot) * $scaleAmt + $framePivot;
+	float $newRangeEnd = ($rangeEnd - $framePivot) * $scaleAmt + $framePivot;
+
+	currentTime -e (($cTime - $framePivot)*$scaleAmt + $framePivot);
+
+	print ($newAnimStart+":"+$newAnimEnd+":"+$newRangeStart+":"+$newRangeEnd +"\n");
+	
+	if ($moveRange){
+		if ($snapRange){
+			playbackOptions -min ((int)($newRangeStart+0.5))-max ((int)($newRangeEnd+0.5)) -ast ((int)($newAnimStart+0.5)) -aet ((int)($newAnimEnd+0.5));
+		}
+		else{
+			playbackOptions -min $newRangeStart -max $newRangeEnd -ast $newAnimStart -aet $newAnimEnd;
+					
+		}
+		
+	}
+	else {
+		playbackOptions -min $rangeStart -max $rangeEnd -ast $animStart -aet $animEnd;	
+	}
+
+
+	/*
+	// get list of timeconversion nodes
+	string $unitNodes[]  = `ls -type unitToTimeConversion`;
+	//print ($unitNodes);
+
+	float $convFactor = 1/($targetFPS/6000);
+	//print ($convFactor+"\n");
+
+	
+	
+	// change value to match new frame rate
+	for ($each in $unitNodes){
+		setAttr ($each+".conversionFactor") $convFactor;
+		print ("setAttr "+$each+".conversionFactor "+$convFactor+"\n");
+	}
+	string $unitNodes[]  = `ls -type timeToUnitConversion`;
+	for ($each in $unitNodes){
+		setAttr ($each+".conversionFactor") (1/$convFactor);
+		print ("setAttr "+$each+".conversionFactor "+$convFactor+"\n");
+	}
+	*/
+}
+
+global proc float fpsNumeric () {
+
+	string $frameRateUnit = `currentUnit -q -f -t`;
+
+	string $validTimes[] = {"game","film","pal","ntsc","show","palf","ntscf","milliseconds","seconds","minutes","hours","2fps","3fps","4fps","5fps","6fps","8fps","10fps","12fps","16fps","20fps","40fps","75fps","80fps","100fps","120fps","125fps","150fps","200fps","240fps","250fps","300fps","375fps","400fps","500fps","600fps","750fps","1200fps","1500fps","2000fps","3000fps","6000fps"};
+	if (`gmatch $frameRateUnit "*fps"`){
+		int $isValid = stringArrayContains ($frameRateUnit,$validTimes);
+		if ($isValid) {
+			string $num =  `match "[0-9]+" $frameRateUnit`;
+			float $numFloat = $num;
+			return $numFloat;
+		}
+		else {
+			warning ("Unknown time format: "+$frameRateUnit+" Defaulting to 24 fps (film)");
+		}
+	}
+	else {
+		switch ($frameRateUnit){
+			case "pal":
+				return 25;
+				break;
+			case "film":
+				return 24;
+				break;
+			case "ntsc":
+				return 30;
+				break;
+			case "game":
+				return 60;
+				break;
+			case "show": 
+				return 48;
+				break;
+			case "palf":
+				return 50;
+				break;
+			case "ntscf":
+				return 60;
+				break;
+			case "milliseconds":
+				return 1000;
+				break;		
+			case "seconds":
+				return 1;
+				break;	
+			case "minutes":
+				return 0.0166666;
+				break;	
+			case "hours":
+				return 0.0002777;
+				break;		
+			default:
+				return 0;
+				break;
+		}
+	}
+	
+
+}
+
+global proc string fpsNumericToUnit (float $fps){
+	
+	// 1 = 1 frame per second;
+	// 
+	string $validTimes[] = {"game","film","pal","ntsc","show","palf","ntscf","milliseconds","seconds","minutes","hours","2fps","3fps","4fps","5fps","6fps","8fps","10fps","12fps","16fps","20fps","40fps","75fps","80fps","100fps","120fps","125fps","150fps","200fps","240fps","250fps","300fps","375fps","400fps","500fps","600fps","750fps","1200fps","1500fps","2000fps","3000fps","6000fps"};
+	string $fpsString = ($fps+"fps");
+
+	switch ($fps){
+		case 25.0:
+			return "pal";
+			break;
+		case 24.0:
+			return "film";
+			break;
+		case 48.0:
+			return "show";
+			break;
+		case 30.0:
+			return "ntsc";
+			break;
+		case 50:
+			return "palf";
+			break;
+		case 60:
+			return "ntscf";
+			break;
+		case 1000:
+			return "milliseconds";
+			break;
+		case 1.0:
+			return "seconds";
+			break;
+		case 0.0166666:
+			return "minutes";
+			break;
+		case 0.0002777:
+			return "hours";
+			break;
+		default:
+			if (stringArrayContains($fpsString,$validTimes)){
+				return $fpsString;
+			}
+			else {
+				return "unknown";
+			}
+			break;
+	}
+
+
+}

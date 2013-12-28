@@ -1,0 +1,34 @@
+// setProject
+global proc setProject(){
+
+
+
+}
+
+
+global proc buildSetProjectUI() {
+
+	window -width 200;
+	formLayout "theForm";
+	string $tl = `treeLister`;
+	formLayout -e
+       		-af $tl top 0
+        	-af $tl left 0
+        	-af $tl bottom 0
+        	-af $tl right 0
+        	theForm;
+	showWindow;
+
+	
+	treeLister -e -add "root/branchone/leafone" "file.png" "sphere"
+              -add "root/branchone/leaftwo" "sphere.png" "sphere"
+              -add "root/branchtwo/leafthree" "sphere.png" "sphere"
+              $tl;
+
+}
+
+global proc addProjectFolder () {
+
+
+
+}

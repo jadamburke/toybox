@@ -1,0 +1,66 @@
+// clearReferenceSGEdits
+
+global proc clearReferenceVisibilityEdits() {
+
+
+	$sel = `ls -sl`;
+	select -clear;
+	
+	
+	for ($referenceNode in $sel){
+
+	int $initialRefLoadState = `file -rfn $referenceNode -q -deferReference`;
+
+	if ($initialRefLoadState == 0){
+		file -unloadReference $referenceNode;
+	}
+
+	string $editCommands[] = `referenceQuery -failedEdits true -successfulEdits true -editStrings $referenceNode`;
+	print (size($editCommands)+"\n");
+
+	for ($each in $editCommands){
+	
+		
+		string $editCmdTokenBuffer[];
+		tokenize $each " " $editCmdTokenBuffer;
+		string $editCommand = $editCmdTokenBuffer[0];
+		string $destination = "";
+
+		if ($editCommand == "setAttr"){
+			if (`gmatch $editCmdTokenBuffer[1] "*.visibility*"` == 1){
+				$destination = $editCmdTokenBuffer[1];
+			}
+		}
+		else if ($editCommand == "connectAttr"){
+			
+			$destination = $editCmdTokenBuffer[2];
+
+			// pull out quotation marks
+			$destination = `substring $destination 2 (size($destination)-1)`;
+			$destination = "";
+		}
+		else if ($editCommand == "disconnectAttr"){
+			$destination = $editCmdTokenBuffer[2];
+
+			// pull out quotation marks
+			$destination = `substring $destination 2 (size($destination)-1)`;
+			$destination = "";
+		}
+
+		if ($destination !=""){
+			print ("referenceEdit -failedEdits true -successfulEdits true -editCommand "+$editCommand+" -removeEdits "+$destination+"\n");
+			referenceEdit -failedEdits true -successfulEdits true -editCommand $editCommand -removeEdits $destination;
+		}
+		//}
+		
+	}
+
+	//referenceEdit -failedEdits true -successfulEdits true -editCommand disconnectAttr -removeEdits "SG" $referenceNode;
+
+	//referenceEdit -failedEdits true -successfulEdits true -editCommand disconnectAttr -removeEdits "|plantFiddleHeadFrond10_GOD|plantFiddleHeadFrond10_DIRECTION|plantFiddleHeadFrond10_BODY|plantFiddleHeadFrond10_fern5Ctrl|plantFiddleHeadFrond10_fernSingle1MeshGroup5|plantFiddleHeadFrond10_fernMesh5_static1|plantFiddleHeadFrond10_fernSingle1Leaf8|plantFiddleHeadFrond10_fernSingle1Leaf5Shape8.instObjGroups";
+	
+	if ($initialRefLoadState == 0){
+		file -loadReference $referenceNode;
+	}
+	}
+}

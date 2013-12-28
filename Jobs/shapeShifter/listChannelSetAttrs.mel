@@ -1,0 +1,21 @@
+// listChannelSetAttrs
+global proc listChannelSetAttrs () {
+
+	string $selected[] = `ls -sl`;
+	for ($each in $selected){
+		string $animatableAttrs[];
+		$selectedChannels = `channelBox -q -sma mainChannelBox`;
+		if (size($selectedChannels) == 0){
+			$animatableAttrs = `listAttr -keyable $each`;
+		}
+		else {
+			$animatableAttrs = $selectedChannels;
+		}
+		for ($every in $animatableAttrs){
+			if (`connectionInfo -id ($each+"."+$every)` == 0){
+				$value = `getAttr ($each+"."+$every)`;
+				print ("setAttr "+$each+"."+$every+" "+$value+"\;\n");
+			}
+		}
+	}
+}

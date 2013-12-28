@@ -1,0 +1,8 @@
+// zbw_animPullDown
+// Created by: adam
+// Date: 2013/03/18 11:38:37
+
+global proc zbw_animPullDown(){
+python("import zbw_animPullDown as apd;apd.animPullDown()");
+
+}

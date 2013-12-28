@@ -1,0 +1,13 @@
+
+createNode transform -n "LE_CAM";
+createNode camera -n "LE_CAMShape" -p "LE_CAM";
+	setAttr -k off ".v";
+	setAttr ".cap" -type "double2" 1.333 1 ;
+	setAttr ".ncp" 0.01;
+	setAttr ".ow" 30;
+	setAttr ".imn" -type "string" "camera1";
+	setAttr ".den" -type "string" "camera1_depth";
+	setAttr ".man" -type "string" "camera1_mask";
+	setAttr ".dr" yes;
+	setAttr ".dsa" yes;
+	setAttr ".dst" yes;

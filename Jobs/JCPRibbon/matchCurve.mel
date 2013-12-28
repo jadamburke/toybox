@@ -1,0 +1,29 @@
+// matchCurve
+
+
+global proc matchCurve(){
+
+$sel = `ls -sl`;
+$shapeNode = `listRelatives -shapes $sel[0]`;
+$spans = `getAttr ($shapeNode[0]+".spans")`;
+$degree = `getAttr ($shapeNode[0]+".degree")`;
+$spans = $spans+$degree;
+string $curve1;
+string $curve2;
+
+if (size($sel) == 2){
+	$curve1 = $sel[0];
+	$curve2 = $sel[1];
+}
+else{
+	error ("Must select two nurbs curves");
+	return;
+}
+
+for ($i = 0;$i<$spans;$i++){
+	float $ppos[] = `pointPosition ($curve1+".cv["+$i+"]")`;
+	select -r ($curve2+".cv["+$i+"]");
+	move -a -ws  $ppos[0] $ppos[1] $ppos[2];
+}
+
+}

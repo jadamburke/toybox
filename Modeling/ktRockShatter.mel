@@ -1,0 +1,303 @@
+global proc doShatter(float $crckOf,int $Smoothed)
+    {
+    	string $s[] = `ls -sl -fl`;
+    	string $pRelatives[] = `listRelatives -s $s[0]`;
+    	string $p = $pRelatives[0];
+    	int $pCount = `getAttr ($p+".count")`;
+    	string $obj = $s[1];
+
+    	$ATN = $s[0];
+    	$ASName = $pRelatives[0];
+
+    	string $objName = $s[1];
+
+    	rockShatter($ATN, $ASName, $objName, $crckOf,$Smoothed);
+    }
+
+global proc rockShatter(string $ATN, string $ASName, string $objName, float $crckOf,int $Smoothed)
+    {
+    	string $SG = `group -empty -n "SG"`;
+
+    	setAttr ($ATN + ".visibility") 0;
+
+    	string $cB = shCCutBk($objName);
+    	string $lGRP = shatterP2L($ASName);
+    	setAttr ($lGRP + ".visibility") 0;
+
+    	string $locators[] = `listRelatives -c -type transform $lGRP`;
+
+    	for($a=0;$a<size($locators);$a++)
+    	{
+    		float $aPos[] = `xform -q -ws -t $locators[$a]`;
+    		string $actblk = "";
+
+    		string $dupMesh[] = `duplicate -rr $objName`;
+    		setAttr ($objName + ".visibility") 0;
+    		$actblk = $dupMesh[0];
+    		setAttr ($actblk + ".visibility") 1;
+
+
+    		for($b=0;$b<size($locators);$b++)
+    		{
+    			if($a != $b)
+    			{
+    				float $bPos[] = `xform -q -ws -t $locators[$b]`;
+
+    				vector $midPnt = <<(($aPos[0] + $bPos[0])/2), (($aPos[1] + $bPos[1])/2), (($aPos[2] + $bPos[2])/2)>>;
+
+    				vector $aPosV = {$aPos[0],$aPos[1],$aPos[2]};
+    				vector $bPosVector = {$bPos[0],$bPos[1],$bPos[2]};
+
+    				vector $dir = $aPosV - $midPnt;
+
+    				$dir = $dir / mag($dir);
+
+
+    				vector $offMidPoint = $midPnt + ($crckOf * $dir);
+
+    				string $aL[] = `spaceLocator -p $bPos[0] $bPos[1] $bPos[2]`;
+    				xform -cp $aL[0];
+
+    				string $cutBlo[] = `duplicate -rr $cB`;
+    				setAttr ($cutBlo[0] + ".visibility") 1;
+    				setAttr ($cutBlo[0] + ".translateX") ($offMidPoint.x);
+    				setAttr ($cutBlo[0] + ".translateY") ($offMidPoint.y);
+    				setAttr ($cutBlo[0] + ".translateZ") ($offMidPoint.z);
+
+    				string $aimConstraint[] = `aimConstraint -offset 0 0 0 -weight 1 -aimVector 0 1 0 -upVector 0 1 0 -worldUpType "vector" -worldUpVector 0 1 0 $aL[0] $cutBlo[0]`;
+    				for($ac=0;$ac<size($aimConstraint);$ac++)
+    				{
+    					if(`objExists $aimConstraint[$ac]`)
+    					{
+    						delete $aimConstraint[$ac];
+    					}
+    				}
+
+    				for($al=0;$al<size($aL);$al++)
+    				{
+    					if(`objExists $aL[$al]`)
+    					{
+    						delete $aL[$al];
+    					}
+    				}
+
+    				vector $cutBlockRot = `xform -q -ws -rotation $cutBlo[0]`;
+    				int $numFace[] = `polyEvaluate -f $actblk`;
+    				polyCut -ch off -df 1 -pc ($offMidPoint.x) ($offMidPoint.y) ($offMidPoint.z) -ro ($cutBlockRot.x + 90) ($cutBlockRot.y) ($cutBlockRot.z) ($actblk + ".f[0:" + $numFace[0] + "]");
+    				polyCloseBorder -ch 0 $actblk;
+
+    				if(`objExists $cutBlo[0]`)
+    				{
+    					delete $cutBlo[0];
+    				}
+    			}
+    			else
+    			{
+    				//delete $dupMesh[0];
+    			}
+    		}
+			//print $actblk;her parca burdan bulabirim.
+			if ($Smoothed)
+			{
+			$percentage =`floatSliderButtonGrp -q -v voroReducePartsByFSBG`;
+
+
+					polyBevel  -offsetAsFraction 1 -ch 0 $actblk ;
+					polySmooth  -divisions 2  -ch 0 $actblk;
+					polyReduce -percentage $percentage
+					-uvWeights 0
+					-colorWeights 0
+					-keepQuadsWeight 1
+					-keepBorder 1
+					-keepMapBorder 1
+					-keepOriginalVertices 0
+					-keepHardEdge 1
+					-compactness 1
+					-triangulate 0
+					-replaceOriginal 1
+					-cachingReduce 1
+					-ch 0 $actblk;
+			}
+    		parent $actblk $SG;
+
+    		//refresh();
+    	}
+
+    	delete $cB;
+
+    //undoInfo -state on;
+    }
+
+
+global proc string shCCutBk(string $objName)
+    {
+    	// Find the bounding box of obj
+    	float $bbox[] = `exactWorldBoundingBox $objName`;
+    	float $bDim = abs($bbox[3]-$bbox[0]);
+    	if (abs($bbox[4]-$bbox[1]) > $bDim)
+    	{
+    		$bDim = abs($bbox[4]-$bbox[1]);
+    	}
+
+    	if (abs($bbox[5]-$bbox[2]) > $bDim)
+    	{
+    		$bDim = abs($bbox[5]-$bbox[2]);
+    	}
+
+    	$bDim = $bDim*4;
+    	string $cutBC[] = `polyPlane -w 1 -h 1 -sx 1 -sy 1 -ax 0 1 0 -cuv 2 -ch 0 -n "cB"`;
+    	string $cutBlk = $cutBC[0];
+
+    	setAttr ($cutBlk + ".scaleX") $bDim;
+    	setAttr ($cutBlk + ".scaleZ") $bDim;
+
+    	polyExtrudeFacet -ch 0 -ltz ($bDim * 2) -smoothingAngle 0 ($cutBlk+".f[0]");
+
+
+    	makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $cutBlk;
+    	setAttr ($cutBlk + ".visibility") 0;
+    	select -cl;
+
+    	return $cutBlk;
+    }
+
+global string $locatorGRP2del;
+global proc string shatterP2L(string $pName)
+    {
+    	string $pGRP = `group -empty -n "particleLocatorGrp"`;
+		global string $locatorGRP2del;
+		$locatorGRP2del=$pGRP;
+
+    	int $pCount = `getAttr ($pName + ".count")`;
+
+    	for($p=0;$p<$pCount;$p++)
+    	{
+    		float $pPos[] = `getParticleAttr -at worldPosition ($pName + ".pt[" + $p + "]")`;
+
+    		string $pLoc[] = `spaceLocator -n "shatterPoint_#"`;
+
+    		// Set attributes
+    		setAttr ($pLoc[0] + ".translateX") $pPos[0];
+    		setAttr ($pLoc[0] + ".translateY") $pPos[1];
+    		setAttr ($pLoc[0] + ".translateZ") $pPos[2];
+    		setAttr ($pLoc[0] + ".scaleX") 0.1;
+    		setAttr ($pLoc[0] + ".scaleY") 0.1;
+    		setAttr ($pLoc[0] + ".scaleZ") 0.1;
+
+    		// Parent locator
+    		parent $pLoc[0] $pGRP;
+    	}
+
+    	// Return the locator group name
+    	return $pGRP;
+    }
+
+global proc goshatter(float $crckOf,int $parts,int $Smoothed)
+{
+$obj=`ls -sl`;
+vector $objCenterVtx=`objectCenter $obj`;
+$objVtxs=`eval("ls -fl \""+$obj[0]+".vtx[*]\"")`;
+
+vector $randPnts[];clear $randPnts;
+vector $vPos;
+string $cmd="";
+
+int $avCount=0;
+
+
+	for ($objVtx in $objVtxs)
+	{
+		vector $vPos=`xform -q -ws -t $objVtx`;
+		$randPnt=`rand $objCenterVtx $vPos`;
+	  $avCount+=1;
+
+		if ($avCount<=$parts)
+		$cmd += ("-p "+($randPnt.x)+" "+($randPnt.y)+" "+($randPnt.z));
+	}
+
+  global string $locatorGRP2del;
+	$myParticle=`eval ("particle "+$cmd)`;
+	select -add $obj;
+
+	doShatter($crckOf,$Smoothed);
+	delete $myParticle;
+	delete $locatorGRP2del;
+}
+
+global proc voroSmoothCBChangeCmd()
+{
+  $state=`checkBox -q -value voroSmoothCB`;
+  floatSliderButtonGrp -e -enable $state voroReducePartsByFSBG;
+}
+
+global proc autoRecommend()
+{
+  $selobj=`ls -sl`;
+  $cnt=`polyEvaluate -v $selobj`;
+  print $cnt[0];
+}
+
+string $window = `window -title "Rock Shatter v1.0  (ktRockShatter) - www.tarzworkshop.com"
+       -widthHeight 200 55`;
+columnLayout -adjustableColumn true -columnAttach "both" 15;
+
+
+rowLayout -numberOfColumns 2
+    -columnWidth2 375 15
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAlign  2 "left"
+
+	-columnAttach 1 "right" 2
+    -columnAttach 2 "both" 2
+
+	-rowAttach 1 "both"  1
+	-rowAttach 2 "both"  1;
+
+intSliderGrp -label "Max Parts" -field true
+    -minValue 2 -maxValue 100
+    -fieldMinValue 2 -fieldMaxValue 100
+    -value 10 voroPartISG;
+//button -label "Auto Recommend" -command "autoRecommend()";
+setParent ..;
+
+floatSliderGrp -label "OffSet" -field true
+    -minValue .000 -maxValue 1.000 -ss .001
+		-fieldMinValue .000 -fieldMaxValue 1.000
+    -value .032 voroPartFSG;
+checkBox -label "Smoothed Parts" -changeCommand  "voroSmoothCBChangeCmd" -value 1 voroSmoothCB;
+
+frameLayout -label "Reduce Settings" -labelAlign "top" -mh 10
+-marginWidth 10 -collapsable 1 -borderStyle "etchedIn";
+
+columnLayout;
+floatSliderButtonGrp -label "Reduce Parts By(%100) " -field true -value 20
+    -buttonLabel "Reset" -symbolButtonDisplay 0 voroReducePartsByFSBG;
+setParent ..;
+setParent ..;
+
+rowLayout -numberOfColumns 2
+    -columnWidth2 175 175
+    -adjustableColumn 1
+    -columnAlign  1 "center"
+    -columnAlign  2 "center"
+
+	-columnAttach 1 "both" 0
+    -columnAttach 2 "both" 0
+
+	-rowAttach 2 "both"  0;
+
+button -label "Apply" -command "goshatter(`floatSliderGrp -q -value voroPartFSG`,`intSliderGrp -q -value voroPartISG`,`checkBox -q -value voroSmoothCB`)";
+button -label "Close" -command ("deleteUI -window " + $window);
+
+setParent ..;
+window -e -width 500 -height 180 $window;
+showWindow $window;
+
+
+			 //
+
+
+//setParent ..;
+
+

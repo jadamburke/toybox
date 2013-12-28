@@ -1,0 +1,15 @@
+global proc subFrameToggle (){
+    $pbSteps = `getAttr "dynGlobals1.overSamples"`;
+    if ($pbSteps == 5){
+        
+        setAttr "dynGlobals1.overSamples" 1;
+        playbackOptions -e -by 1;
+    
+    }
+    else {
+        setAttr "dynGlobals1.overSamples" 5;
+        playbackOptions -e -by .2;
+
+    }
+    print ("Playback Sub Steps = "+$pbSteps+"\n");
+}

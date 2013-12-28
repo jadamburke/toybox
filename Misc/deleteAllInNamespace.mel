@@ -1,0 +1,7 @@
+// deleteAllInNamespace
+// Created by: adam
+// Date: 2013/04/09 23:49:34
+
+global proc deleteAllInNamespace(){
+
+}

@@ -1,0 +1,93 @@
+global proc hairDynamicsToggle()
+{
+    window -title "hair dynamics toggle" shaveHairDynamicsWindow;
+    rowColumnLayout -numberOfColumns 2;
+    button -c "ryanHairDyn" -label "ryan Hair";
+    button -c "abbyHairDyn" -label "abby hair";
+    button -c "booferHairDyn" -label "boofer hair";
+    
+    showWindow shaveHairDynamicsWindow;
+}
+
+global proc ryanHairDyn()
+{
+   print "son";
+   select -cl;
+    string $theNodes[] = `ls -type shaveHair "anm*:RyanFinal*:geo_shaveHair*"`;
+    for($tmp in $theNodes)
+    {
+        
+        if(`gmatch $tmp "anm*:RyanFinal*:geo_shaveHairShape31"`)
+        {
+            print "brow skipped\n";
+        }
+        
+        else if(`gmatch $tmp "anm*:RyanFinal*:geo_shaveHairShape30"`)
+        {
+            print "brow skipped\n";
+        }
+        
+        else
+        {
+            
+            int $x =`getAttr ($tmp+".runDynamics")`;
+            if($x == 0)
+            {
+                setAttr($tmp+".runDynamics") 2;
+                print ($tmp+" -- on\n");
+            }
+            
+            if($x == 2)
+            {
+                setAttr($tmp+".runDynamics") 0;
+                print ($x+"--"+$tmp+" -- off\n");
+            }
+         }
+            
+       
+
+    } 
+}
+
+global proc abbyHairDyn()
+{
+   select -cl;
+    string $theNodes[] = `ls -type shaveHair "anm*:Abby*:geo_bangHair*"`;
+    for($tmp in $theNodes)
+    {
+        int $x =`getAttr ($tmp+".runDynamics")`;
+        if($x == 0)
+        {
+            setAttr($tmp+".runDynamics") 2;
+            print ($tmp+" -- on\n");
+        }
+        
+        if($x == 2)
+        {
+            setAttr($tmp+".runDynamics") 0;
+            print ($x+"--"+$tmp+" -- off\n");
+        }
+    } 
+}
+
+
+global proc booferHairDyn()
+{
+   select -cl;
+    string $theNodes[] = `ls -type shaveHair "anm*:booferBully*:geo_shaveHair*"`;
+    for($tmp in $theNodes)
+    {
+        int $x =`getAttr ($tmp+".runDynamics")`;
+        if($x == 0)
+        {
+            setAttr($tmp+".runDynamics") 2;
+            print ($tmp+" -- on\n");
+        }
+        
+        if($x == 2)
+        {
+            setAttr($tmp+".runDynamics") 0;
+            print ($tmp+" -- off\n");
+        }
+    } 
+}

@@ -1,0 +1,170 @@
+// playbackPanel
+
+// define callbacks for this type and make it a unique type
+// as we don't want two panels sharing the same global data.
+
+global proc playbackPanel () {
+
+if (!`scriptedPanelType -exists playbackPanelType`){
+scriptedPanelType
+    -ccb playbackCreateCallback
+    -icb playbackInitCallback
+    -acb playbackAddCallback
+    -rcb playbackRemoveCallback
+    -dcb playbackDeleteCallback
+    -scb playbackSaveStateCallback
+    -unique true
+    playbackPanelType;
+}
+
+	if (!`scriptedPanel -exists playbackPanel`){
+		scriptedPanel -unParent -type playbackPanelType -label "Playback" playbackPanel;
+	}
+
+}
+
+
+global proc playbackCreateCallback(string $panelName) {
+//
+//  Description:
+//      Create any editors unparented here and do
+//      any other initialization required.
+//
+//      In this example we will only declare a global array to
+//        maintain some state information.
+//
+    global float $gSampleState[5];
+
+}
+
+
+global proc playbackInitCallback(string $panelName) {
+//
+//  Description:
+//      Re-initialize the panel on file -new or file -open.
+//
+//      In this example we will only re-init the global array.
+//
+    global float $gSampleState[];
+
+       $gSampleState[0] = 20.2;
+       $gSampleState[1] = 50.5;
+       $gSampleState[2] = 34.7;
+       $gSampleState[3] = 2.0;
+       $gSampleState[4] = 1.0;
+
+}
+
+global proc playbackAddCallback(string $panelName) {
+//
+//  Description:  Create UI and parent any editors.
+//
+    global float $gSampleState[];
+
+    columnLayout -adj true topCol;
+    separator -style "none" -h 10;
+        frameLayout -l "Sliders" -mw 10;
+            columnLayout -adj true sampleCol;
+                separator -style "none" -h 10;
+
+                floatSliderGrp -l "Property A" -f true
+                    -v $gSampleState[0]
+                    fsg1;
+                floatSliderGrp -l "Property B" -f true
+                    -v $gSampleState[1]
+                    fsg2;
+                floatSliderGrp -l "Property C" -f true
+                    -v $gSampleState[2]
+                    fsg3;
+                separator -style "none" -h 10;
+            setParent ..;
+        setParent ..;
+
+        separator -style "none" -h 10;
+        frameLayout -l "Radio Buttons" -mw 10;
+            columnLayout sampleCol2;
+                separator -style "none" -h 10;
+                radioButtonGrp -nrb 3
+                    -l "Big Options"
+                    -la3 "Option 1" "Option 2" "Option 3"
+                    -select $gSampleState[3]
+                    rbg;
+                radioButtonGrp -nrb 3
+                    -l "Little Options"
+                    -la3 "Option 4" "Option 5" "Option 6"
+                    -select $gSampleState[4]
+                    rbg2;
+                separator -style "none" -h 10;
+
+}
+
+global proc playbackRemoveCallback(string $panelName) {
+//
+//  Description:
+//        Unparent any editors and save state if required.
+//
+        global float $gSampleState[];
+       //  Scope the control names to this panel.
+       //
+       string $control = `scriptedPanel -q -control $panelName`;
+       setParent $control;
+
+       $gSampleState[0] = `floatSliderGrp -q -v fsg1`;
+       $gSampleState[1] = `floatSliderGrp -q -v fsg2`;
+       $gSampleState[2] = `floatSliderGrp -q -v fsg3`;
+       $gSampleState[3] = `radioButtonGrp -q -sl rbg`;
+       $gSampleState[4] = `radioButtonGrp -q -sl rbg2`;
+}
+
+global proc playbackDeleteCallback(string $panelName) {
+//
+//  Description:
+//        Delete any editors and do any other cleanup required.
+
+}
+
+global proc string playbackSaveStateCallback(string $panelName) {
+//
+//  Description:
+//        Return a string that will restore the current state
+//        when it is executed.
+
+        global float $gSampleState[];
+       $indent = "\n\t\t\t";
+
+       return ($indent+"$gSampleState[0]="+$gSampleState[0]+";" +
+               $indent+"$gSampleState[1]="+$gSampleState[1]+";" +
+               $indent+"$gSampleState[2]="+$gSampleState[2]+";" +
+               $indent+"$gSampleState[3]="+$gSampleState[3]+";" +
+               $indent+"$gSampleState[4]="+$gSampleState[4]+";" +
+               $indent+"setPlaybackPanelState $panelName;\n" );
+}
+
+global proc setPlaybackPanelState( string $whichPanel ) {
+//
+//  Description:
+//        This is a convenience proc to set the panel state from the
+//        global array
+
+        global float $gSampleState[];
+
+       //  Scope the control names to this panel.
+       //
+       string $control = `scriptedPanel -q -control $whichPanel`;
+       if ("" != $control) {
+              setParent $control;
+
+              floatSliderGrp -e -v $gSampleState[0] fsg1;
+              floatSliderGrp -e -v $gSampleState[1] fsg2;
+              floatSliderGrp -e -v $gSampleState[2] fsg3;
+              if (0 != $gSampleState[3]) {
+               radioButtonGrp -e -sl $gSampleState[3] rbg;
+              };
+           if (0 != $gSampleState[4]) {
+               radioButtonGrp -e -sl $gSampleState[4] rbg2;
+           }
+       }
+}
+
+
+  

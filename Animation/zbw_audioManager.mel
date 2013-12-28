@@ -1,0 +1,7 @@
+// zbw_audioManager
+// Created by: adam
+// Date: 2013/03/22 15:19:06
+
+global proc zbw_audioManager(){
+
+python("import zbw_audioManager as zam;zam.audioManager()");}

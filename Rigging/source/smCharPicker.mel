@@ -1,0 +1,9 @@
+global proc smCharPicker ()
+{
+string $sel[] = `ls -sl`;
+string $prefix = `match "[^_]*" $sel[0]`;
+if(`objExists ($prefix + "_ALLKEYABLE")` == 0)
+	error ("sorry " + $prefix + "_ALLKEYABLE  doesn't exist ");
+string $anotes = `getAttr ($prefix + "_ALLKEYABLE.notes")`;
+eval $anotes;
+}

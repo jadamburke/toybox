@@ -1,0 +1,9 @@
+// deformedShapeRename
+global proc deformedShapeRename() {
+
+$sel = `ls -sl`;for ($each in $sel){
+		int $length = size($each) - 8;
+	string $every = $each;
+	substring $every 1 $length;	string $originalname = `substring $every 1 $length`;	if (`exists $originalname`)		rename $originalname ($originalname+"Orig");	rename $each $originalname;}
+}
+

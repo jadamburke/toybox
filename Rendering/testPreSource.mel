@@ -1,0 +1,4 @@
+// testPreSource
+global proc testPreSource2(){
+	theTest;
+}

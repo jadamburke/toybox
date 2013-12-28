@@ -1,0 +1,24 @@
+// replaceShape
+
+global proc replaceShape () {
+
+	string $selectedObj[] = `ls -sl`;
+	int $i;
+	
+	for ($i=1; $i<size($selectedObj);$i++){
+		string $currentObj = $selectedObj[$i];
+		string $newObj[] = `duplicate $selectedObj[0]`;
+		string $shapeNodeName[] = `listRelatives -s $newObj[0]`;
+		string $oldObj[] = `listRelatives -s $currentObj`;
+		delete $oldObj[0];
+		parent -r -shape $shapeNodeName[0] $currentObj;
+		rename $shapeNodeName[0] $oldObj[0];
+		delete $newObj;
+		
+
+	}	
+
+
+
+
+}

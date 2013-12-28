@@ -1,0 +1,184 @@
+
+
+
+global proc leGetShot (){
+   
+    if (`window -ex leGetShotWindow` != true)
+        {
+
+
+	window 
+		-title GetShot
+		-widthHeight 200 100
+		leGetShotWindow;
+
+	formLayout getShotLyt;
+		
+		text 
+			-label "Episode"
+			-al "center"
+			 txtEpisode;
+				
+		text 
+			-label "Shot" 
+			-al "center"
+			txtShot;
+		
+		string $textFieldEpisode =`textField
+			-text "101"`;
+		
+		string $textFieldShot = `textField
+			-text "000"`;
+
+		button
+			-label "Get Shot!"
+			-al center
+			-h 26
+			-c ("leGetShotProc(`textField  -q -text "+$textFieldEpisode+"`,`textField  -q -text "+$textFieldShot+"`); window -e -vis 0 leGetShotWindow;")
+			executeButton;
+		button 
+			-label "Apply"
+			-al center
+			-h 26
+			-c ("leGetShotProc(`textField  -q -text "+$textFieldEpisode+"`,`textField  -q -text "+$textFieldShot+"`);")
+			applyButton;
+		button
+			-label "Close"
+			-c "deleteUI -window leGetShotWindow;" 
+			-al center
+			-h 26
+			closeButton;
+	formLayout -e 
+
+		-attachForm txtEpisode "left" 0 
+		-attachPosition txtEpisode "right" 0 50 
+		-attachForm txtEpisode "top" 0 
+		-attachNone txtEpisode "bottom" 
+
+		-attachControl txtShot "left" 0 txtEpisode 
+		-attachForm txtShot "right" 0  
+		-attachForm txtShot "top" 0 
+		-attachNone txtShot "bottom"  
+	
+		-attachForm $textFieldEpisode "left" 0
+		-attachPosition $textFieldEpisode "right" 0 50 
+		-attachControl $textFieldEpisode "top" 0 txtEpisode
+		-attachNone $textFieldEpisode "bottom"
+		
+		-attachControl $textFieldShot "left" 0 $textFieldEpisode
+		-attachForm $textFieldShot "right" 0
+		-attachControl $textFieldShot "top" 0 txtShot
+		-attachNone $textFieldShot "bottom"
+
+		
+	   	-attachForm executeButton "left" 5 
+	   	-attachPosition executeButton "right" 3 33
+	   	-attachNone executeButton "top"
+	   	-attachForm executeButton "bottom" 5
+
+	    	-attachPosition applyButton "left" 3 33 
+	    	-attachPosition applyButton "right" 3 66
+	   	-attachNone applyButton "top"
+	    	-attachForm applyButton "bottom" 5
+	    
+	    	-attachPosition closeButton "left" 3 66
+	    	-attachForm closeButton "right" 5
+	    	-attachNone closeButton "top"
+	    	-attachForm closeButton "bottom" 5
+
+		getShotLyt;
+
+		showWindow leGetShotWindow;
+		}
+		else	// else just pop it up from being minimized again
+    		{
+			showWindow leGetShotWindow;
+		}
+}
+	
+global proc int leGetShotProc (string $episode, string $shotnum)
+{
+	string $localStorage = "d:/le";                                       
+	string $digiAnim01 = "//slinky/digiAnim01";			
+	string $digiAnim02 = "//slinky/digiAnim02";				    
+	string $cgShare = "//slinky/cg01";
+	string $cgDropBox = "//slinky/cg01/DigAnim Drop Box";
+	string $imageSeqTemp[];
+	int $i = 0;
+	
+	$imageSeqDir = ($cgDropBox+ "/"+$episode+"_"+$shotnum); // "//slinky/cg/DigAnim Drop Box/100/001
+	if (`filetest -d $imageSeqDir`) {
+
+		//make shot directory on d drive if it doesn't already exist
+		if (!(`filetest -d ($localStorage+"/"+$episode+"/"+$shotnum)`)) // d:/le/100/001
+			if (`sysFile -makeDir ($localStorage+"/"+ $episode+"/"+$shotnum)`) // d:/le/100/100
+				print ("Create Directory "+$localStorage+"/"+ $episode+"/"+$shotnum+"\n");
+
+		//move imageSeqDir to local drive
+		if (!(`filetest -d ($localStorage+"/"+$episode+"/"+$shotnum+"/"+$episode+"_"+$shotnum)`)){ // d:/le/100/001/100_001
+
+			sysFile -makeDir ($localStorage+"/"+$episode+"/"+$shotnum+"/"+$episode+"_"+$shotnum); // 
+			$imageSeqTemp = `getFileList -folder ($imageSeqDir+"/") -fs "*.*"`; //grabs all files in slinky/cg/DigAnim Drop Box/100/001, puts it in a string array
+			for ($i=0;$i<size($imageSeqTemp);$i++){
+				sysFile -move ($localStorage+"/"+$episode+"/"+$shotnum+"/"+$episode+"_"+$shotnum+"/"+$imageSeqTemp[$i]) ($imageSeqDir+"/"+$imageSeqTemp[$i]);
+				print ("sysFile -move "+$localStorage+"/"+$episode+"/"+$shotnum+"/"+$episode+"_"+$shotnum+"/"+$imageSeqTemp[$i]+" "+$imageSeqDir+"/"+$imageSeqTemp[$i]+"\n");
+			}
+			if (`sysFile -delete ($imageSeqDir+"/")`)
+				print ($imageSeqDir+" moved to "+$localStorage+"/"+$episode+"/"+$shotnum+"\n");
+
+			if (!(`objExists "LE_CAM"`)){
+				$newCam = `camera`;
+				rename $newCam[0] "LE_CAM";
+ 				//createNode "camera" -n "LE_CAM";
+ 			}
+
+			// connect imageSequence
+			if (!(`objExists "LE_LAYOUT"`))
+			createNode "imagePlane" -n "LE_Layout";
+			connectAttr LE_Layout.message LE_CAMShape.imagePlane;
+			setAttr -type "string" LE_Layout.imageName ($localStorage+"/"+$episode+"/"+$shotnum+"/"+$episode+"_"+$shotnum+"/"+$imageSeqTemp[0]);
+			pause -sec 3; //wait for image to load
+			setAttr "LE_Layout.useFrameExtension" 1;
+			setAttr "LE_Layout.frameOffset" -100;
+			setAttr "LE_CAMShape.displayResolution" 1;
+			setAttr "LE_CAMShape.displaySafeAction" 1;
+			AEinvokeFitRezGate LE_Layout.sizeX LE_Layout.sizeY;
+		}
+		else {
+			print ("Image Sequence Already Exists Locally, Please Delete and Try Again.\n");
+			return 0;
+		}
+	}
+	else {
+		print ("Image Sequence Not Found in"+$imageSeqDir+"\n");
+	}
+
+	$soundFile = ($digiAnim01+"/"+$episode+"/"+$episode+"_"+$shotnum+"/REF/"+$episode+"_"+$shotnum+".wav");
+	if (!(`filetest -f $soundFile`)) {
+		$soundFile = ($digiAnim02+"/"+$episode+"/"+$episode+"_"+$shotnum+"/REF/"+$episode+"_"+$shotnum+".wav");
+		if (!(`filetest -f $soundFile`)) {
+			print ("Sound File not found in " + $soundFile + "\n");
+			return 0;
+		}
+	}
+
+	//make shot directory on d drive if it doesn't already exist
+	if (!(`filetest -d ($localStorage+"/"+$episode+"/"+$shotnum)`)) 
+		if (`sysFile -makeDir ($localStorage+"/"+ $episode+"/"+$shotnum)`)
+			print ("Create Directory "+$localStorage+"/"+ $episode+"/"+$shotnum+"\n");	
+
+	// copy sound file to local storage
+	if (`sysFile -copy ($localStorage+"/"+$episode+"/"+$shotnum+"/"+$episode+"_"+$shotnum+".wav") $soundFile`)
+		print ($soundFile+" moved to "+ $localStorage+"/"+$episode+"/"+$shotnum+"/"+$episode+"_"+$shotnum+".wav\n") ;
+
+	
+	// import the audio file and display it on the timeline
+	sound -file ($localStorage+"/"+$episode+"/"+$shotnum+"/"+$episode+"_"+$shotnum+".wav") -n "LE_AUDIO" -offset 100;
+	setSoundDisplay LE_AUDIO 1;
+
+
+	return 1;
+}
+
+
+

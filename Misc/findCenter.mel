@@ -1,0 +1,17 @@
+// findCenter
+
+SelectAllGeometry;
+string $selectedObj[] = `selectedNodes`;
+float $xyzSum[];
+for ($currentItem in $selectedObj){
+	float $xyzBuffer[] = `objectCenter $currentItem`;
+	$xyzSum[0] = $xyzSum[0]+$xyzBuffer[0];
+	$xyzSum[1] = $xyzSum[1]+$xyzBuffer[1];
+	$xyzSum[2] = $xyzSum[2]+$xyzBuffer[2];
+}
+string $xyzAllCenter[];
+$xyzAllCenter[0]=$xyzSum[0]/size($selectedObj);
+$xyzAllCenter[1]=$xyzSum[1]/size($selectedObj);
+$xyzAllCenter[2]=$xyzSum[2]/size($selectedObj);
+group -em;
+xform -os -piv $xyzAllCenter[0] $xyzAllCenter[1] $xyzAllCenter[2];

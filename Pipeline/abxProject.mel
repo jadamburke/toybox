@@ -1,0 +1,229 @@
+// abxProject
+
+global proc abxProject () {
+
+	if (!`window -exists abxProjectWindow`){
+		window -title "PandaPanther Project Manager" -width 580 -height 540 -menuBar true abxProjectWindow;
+
+		//menu -label "Create";
+		//	menuItem -label "New Job" ;
+		//	menuItem -label "New Maya Project";
+
+		formLayout abxProjectWindowMainForm;
+		image -w 99 -h 52 -image "//MONKEY/Resources/maya/scripts/production/resources/pandapantherLogo.png" abxProjectLogoImage;
+		columnLayout abxProjectDetailsCol;
+		text -font "fixedWidthFont" -label ("Current Project: "+`workspace -q -rd`);
+		//text -font "fixedWidthFont" -label ("     Resolution: 1920 X 1080");
+		//text -font "fixedWidthFont" -label ("            FPS: 24");
+
+			
+		setParent ..;
+
+		button -l "Set Project" -c "abxProjectSetProjectToSelected;window -e -vis 0 abxProjectWindow;" -al "center" -h 26 abxProjectBtnRefresh ;
+		button -l "Close" -c "window -e -vis 0 abxProjectWindow" -al "center" -h 26 abxProjectBtnClose ;
+
+
+		//image -w 32 -h 32 -image "channelLayers.png" abxProjectLogoImage;
+
+		
+		paneLayout -configuration "vertical2" abxProjectMainPane;
+		formLayout abxProjectLibForm;
+		
+		formLayout -p abxProjectMainPane abxProjectDetailsForm;
+
+		text -label "Maya Projects:" abxProjectTL1;
+
+		string $projLister = `treeView -numberOfButtons 0 -abr true -enk true -sc "abxProjectSetActiveProject " -cmc "abxProjectUpdateMenu" abxProjectProjectList`;
+
+
+		setParent abxProjectLibForm;
+
+		text -label "Jobs:" abxProjectTL2;
+
+		//string $jobLister = `textScrollList  abxProjectJobList`;
+		string $jobLister = `treeView -numberOfButtons 0 -abr true -enk true -sc "abxProjectSetActiveJob " -cmc "abxProjectUpdateMenu" abxProjectJobList`;
+		string $pMenu = `popupMenu -parent $jobLister abxProjectPopupMenu`;		
+
+		abxProjectBuildMenu  $jobLister;
+
+		abxProjectPopulateList;
+
+		formLayout -e
+        		-af abxProjectMainPane top 52
+        		-af abxProjectMainPane left 0
+        		-af abxProjectMainPane bottom 35
+        		-af abxProjectMainPane right 0
+
+			-af abxProjectLogoImage top 0
+			-af abxProjectLogoImage left 0
+        		-an abxProjectLogoImage bottom
+        		-an abxProjectLogoImage right
+
+			-ac abxProjectDetailsCol left 0 abxProjectLogoImage
+			-af abxProjectDetailsCol top 0
+
+	    		-attachForm abxProjectBtnRefresh "left" 5 
+	    		-attachPosition abxProjectBtnRefresh "right" 3 50
+			-attachNone abxProjectBtnRefresh "top"
+			-attachForm abxProjectBtnRefresh "bottom" 5
+	    
+			-attachPosition abxProjectBtnClose "left" 3 50
+			-attachForm abxProjectBtnClose "right" 5
+			-attachNone abxProjectBtnClose "top"
+			-attachForm abxProjectBtnClose "bottom" 5
+
+
+        		abxProjectWindowMainForm;
+
+		formLayout -e 
+			-af abxProjectTL2 left 5
+			-af abxProjectTL2 top 0
+			-af $jobLister left 5
+			-af $jobLister top 15
+			-af $jobLister right 5
+			-af $jobLister bottom 5
+			abxProjectLibForm;
+
+		formLayout -e 
+			-af abxProjectTL1 left 5
+			-af abxProjectTL1 top 0
+			-af $projLister left 5
+			-af $projLister top 15
+			-af $projLister right 5
+			-aof $projLister bottom -150
+			abxProjectDetailsForm;
+		
+		paneLayout -e -paneSize 1 50 100 abxProjectMainPane;
+
+		
+
+		showWindow abxProjectWindow;
+		abxProjectSelectCurrentProject;
+	}
+
+	else {
+
+		showWindow abxProjectWindow;
+		abxProjectSelectCurrentProject;
+	}
+
+
+}
+
+global proc abxProjectSelectCurrentProject () {
+		
+	string $curWorkspace = `workspace -q -rd`;
+	string $tokenBuffer[];
+	tokenize $curWorkspace "/" $tokenBuffer;
+	if (size($tokenBuffer) == 4){
+		print ($tokenBuffer[0]+"/"+$tokenBuffer[1]+"\n");
+		treeView -e -selectItem ($tokenBuffer[0]+"/"+$tokenBuffer[1]) 1 abxProjectJobList;
+		treeView -e -showItem ($tokenBuffer[0]+"/"+$tokenBuffer[1]) abxProjectJobList;
+		abxProjectRefreshProjectList ($tokenBuffer[0]+"/"+$tokenBuffer[1]);
+		treeView -e -selectItem $curWorkspace 1 abxProjectProjectList;
+		treeView -e -showItem $curWorkspace abxProjectProjectList;
+	}
+
+
+}
+
+global proc abxProjectBuildMenu (string $shotLister){
+
+
+}
+
+global proc abxProjectPopulateList () {
+
+	string $jobsPath = "P:/";
+	string $jobsPath2 = "M:/";
+	string $jobFolders[] = `getFileList -folder ($jobsPath)`;
+	string $moonJobs[] = `getFileList -folder ($jobsPath2)`;
+
+	
+
+	string $sorted[] = sort($jobFolders);
+	//string $sorted[] = abxShotsSort($jobFolders);
+
+	treeView -e -addItem "Backlot" "" abxProjectJobList;
+	treeView -e -addItem "Monkey" "" abxProjectJobList;
+	treeView -e -addItem "Moon" "" abxProjectJobList;
+
+	for ($each in $sorted){
+		
+		//string $subFolders[] = `getFileList -folder ($projectPath+"/scenes/_ALL_SHOTS/"+$each+"/")`;
+		//textScrollList -e -append $each abxProjectJobList;
+		if (`filetest -d ($jobsPath+$each)` && $each != "TEMP" && $each != ".TemporaryItems" && $each != ".Trashes"){
+			treeView -e -addItem ("P:/"+$each) "Monkey" abxProjectJobList;
+			treeView -e -displayLabel ("P:/"+$each) $each abxProjectJobList;
+			//treeView -e -bti $each 1 "A" -bti $each 2 "F" -bti $each 3 "L" abxProjectJobList;
+		}
+
+	}
+	
+	$sorted = sort($moonJobs);
+
+	for ($each in $sorted){
+		//print ("adding "+$each+"\n");
+		//string $subFolders[] = `getFileList -folder ($projectPath+"/scenes/_ALL_SHOTS/"+$each+"/")`;
+		//textScrollList -e -append $each abxProjectJobList;
+		if (`filetest -d ($jobsPath2+$each)` && $each != "TEMP" && $each != ".TemporaryItems" && $each != ".Trashes"){
+			treeView -e -addItem ("M:/"+$each) "Moon" abxProjectJobList;
+			treeView -e -displayLabel ("M:/"+$each) $each abxProjectJobList;
+			//treeView -e -bti $each 1 "A" -bti $each 2 "F" -bti $each 3 "L" abxProjectJobList;
+		}
+
+	}
+
+}
+
+global proc abxProjectRefreshProjectList (string $jobName) {
+		treeView -e -removeAll abxProjectProjectList;
+
+		string $projFolders[] = `getFileList -folder ($jobName+"/3D/")`;
+		for ($each in $projFolders){
+			if (`filetest -d ($jobName+"/3D/"+$each)` && $each != "TEMP" && $each != ".TemporaryItems" && $each != ".Trashes"){
+				treeView -e -addItem ($jobName+"/3D/"+$each+"/") $jobName abxProjectProjectList;
+				treeView -e -displayLabel ($jobName+"/3D/"+$each+"/") $each abxProjectProjectList;
+			}
+		}
+
+}
+global proc int abxProjectSetActiveJob (string $jobName, int $state) {
+
+	//treeView -e -cs abxShotsList;
+	//treeView -e -si $jobName 1  abxShotsList;
+	if ($state == 1){
+		abxProjectRefreshDetailsUI $jobName;
+		//print ("set job to "+$jobName+"\n");
+		button -e -en 0 abxProjectBtnRefresh;
+
+	}
+	return 1;
+
+}
+
+global proc int abxProjectSetActiveProject (string $projName, int $state) {
+
+	//treeView -e -cs abxShotsList;
+	//treeView -e -si $jobName 1  abxShotsList;
+	if ($state == 1){
+		//abxProjectRefreshDetailsUI $jobName;
+		//print ("set job to "+$jobName+"\n");
+		button -e -en 1 abxProjectBtnRefresh;
+	}
+	return 1;
+
+}
+
+global proc abxProjectRefreshDetailsUI (string $jobName) {
+	abxProjectRefreshProjectList $jobName;
+	
+
+}
+
+global proc abxProjectSetProjectToSelected () {
+	workspace -openWorkspace `treeView -q -si abxProjectProjectList`;
+	if (`window -q -exists abxShotsWindow`){
+		abxShotsPopulateList;
+	}
+}

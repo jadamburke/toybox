@@ -1,0 +1,14 @@
+string $clust[] = `ls -selection`;
+for ($tmp in $clust)
+{
+string $clustName = substitute ("_GEO",$tmp,"");
+select -r $tmp;
+string $newClust[] = `cluster -relative -name ($clustName+"_CLS") $tmp`;
+//string $clustName = `rename $newClust($clustName+"_CLS)`;
+
+
+
+
+
+}
+

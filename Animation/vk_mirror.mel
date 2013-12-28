@@ -1,0 +1,227 @@
+global proc vk_mirror()
+{
+    string $mySel[]=`ls -sl`;
+    string $myNameSpace="";
+    string $mySide="";
+    string $myOpositSide="";
+    int $mySelSize=`size($mySel)`;
+    if ($mySelSize)
+    {
+        for ($obj in $mySel)
+        {
+            //check for namespace
+            //check for side
+            string $myBuffer[];
+            $myTokens = `tokenize $obj ":" $myBuffer`;
+            if ($myBuffer[0] != $mySel[0])
+            {
+                int $myBufferSize = size($myBuffer);
+               
+                if ($myBufferSize == 2)
+                {
+                    $myNameSpace=($myBuffer[0]+":");
+                    //side
+                    string $mySideBuffer[];
+                    $mySideTokens = `tokenize $myBuffer[1] "_" $mySideBuffer`;
+                    $mySide=$mySideBuffer[0];
+                    
+                }
+                if ($myBufferSize == 3)
+                {
+                    $myNameSpace=($myBuffer[0]+":"+$myBuffer[1]+":");
+                    //side
+                    string $mySideBuffer[];
+                    $mySideTokens = `tokenize $myBuffer[2] "_" $mySideBuffer`;
+                    $mySide=$mySideBuffer[0];
+                }
+                if ($myBufferSize == 4)
+                {
+                    $myNameSpace=($myBuffer[0]+":"+$myBuffer[1]+":"+$myBuffer[2]+":");
+                    //side
+                    string $mySideBuffer[];
+                    $mySideTokens = `tokenize $myBuffer[3] "_" $mySideBuffer`;
+                    $mySide=$mySideBuffer[0];
+                 }
+            }
+            if ($myBuffer[0] == $mySel[0])
+            {
+                 //side
+                 string $mySideBuffer[];
+                 $mySideTokens = `tokenize $myBuffer[0] "_" $mySideBuffer`;
+                 $mySide=$mySideBuffer[0];
+            }
+            if($mySide=="left")
+                $myOpositSide="right";
+            if($mySide=="right")
+                $myOpositSide="left";
+            string $flipedList[] = {($myNameSpace+$mySide+"_ikHand_CTRL"), 
+                                    ($myNameSpace+$mySide+"_ikHandPV_CTRL"), 
+                                    ($myNameSpace+$mySide+"_clavicle_CTRL"),
+                                    ($myNameSpace+$mySide+"_shoulder_CTRL"),
+                                    ($myNameSpace+$mySide+"_ear_1_04_CTRL"),
+                                    ($myNameSpace+$mySide+"_ear_1_03_CTRL"),
+                                    ($myNameSpace+$mySide+"_ear_1_02_CTRL"),
+                                    ($myNameSpace+$mySide+"_ear_1_01_CTRL"),
+                                    ($myNameSpace+$mySide+"_hipOff_CTRL"),
+                                    ($myNameSpace+$mySide+"_elbow_CTRL"),
+                                    ($myNameSpace+$mySide+"_wrist_CTRL"),
+                                    ($myNameSpace+$mySide+"_hip_CTRL"),
+                                    ($myNameSpace+$mySide+"_knee_CTRL"),
+				($myNameSpace+$mySide+"_ikArm_CTRL"),
+				($myNameSpace+$mySide+"_ikLeg_CTRL"),
+				($myNameSpace+$mySide+"_ikLegPV_CTRL"),
+				($myNameSpace+$mySide+"_ikArmPV_CTRL"),
+                                    ($myNameSpace+$mySide+"_ikFoot_CTRL"),
+				    ($myNameSpace+$mySide+"_ikFootPV_CTRL"),
+                                    
+                                        ($myNameSpace+$mySide+"_finger_1_04_CTRL"), 
+                                        ($myNameSpace+$mySide+"_finger_1_03_CTRL"), 
+                                        ($myNameSpace+$mySide+"_finger_1_02_CTRL"),
+                                        ($myNameSpace+$mySide+"_finger_1_01_CTRL"),
+                                        ($myNameSpace+$mySide+"_finger_2_04_CTRL"), 
+                                        ($myNameSpace+$mySide+"_finger_2_03_CTRL"), 
+                                        ($myNameSpace+$mySide+"_finger_2_02_CTRL"),
+                                        ($myNameSpace+$mySide+"_finger_2_01_CTRL"),
+                                        ($myNameSpace+$mySide+"_finger_3_04_CTRL"), 
+                                        ($myNameSpace+$mySide+"_finger_3_03_CTRL"), 
+                                        ($myNameSpace+$mySide+"_finger_3_02_CTRL"),
+                                        ($myNameSpace+$mySide+"_finger_3_01_CTRL"),
+                                        ($myNameSpace+$mySide+"_finger_4_04_CTRL"), 
+                                        ($myNameSpace+$mySide+"_finger_4_03_CTRL"), 
+                                        ($myNameSpace+$mySide+"_finger_4_02_CTRL"),
+                                        ($myNameSpace+$mySide+"_finger_4_01_CTRL")};
+            
+            int $foundFliped = stringArrayContains($obj, $flipedList);
+            if ($foundFliped)
+            {
+                string $oppositeObj=`substitute $mySide $obj $myOpositSide`;
+                //translation
+                if (`getAttr -k ($obj+".tx")`)
+                {
+                    float $myTx=`getAttr ($obj+".tx")`;
+                    setAttr ($oppositeObj+".tx") (-1*$myTx);
+                }
+                if (`getAttr -k ($obj+".ty")`)
+                {
+                    float $myTy=`getAttr ($obj+".ty")`;
+                    setAttr ($oppositeObj+".ty") (-1*$myTy);
+                }
+                if (`getAttr -k ($obj+".tz")`)
+                {
+                    float $myTz=`getAttr ($obj+".tz")`;
+                    setAttr ($oppositeObj+".tz") (-1*$myTz);
+                }
+                //rotaion
+                if (`getAttr -k ($obj+".rx")`)
+                {
+                    float $myRx=`getAttr ($obj+".rx")`;
+                    setAttr ($oppositeObj+".rx") $myRx;
+                }
+                if (`getAttr -k ($obj+".ry")`)
+                {
+                    float $myRy=`getAttr ($obj+".ry")`;
+                    setAttr ($oppositeObj+".ry") $myRy;
+                }
+                if (`getAttr -k ($obj+".rz")`)
+                {
+                    float $myRz=`getAttr ($obj+".rz")`;
+                    setAttr ($oppositeObj+".rz") $myRz;
+                }
+               //scale
+                if (`getAttr -k ($obj+".sx")`)
+                {
+                    float $mySx=`getAttr ($obj+".sx")`;
+                    setAttr ($oppositeObj+".sx") $mySx;
+                }
+                if (`getAttr -k ($obj+".sy")`)
+                {
+                    float $mySy=`getAttr ($obj+".sy")`;
+                    setAttr ($oppositeObj+".sy") $mySy;
+                }
+                if (`getAttr -k ($obj+".sz")`)
+                {
+                    float $mySz=`getAttr ($obj+".sz")`;
+                    setAttr ($oppositeObj+".sz") $mySz;
+                }
+            }//end of $foundFliped
+                
+                string $worldList[] = {($myNameSpace+$mySide+"_brow_CTRL"),
+                                        ($myNameSpace+$mySide+"_brow_in_CTRL"),
+                                        ($myNameSpace+$mySide+"_collar_01_CTRL"),
+                                        ($myNameSpace+$mySide+"_collar_02_CTRL"),
+                                        ($myNameSpace+$mySide+"_collar_03_CTRL"),
+                                        ($myNameSpace+$mySide+"_lookAt_CTRL"),
+                                        ($myNameSpace+$mySide+"_brow_mid_CTRL"),
+                                        ($myNameSpace+$mySide+"_brow_out_CTRL"),
+                                        ($myNameSpace+$mySide+"_eyeLid_top_CTRL"),
+                                        ($myNameSpace+$mySide+"_eyeLid_bttm_CTRL"),
+                                        ($myNameSpace+$mySide+"_top_cheek_CTRL"),
+                                        ($myNameSpace+$mySide+"_nose_side_CTRL"), 
+                                        ($myNameSpace+$mySide+"_mouth_top_sideMid_CTRL"), 
+                                        ($myNameSpace+$mySide+"_mouth_bttm_sideMid_CTRL"),
+                                        ($myNameSpace+$mySide+"_mouth_top_side_CTRL"),
+                                        ($myNameSpace+$mySide+"_mouth_bttm_side_CTRL"), 
+                                        ($myNameSpace+$mySide+"_mouth_top_sideSide_CTRL"), 
+                                        ($myNameSpace+$mySide+"_mouth_bttm_sideSide_CTRL"),
+                                        ($myNameSpace+$mySide+"_mouth_corner_CTRL"),
+                                        ($myNameSpace+$mySide+"_creaseLine_CTRL"),
+                                        ($myNameSpace+$mySide+"_toe_CTRL")};
+
+             //
+             int $foundWorldList = stringArrayContains($obj, $worldList);
+             if ($foundWorldList)
+             {//start $foundWorldList
+                string $oppositeObj=`substitute $mySide $obj $myOpositSide`;
+                //translation
+                if (`getAttr -k ($obj+".tx")`)
+                {
+                    float $myTx=`getAttr ($obj+".tx")`;
+                    setAttr ($oppositeObj+".tx") (-1*$myTx);
+                }
+                if (`getAttr -k ($obj+".ty")`)
+                {
+                    float $myTy=`getAttr ($obj+".ty")`;
+                    setAttr ($oppositeObj+".ty") $myTy;
+                }
+                if (`getAttr -k ($obj+".tz")`)
+                {
+                    float $myTz=`getAttr ($obj+".tz")`;
+                    setAttr ($oppositeObj+".tz") $myTz;
+                }
+                //rotaion
+                if (`getAttr -k ($obj+".rx")`)
+                {
+                    float $myRx=`getAttr ($obj+".rx")`;
+                    setAttr ($oppositeObj+".rx") (-1*$myRx);
+                }
+                if (`getAttr -k ($obj+".ry")`)
+                {
+                    float $myRy=`getAttr ($obj+".ry")`;
+                    setAttr ($oppositeObj+".ry") (-1*$myRy);
+                }
+                if (`getAttr -k ($obj+".rz")`)
+                {
+                    float $myRz=`getAttr ($obj+".rz")`;
+                    setAttr ($oppositeObj+".rz") (-1*$myRz);
+                }
+               //scale
+                if (`getAttr -k ($obj+".sx")`)
+                {
+                    float $mySx=`getAttr ($obj+".sx")`;
+                    setAttr ($oppositeObj+".sx") $mySx;
+                }
+                if (`getAttr -k ($obj+".sy")`)
+                {
+                    float $mySy=`getAttr ($obj+".sy")`;
+                    setAttr ($oppositeObj+".sy") $mySy;
+                }
+                if (`getAttr -k ($obj+".sz")`)
+                {
+                    float $mySz=`getAttr ($obj+".sz")`;
+                    setAttr ($oppositeObj+".sz") $mySz;
+                }
+             }//end $foundWorldList      
+         }
+    }
+}
+vk_mirror();

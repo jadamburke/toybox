@@ -1,0 +1,11 @@
+// groupEach
+// Created by: adambu
+// Date: 2011/12/04 23:24:49
+
+global proc groupEach(){
+$sel = `ls -sl`;
+for ($each in $sel){
+	group -name ($each+"_GRP") $each;
+	xform -cp ($each+"_GRP");
+	}
+}

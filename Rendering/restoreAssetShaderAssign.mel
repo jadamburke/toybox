@@ -1,0 +1,51 @@
+// restoreAssetShaderAssign
+
+global proc restoreAssetShaderAssign () {
+	
+	string $selectedObjs[] = `ls -sl`;
+
+	for ($each in $selectedObjs){
+
+		string $targetObj = $each;
+		string $targetNamespace = "";
+
+		string $tokenBuffer2[];
+		tokenize $targetObj ":" $tokenBuffer2;
+		
+		if (size($tokenBuffer2) > 1){
+			$targetNamespace = ($tokenBuffer2[0]+":");
+			if (size($tokenBuffer2)>2){
+				for ($j=1;$j<size($tokenBuffer2)-1;$j++){
+					$targetNamespace += ($tokenBuffer2[$j]+":");
+				}
+			}
+		}
+
+		
+		evalEcho("doRestoreAssetShaderAssign \""+$sourceNamespace+"\"");
+	}
+
+}
+
+global proc doRestoreAssetShaderAssign (string $sourceNamespace) {
+
+	$sourceGeo  = `ls -type mesh -noIntermediate ($sourceNamespace+"*")`;
+	for ($each in $sourceGeo){
+		string $sgName = "";
+		if (`attributeExists "shadingGroupName" $each`){
+			$sgName = `getAttr ($each+".shadingGroupName")`;
+			if ($sgName != "initialShadingGroup"){
+				if (`objExists ($sourceNamespace+$sgName)`)
+					evalEcho("sets -forceElement \""+$sourceNamespace+$sgName+"\" \""+$each+"\"");
+				else 
+					print ($sourceNamespace+$sgName+" does not exist, skipping");
+			}
+			
+		}
+
+	}
+
+
+
+
+}

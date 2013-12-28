@@ -1,0 +1,4 @@
+VRay sphere light 
+ 
+ 
+ 

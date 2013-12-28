@@ -1,0 +1,9 @@
+// turntable
+// Created by: raphe
+// Date: 2012/03/09 09:57:51
+
+global proc turnTable(){
+
+	file -import -type "mayaAscii" -ra true -namespace "lightRig_07" -options "v=0"  -pr -loadReferenceDepth "all" "M:/Skylanders2_Giants_PP10092/3D/skylanders2_giants_maya/scenes/templates/lightRig_07.ma";
+
+}

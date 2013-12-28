@@ -1,0 +1,3799 @@
+
+
+global string $baus_mainWindowName;
+
+
+$baus_mainWindowName = `window -title "Byron's Automatic Unwrap Tools" -in "B.A.U.S." -w 500 -s 0`;
+
+tabLayout "baus_mainTabs";
+
+	columnLayout -columnAttach "both" 5 -rowSpacing 10 -columnWidth 500 baus_phase1;
+
+		frameLayout -label "Creation" -labelAlign "center"
+    				-borderStyle "etchedIn";
+    					
+				
+				rowColumnLayout 
+					-nc 1
+					-cw 1 480
+					-cal 1 center;
+		
+			
+				separator -style "none";
+				separator -style "none";
+
+
+					button -l "Use Selected" -c getBaseMesh "baseMeshButton";
+				
+
+				separator -style "none";
+				separator -style "none";
+				
+
+				setParent ..;
+
+		
+    		setParent ..;
+
+	
+	
+		frameLayout -label "UV-Set Editing" -labelAlign "center"
+    				-borderStyle "etchedIn";
+    					
+				rowColumnLayout 
+					-numberOfColumns 3 
+					-cal 1 center
+					-cal 2 center
+					-cs 2 20
+					-cs 3 12
+					-cw 1 200
+					-cw 2 125
+					-cw 3 125;
+		
+				
+    					
+					textScrollList -m `au_isBaseMeshAvailable` -nr 4 -sc "polyUVSet -uvs `textScrollList -q -si au_uvSetScroller` -cuv $baseMesh; string $temp[] = `textScrollList -q -si au_uvSetScroller`; text -e -l (\"Current UVSet: \" + $temp[0]) UVNameText;" "au_uvSetScroller"; 
+
+					button -l "Create New" -en `au_isBaseMeshAvailable` -c " polyUVSet -create -uvSet  \"NewSet\" $baseMesh; getUVSetList;" createUVSetButton;
+
+					button -l "Delete Current" -en `au_isBaseMeshAvailable` -c "int $temp2[] = `polyEvaluate -uv $baseMesh`; if ($temp2[0] == 0) au_deleteUVSet; else {string $result = `confirmDialog -title \"Warning - UVSet not empty\" -message \"The current uvSet is not empty. Do you really want to delete it?\" -button \"Yes\" -button \"No\" -defaultButton \"Yes\" -cancelButton \"No\" -dismissString \"No\"`; if ($result == \"Yes\") au_deleteUVSet; }" deleteUVButton;
+					
+					text  -l "No mesh selected" UVNameText;
+
+// ----> Text verliert Fokus, wenn man per Script (indizes) die Auswahl des ScrollFeldes verändert. Funzt es vielleicht mit StringVeränderung?
+
+					button -l "Rename Current" -en `au_isBaseMeshAvailable` -c "au_renameUVSet;" renameUVButton;
+					
+					button -l "Open UVTextureEditor" -en `au_isBaseMeshAvailable` -c "TextureViewWindow;" tViewButton;
+				
+					
+				
+				separator -style "none";
+				separator -style "none";
+				separator -style "none";
+
+				
+				setParent ..;
+
+		
+    		setParent ..;
+		
+
+	setParent ..;
+		
+
+
+
+	columnLayout -columnAttach "both" 5 -rowSpacing 10 -columnWidth 500 baus_phase2;
+
+		frameLayout -label "Attributes" -labelAlign "center"
+    				-borderStyle "etchedIn";
+    					
+				
+				
+				
+
+
+
+				rowColumnLayout 
+					-nc 1
+					-cw 1 480
+					-cal 1 center;
+		
+				separator -style "none";
+				separator -style "none";
+				separator -style "none";
+    					
+				rowColumnLayout 
+					-nc 2
+					-cw 1 240
+					-cw 2 240
+					-cal 1 center;
+				
+					checkBoxGrp
+						-numberOfCheckBoxes 1
+						-label "Enable Advanced Controls"
+						-en `au_isBaseMeshAvailable`
+						-en1 0
+						-on1 "checkBoxGrp -e -en `checkBoxGrp -q -v1 au_enableAdvancedCheckBox` au_advancedCheckBox; button -e -en `checkBoxGrp -q -v1 au_enableAdvancedCheckBox` assignShaderButton; if(!`checkBoxGrp -q -v3 au_advancedCheckBox`)checkBox -e -en 1 afterStrokeAssigner;"
+						-of1 "checkBoxGrp -e -en `checkBoxGrp -q -v1 au_enableAdvancedCheckBox` au_advancedCheckBox; button -e -en `checkBoxGrp -q -v1 au_enableAdvancedCheckBox` assignShaderButton; resetAttributes; checkBox -e -en 0 -v 0 afterStrokeAssigner; au_afterStrokeChanger;"
+						au_enableAdvancedCheckBox;
+
+					
+
+				setParent ..;
+
+				rowColumnLayout 
+					-nc 2
+					-cw 1 445
+					-cw 2 35
+					-cal 1 center;
+
+					checkBoxGrp
+    						-numberOfCheckBoxes 3
+    						-label "Current Face Selection:"
+    						-labelArray3 "Include" "Exclude" "Group"
+						-va3 1 0 0
+			
+						-on1 "checkBoxGrp -e -v2 0 -en3 1 au_advancedCheckBox; if (`checkBoxGrp -q -v1 au_advancedCheckBox` + `checkBoxGrp -q -v2 au_advancedCheckBox` + `checkBoxGrp -q -v3 au_advancedCheckBox` < 1) {button -e -en 0 assignShaderButton; checkBox -e -en 0 -v 0 afterStrokeAssigner; au_afterStrokeChanger;}else {button -e -en 1 assignShaderButton; checkBox -e -en 1 afterStrokeAssigner;}"
+						-of1 "checkBoxGrp -e -v3 0 au_advancedCheckBox; if (`checkBoxGrp -q -v1 au_advancedCheckBox` + `checkBoxGrp -q -v2 au_advancedCheckBox` + `checkBoxGrp -q -v3 au_advancedCheckBox` < 1) {button -e -en 0 assignShaderButton; checkBox -e -en 0 -v 0 afterStrokeAssigner; au_afterStrokeChanger;} else {button -e -en 1 assignShaderButton; checkBox -e -en 1 afterStrokeAssigner;}"
+						-on2 "checkBoxGrp -e -v1 0 -v3 0 -en3 0 au_advancedCheckBox; if (`checkBoxGrp -q -v1 au_advancedCheckBox` + `checkBoxGrp -q -v2 au_advancedCheckBox` + `checkBoxGrp -q -v3 au_advancedCheckBox` < 1) {button -e -en 0 assignShaderButton; checkBox -e -en 0 -v 0 afterStrokeAssigner; au_afterStrokeChanger;} else {button -e -en 1 assignShaderButton; checkBox -e -en 1 afterStrokeAssigner;}"
+						-of2 "checkBoxGrp -e -en3 1 au_advancedCheckBox; if (`checkBoxGrp -q -v1 au_advancedCheckBox` + `checkBoxGrp -q -v2 au_advancedCheckBox` + `checkBoxGrp -q -v3 au_advancedCheckBox` < 1) {button -e -en 0 assignShaderButton; checkBox -e -en 0 -v 0 afterStrokeAssigner; au_afterStrokeChanger;} else {button -e -en 1 assignShaderButton; checkBox -e -en 1 afterStrokeAssigner;}"
+						-on3 "checkBoxGrp -e -v1 1 au_advancedCheckBox; if (`checkBoxGrp -q -v1 au_advancedCheckBox` + `checkBoxGrp -q -v2 au_advancedCheckBox` + `checkBoxGrp -q -v3 au_advancedCheckBox` < 1) {button -e -en 0 assignShaderButton; checkBox -e -en 0 -v 0 afterStrokeAssigner; au_afterStrokeChanger;} else {button -e -en 1 assignShaderButton; checkBox -e -en 0 -v 0 afterStrokeAssigner; au_afterStrokeChanger;}"
+						-of3 "checkBox -e -en 1 afterStrokeAssigner"
+						-en 0
+						au_advancedCheckBox;
+
+
+					button -l "GM" -c createGroupManagerWindow -en `objExists "includedFaces_mapPlanar_automaticUVShader"` groupManagerButton;
+
+				setParent ..;
+				
+				separator -style "none";
+				separator -style "none";
+				
+				
+				separator -w 500;	
+
+
+			
+				separator -style "none";
+				separator -style "none";
+
+					rowColumnLayout 
+						-nc 3
+						-cw 1 140
+						-cw 3 260
+						-cw 2 80
+						-cal 1 left
+						-cal 2 left;
+
+						checkBox 
+							-label "After-Stroke-Assignment" 
+							-en `au_isBaseMeshAvailable` 
+							-cc au_afterStrokeChanger 
+							afterStrokeAssigner;
+						
+						button -l "Paint Selection" -c "string $selected[] = `filterExpand -sm 34`; if (`selectMode -q -object`) {setSelectMode(\"components\", \"Components\");hilite -r $baseMesh; } SelectFacetMask; paintSelectTool; if(`checkBox -q -v afterStrokeAssigner`) artSelectCtx -e -asc \"assignPolygonAttributes\" `currentCtx`; else artSelectCtx -e -asc \"\" `currentCtx`; if(size($selected) != 0)select $selected;" -en `au_isBaseMeshAvailable` paintSelectEnableButton;
+						button -l "Assign Attributes" -en 0 -al center -c assignPolygonAttributes "assignShaderButton";
+					
+					
+					setParent ..;
+
+			
+					
+					
+				
+
+
+				
+				separator -style "none";
+				separator -style "none";
+
+
+				separator -w 500;
+
+				rowColumnLayout 
+					-nc 2
+					-cw 1 255
+					-cw 2 225
+					-cal 1 center;
+
+
+					button -l "Reset Attributes" -al center -c "string $result = `confirmDialog -title \"Warning\" -message \"Do you really want to dismiss your attributes?\" -button \"Yes\" -button \"No\" -defaultButton \"Yes\" -cancelButton \"No\" -dismissString \"No\"`; if ($result == \"Yes\") resetAttributes;" -en `au_isAttrMapAssigned` "resetButton";
+					button -l "Delete Attributes on Selected" -c "baus_deleteAttributes(0)" -en `au_isAttrMapAssigned` deleteAttributesButton;
+				
+			
+				setParent ..;
+
+				separator -w 500;
+
+				separator -style "none";
+				separator -style "none";
+
+				rowColumnLayout 
+						-nc 3
+						-cw 1 225
+						-cw 3 225
+						-cw 2 30;
+
+			
+					
+				
+						button -l "Make hard Edge (= cut in UVMesh)" -en `au_isBaseMeshAvailable` -c "au_modifyEdge(\"hard\")" hardEdgeButton;
+
+						button -l "V" -en `au_isBaseMeshAvailable` -c "int $temp225[] = `polyOptions -q -he $baseMesh`; if($temp225[0]) polyOptions -ae $baseMesh; else polyOptions -he $baseMesh;" lookButton;
+	
+						button -l "Make soft Edge" -en 	`au_isBaseMeshAvailable` -c "au_modifyEdge(\"soft\")" softEdgeButton;			
+
+					setParent ..;
+
+				setParent ..;
+			setParent ..;
+		
+				
+			frameLayout -label "Component Selection" -labelAlign "center"
+    				-borderStyle "etchedIn";
+
+
+				rowColumnLayout 
+					-nc 1
+					-cw 1 480;
+
+				rowColumnLayout 
+					-nc 6
+					-cw 1 40
+					-cw 2 120
+					-cw 3 40
+					-cw 4 120
+					-cw 5 40
+					-cw 6 120
+					-cal 1 center;
+			
+				button -label "Add" -en `objExists "includedFaces_automaticUVShader"` -c "if (`objExists \"includedFaces_automaticUVShader\"`){string $selected[] = `ls -sl`; hyperShade -objects includedFaces_automaticUVShader; select -add $selected;}" "ADDselectIncludedButton";
+				button -label "Select Included" -en `objExists "includedFaces_automaticUVShader"` -c "if (`objExists \"includedFaces_automaticUVShader\"`) hyperShade -objects includedFaces_automaticUVShader;" "selectIncludedButton" ;
+				
+				button -label "Add" -en `objExists "excludedFaces_automaticUVShader"` -c "if (`objExists \"excludedFaces_automaticUVShader\"`){string $selected[] = `ls -sl`; hyperShade -objects excludedFaces_automaticUVShader; select -add $selected;}" "ADDselectExcludedButton";
+				button -label "Select Excluded" -en `objExists "excludedFaces_automaticUVShader"` -c "if (`objExists \"excludedFaces_automaticUVShader\"`) hyperShade -objects excludedFaces_automaticUVShader;" "selectExcludedButton";
+				
+				button -label "Add" -en `objExists "includedFaces_mapPlanar_automaticUVShader"` -c "if (`objExists \"includedFaces_mapPlanar_automaticUVShader\"`){string $selected[] = `ls -sl`; hyperShade -objects includedFaces_mapPlanar_automaticUVShader; select -add $selected;}" "ADDselectPlanarButton";
+				button -label "Select All Groups" -en `objExists "includedFaces_mapPlanar_automaticUVShader"` -c "if (`objExists \"includedFaces_mapPlanar_automaticUVShader\"`) hyperShade -objects includedFaces_mapPlanar_automaticUVShader;" "selectPlanarButton";
+
+				setParent ..;
+				
+				text -l "";
+				separator -w 150;
+				text -l "";
+
+				rowColumnLayout 
+					-nc 3
+					-cw 1 160
+					-cw 2 160
+					-cw 3 160;
+						
+					
+					button -l "Select Outline" -c "if ( size(`filterExpand -sm 34`) == 0 ) warning \"Please select some Faces\"; else {string $buttonOutline[] = au_queryOutline(`ls -sl`); select $buttonOutline;}" -en `au_isBaseMeshAvailable` outlineSelectButton;				
+					button -l "Select Cutedge-Faceoutline" -c "string $meshName = `au_appropriateBaseMesh`; int $tempEdges[] = `polyEvaluate -edge $meshName`; string $hardEdges[] = au_queryHardEdges($tempEdges[0]); if( size($hardEdges) != 0 ){ select $hardEdges; PolySelectConvert 1;} else warning \"Please create some Hard Edges\";  " -en `au_isBaseMeshAvailable` blendSetFacesButton;
+					button -l "Select Hard Edges" -c "string $meshName = `au_appropriateBaseMesh`; int $tempEdges[] = `polyEvaluate -edge $meshName`; string $hardEdges[] = au_queryHardEdges($tempEdges[0]); if( size($hardEdges) != 0 ) select $hardEdges;  else warning \"Please create some Hard Edges\"; " -en `au_isBaseMeshAvailable` selectHardEdgesButton;
+
+				
+				
+				
+				setParent ..;
+				
+				text -l "";
+				separator -w 500;
+				text -l "";
+				
+				rowColumnLayout 
+					-nc 2
+					-cw 1 240
+					-cw 2 240;
+				
+
+
+				
+					button -l "Save Original Edges" -c "global string $baseMesh; string $meshName = `au_appropriateBaseMesh`; int $tempEdges[] = `polyEvaluate -edge $meshName`; global string $au_origEdgesSave[];   if ( size($au_origEdgesSave) != 0 ) {string $result = `confirmDialog -title \"Warning\" -message \"You already saved the edges. Would you like to overwrite them?\" -button \"Yes\" -button \"No\" -defaultButton \"Yes\" -cancelButton \"No\" -dismissString \"No\"`; if ($result == \"Yes\"){ $au_origEdgesSave = au_queryHardEdges($tempEdges[0]); button -e -label \"Original Edges Saved Again\" saveOriginalEdgesButton; button -e -en 1 restoreOriginalEdgesButton; select $baseMesh;} } else {$au_origEdgesSave = au_queryHardEdges($tempEdges[0]); button -e -label \"Original Edges Saved\" saveOriginalEdgesButton; button -e -en 1 restoreOriginalEdgesButton; select $baseMesh;  }  " -en `au_isBaseMeshAvailable` saveOriginalEdgesButton;
+		
+					button -l "Restore Original Edges" -en 0 -c "global string $baseMesh; string $meshName = `au_appropriateBaseMesh`; int $tempEdges[] = `polyEvaluate -edge $meshName`; global string $au_origEdgesSave[];    string $result = `confirmDialog -title \"Warning\" -message \"Your current hard Edges will be lost.\" -button \"OK\" -button \"Abort\" -defaultButton \"OK\" -cancelButton \"Abort\" -dismissString \"Abort\"`; if ($result == \"OK\"){select ($meshName + \".e[0:\" + ($tempEdges[0] - 1) + \"]\"); polySoftEdge -a 180 -ch 0 ; select $au_origEdgesSave; polySoftEdge -a 0 -ch 0; select $baseMesh; print \"Original Edges have been restored. They are still saved and can be restored again.\";}" restoreOriginalEdgesButton;
+				
+				
+					
+
+				setParent ..;				
+
+				
+			setParent ..;
+
+		setParent ..;
+		
+	setParent ..;
+
+
+
+			
+			
+				
+
+
+
+
+	columnLayout -columnAttach "both" 5 -rowSpacing 10 -columnWidth 500 baus_phase4;	
+	
+	
+	frameLayout -label "Sew UV Options" -labelAlign "center"
+    				-borderStyle "etchedIn";
+
+
+		rowColumnLayout 
+					-numberOfColumns 1
+					-cal 1 left
+					-cw 1 480;
+		
+
+		checkBox -l "MoveAndSew automatically" -v 1 -onc "radioButtonGrp -e -en 1 -sl 1 sewMethodSelector; if( `objExists \"includedFaces_mapPlanar_automaticUVShader\"` ) checkBox -e -en 1 separatePMFClustersButton;" -ofc "radioButtonGrp -e -en 0 sewMethodSelector; checkBox -e -en 0 separatePMFClustersButton; tabLayout -e -m 0 au_balanceTabs" moveAndSewCheck;		
+
+
+				separator -style "none";
+				separator -style "none";
+				separator -style "none";
+
+		
+		radioButtonGrp -numberOfRadioButtons 2
+    					-label "Sew Method" -sl 1 -labelArray2 "All at Once" "Piece by Piece"  sewMethodSelector;
+
+				separator -style "none";
+				separator -style "none";
+				separator -style "none";
+
+		checkBox -l "Grouped Faces may be separated by hard Edges" -en 0  separatePMFClustersButton;
+
+		
+
+		
+
+		setParent ..;
+	setParent ..;
+
+
+
+
+	frameLayout -label "Misc & Optimizations" -labelAlign "center"
+    					-borderStyle "etchedIn";
+
+
+			rowColumnLayout 
+					-numberOfColumns 2
+					-cal 1 center
+					-cal 2 center
+					
+					-cw 1 240
+					-cw 2 240;
+		
+			
+					
+			
+		
+		
+
+				
+				
+				checkBox -l "Rescale Faces (Recommended)" -v 1 rescaleFacesCheck;			
+
+					checkBox -l "Preserve BasemeshHistory" -v 1 -cc "$workBaseMesh = \"\";" preserveHistoryCheck;
+				
+				checkBox -l "Layout and Normalize Result" -v 1 layoutAndNormalizeResultCheck;				
+	
+					
+			
+	
+			
+				
+			
+
+					
+	
+			setParent ..;
+		setParent ..;
+
+
+		
+
+		button -l "-->Create UVs<--" -c au_createUVs -en `au_createUVValid` createUVButton;
+
+	setParent ..;
+
+
+
+	
+
+	columnLayout -columnAttach "both" 5 -rowSpacing 10 -columnWidth 500 baus_softSelectionTools;
+
+		
+		frameLayout -label "Falloff Options" -labelAlign "center"
+    					-borderStyle "etchedIn";
+
+
+				rowColumnLayout 
+					-numberOfColumns 5
+					-cal 1 left
+					-cal 2 center
+					-cal 3 center
+					-cal 4 center
+					-cal 5 center
+					
+					
+					-cw 1 96
+					-cw 2 96
+					-cw 3 96
+					-cw 4 96
+					-cw 5 96;
+							
+	
+
+				
+				
+				iconTextRadioCollection SST_IconRadioCollection;
+
+					iconTextRadioButton 	-st "iconOnly"
+                        					-i1 "SST_Falloff1on.bmp" 
+								-onc "SST_editTangents(1); iconTextRadioButton -e -i1 \"SST_Falloff1on.bmp\" SST_b1 "
+								-ofc "iconTextRadioButton -e -i1 \"SST_Falloff1off.bmp\" SST_b1"
+								-sl
+								SST_b1;
+
+					iconTextRadioButton 	-st "iconOnly"
+                         					-i1 "SST_Falloff2off.bmp" 
+								-onc "SST_editTangents(2); iconTextRadioButton -e -i1 \"SST_Falloff2on.bmp\" SST_b2 "
+								-ofc "iconTextRadioButton -e -i1 \"SST_Falloff2off.bmp\" SST_b2"
+								SST_b2;
+
+
+					
+					iconTextRadioButton 	-st "iconOnly"
+                         					-i1 "SST_Falloff3off.bmp" 
+								-onc "SST_editTangents(3); iconTextRadioButton -e -i1 \"SST_Falloff3on.bmp\" SST_b3 "
+								-ofc "iconTextRadioButton -e -i1 \"SST_Falloff3off.bmp\" SST_b3"
+								SST_b3;
+
+					
+					iconTextRadioButton 	-st "iconOnly"
+                         					-i1 "SST_Falloff4off.bmp" 
+								-onc "SST_editTangents(4); iconTextRadioButton -e -i1 \"SST_Falloff4on.bmp\" SST_b4 "
+								-ofc "iconTextRadioButton -e -i1 \"SST_Falloff4off.bmp\" SST_b4"
+								SST_b4;
+		
+					iconTextRadioButton 	-st "iconOnly"
+                         					-i1 "SST_Falloff5off.bmp" 
+								-onc "GraphEditor; toggleAutoLoad graphEditor1OutlineEd 1;  select SST_Falloff; FrameSelected; toggleAutoLoad graphEditor1OutlineEd 0; iconTextRadioButton -e -i1 \"SST_Falloff5on.bmp\" SST_b5 "
+								-ofc "delete SST_Falloff;SST_init ; iconTextRadioButton -e -i1 \"SST_Falloff5off.bmp\" SST_b5"
+								SST_b5;
+
+				
+				//checkBox -l "Custom" -v 0 -onc "GraphEditor; toggleAutoLoad graphEditor1OutlineEd 1;  select SST_Falloff; FrameSelected; toggleAutoLoad graphEditor1OutlineEd 0; radioButtonGrp -e -en 0 soft_falloff;" -ofc "radioButtonGrp -e -en 1 soft_falloff; cmdFileOutput -c $SST_fileID; delete SST_Falloff;SST_init ; SST_editTangents(`radioButtonGrp -q -sl soft_falloff`); deleteUI graphEditor1Window;" soft_customFalloffCheck;
+
+
+
+				setParent ..;
+
+
+		setParent ..;
+
+
+		
+
+
+
+		rowColumnLayout 
+					-numberOfColumns 3
+					-cal 1 left
+					-cal 2 left
+					-cal 3 left
+					-cw 1 90
+					-cs 2 5
+					-cw 2 295
+					-cs 3 5
+					-cw 3 95;
+	
+		
+		frameLayout -label "Read In" -labelAlign "center"
+    					-borderStyle "etchedIn";
+
+
+			rowColumnLayout 
+					-numberOfRows 2
+					-w 80
+					-rh 1 20
+					-rh 2 40;
+
+					button -l "Read In Mode" -c "if(`button -q -l SST_modeButton` == \"Automatically\"){button -e -en 1 -l \"Manually\" SST_modeButton; SST_killInitSJ(0) ;} else {button -e -en 0 -l \"Automatically\" SST_modeButton; SST_init; }" SST_readButton;
+					button -l "Automatically" -en 0 -c SST_getSoftSelected SST_modeButton;		
+
+
+
+
+				setParent ..;
+		setParent ..;
+
+		frameLayout -label "Area Options" -labelAlign "center"
+    					-borderStyle "etchedIn";
+
+		
+				
+			rowColumnLayout 
+					-numberOfColumns 1
+					-cal 1 left
+					-cw 1 480;
+					
+
+				rowColumnLayout 
+					-nc 3
+					-cw 1 40
+					-cw 2 100
+					-cw 3 100;
+
+				text -l "By: ";
+					
+					radioCollection soft_radiusType;
+					
+						radioButton -label "Radius" -sl -onc "rowColumnLayout -e -en 1 soft_radius; rowColumnLayout -e -en 0 soft_edges; SST_getSoftSelected;" SST_radiusRadio;
+						radioButton -label "Edge Distance" -onc "rowColumnLayout -e -en 0 soft_radius; rowColumnLayout -e -en 1 soft_edges; SST_getSoftSelected;" SST_edgeRadio;
+					
+					
+
+
+				setParent ..;
+				
+				
+				rowColumnLayout 
+					-nc 3
+					-cw 1 40
+					-cw 2 100
+					-cw 3 155
+					soft_radius;
+
+				text -l "Radius";
+				floatField -v 0.5 -min 0.1 -max 6 -pre 3 -cc "string $selected[] = `ls -sl`;select $selected; floatSlider -e -v `floatField -q -v SST_radiusField` SST_radiusSlider" SST_radiusField;
+				floatSlider -step 0.01 -v 0.5 -min 0.1 -max 3 -cc "string $selected[] = `ls -sl`;select $selected;" -dc "floatField -e -v `floatSlider -q -v SST_radiusSlider` SST_radiusField; " SST_radiusSlider;
+
+				setParent ..;
+
+				rowColumnLayout 
+					-nc 3
+					-en 1
+					-cw 1 40
+					-cw 2 100
+					-cw 3 155
+					soft_edges;
+
+				text -l "Edges";
+				intField -v 2 -min 2 -max 20 -cc "string $selected[] = `ls -sl`;select $selected;  intSlider -e -v `intField -q -v SST_edgeField` SST_edgeSlider;" SST_edgeField;
+				intSlider -v 2 -min 2 -max 10 -cc "string $selected[] = `ls -sl`;select $selected;" -dc "intField -e -v `intSlider -q -v SST_edgeSlider` SST_edgeField; " SST_edgeSlider;
+
+
+
+				setParent ..;				
+
+			setParent ..;
+
+		setParent ..;
+
+		
+		frameLayout -label "Update" -labelAlign "center"
+    					-borderStyle "etchedIn";
+
+			rowColumnLayout 
+					-numberOfRows 2
+					-w 80
+					-rh 1 40
+					-rh 2 20;
+		
+				button -l "Update" -c SST_Update;
+				button -l "Floating Window" -c "if(!`window -ex SST_FloatingWindow`){window -title \"Floating Update\" -in \"SST\" -s 0 SST_FloatingWindow; rowColumnLayout -nc 1 -cw 1 95; button -l \"Update\" -c SST_Update; showWindow; window -e -w 100 -h 47 SST_FloatingWindow;   }";
+			
+					
+
+			setParent ..;
+		
+
+		setParent ..;
+
+		
+
+		setParent ..;
+
+		
+		
+
+	setParent ..;
+
+	tabLayout -e -tabLabel baus_phase1 "Creation Tab" -tabLabel baus_phase2 "Attributes Tab" -tabLabel baus_phase4 "Sew-Options/Create Tab" -tabLabel baus_softSelectionTools "SoftSelTools"
+		-psc "  if(`tabLayout -q -st baus_mainTabs` == \"baus_phase1\"){ window -e -h 220 -w 520 $baus_mainWindowName; SST_killInitSJ(0); UI_deleteFloatingWindows;} else if(`tabLayout -q -st baus_mainTabs` == \"baus_phase2\") {window -e -h 390 -w 520 $baus_mainWindowName; SST_killInitSJ(0); UI_deleteFloatingWindows;} else if(`tabLayout -q -st baus_mainTabs` == \"baus_phase4\"){ window -e -h 240 -w 520 $baus_mainWindowName; SST_killInitSJ(0); UI_deleteFloatingWindows;} else if(`tabLayout -q -st baus_mainTabs` == \"baus_softSelectionTools\"){ window -e -h 220 -w 520 $baus_mainWindowName; if(`button -q -l SST_modeButton` == \"Automatically\") SST_init; UI_deleteFloatingWindows; }        " 
+		baus_mainTabs;
+		
+//GLobale Variablen zurücksetzen
+
+global int $planarMappedFacesIndex;
+$planarMappedFacesIndex = 0;
+global string $planarMappedFaces[];
+clear $planarMappedFaces;
+getUVSetList;
+
+
+showWindow;
+
+
+window -e -h 220 -w 520 $baus_mainWindowName;
+rowColumnLayout -e -en 0 soft_edges;
+
+
+
+
+//SetUp ScriptJobs
+
+//wird beim schließen des Fensters aktiviert
+scriptJob -p $baus_mainWindowName -uid $baus_mainWindowName "baus_saubermachen";
+
+scriptJob -p $baus_mainWindowName -ct "delete" "if ( !`objExists $baseMesh` ) {baus_saubermachen; $baseMesh = \"\"; baus_buttonEnabler(int(1)); }"; 
+scriptJob -p $baus_mainWindowName -e "NewSceneOpened" "baus_saubermachen; $baseMesh = \"\"; baus_buttonEnabler(int(1));";	
+
+
+
+global proc baus_saubermachen(){
+	
+	global string $baseMesh = "";
+	global string $weightMesh;
+	global string $workBaseMesh;
+	global string $groupManagerName;
+	
+	
+
+	if( `objExists $workBaseMesh`)
+		delete $workBaseMesh;
+
+
+
+	
+	if( `objExists $weightMesh`)
+		delete $weightMesh;
+
+	
+	if( `objExists "includedFaces_mapPlanar_automaticUVShader"`){
+		
+		hyperShade -objects includedFaces_mapPlanar_automaticUVShader;
+		delete "includedFaces_mapPlanar_automaticUVShader";
+		delete "includedFaces_mapPlanar_automaticUVShaderSG";
+
+		if (size(`ls -sl`) != 0){
+			
+			if (`objExists "includedFaces_automaticUVShader"`)
+			
+				hyperShade -assign "includedFaces_automaticUVShader";
+			else
+				hyperShade -assign "lambert1";
+			}
+
+		
+		
+		}
+
+	if( `objExists "au_customFalloff"` )
+		delete "au_customFalloff";
+
+
+	if( `objExists "SST_Falloff"` )
+		delete "SST_Falloff";
+	
+	
+	if(`objExists $baseMesh`)
+		showHidden -a $baseMesh;
+
+
+
+
+	if(`window -ex $groupManagerName`)
+		deleteUI $groupManagerName;
+
+	if(`window -ex SST_FloatingWindow`)
+		deleteUI SST_FloatingWindow;
+		
+	SST_killInitSJ(1);
+	
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
+
+	
+
+
+	
+
+
+	
+
+
+//
+//------------------------------------------------------------->>>> UI global procedures <<<<-----------------------------------------------------
+//
+
+global proc au_afterStrokeChanger(){
+
+	if( (`currentCtx` == "artSelectContext") && ( (`checkBox -q -v afterStrokeAssigner`) == 0) ) 
+		artSelectCtx -e -asc "" `currentCtx`;
+	
+
+	if( (`currentCtx` == "artSelectContext") && ( (`checkBox -q -v afterStrokeAssigner`) == 1) ) 
+		artSelectCtx -e -asc "assignPolygonAttributes" `currentCtx`;
+
+}
+
+
+
+//
+//-----<<>>-----
+//
+
+global proc UI_deleteFloatingWindows(){
+
+	global string $groupManagerName;
+
+	if(`window -ex $groupManagerName`)
+		deleteUI $groupManagerName;
+
+	if(`window -ex SST_FloatingWindow`)
+		deleteUI SST_FloatingWindow;
+
+}
+//
+//-----<<>>-----
+//
+
+global proc string selectButtonCheck(){
+
+	button -e -en `objExists "includedFaces_automaticUVShader"` "selectIncludedButton" ;
+	button -e -en `objExists "includedFaces_automaticUVShader"` "ADDselectIncludedButton" ;
+	
+	button -e -en `objExists "excludedFaces_automaticUVShader"` "selectExcludedButton";
+	button -e -en `objExists "excludedFaces_automaticUVShader"` "ADDselectExcludedButton";
+	
+	button -e -en `objExists "includedFaces_mapPlanar_automaticUVShader"` "selectPlanarButton";
+	button -e -en `objExists "includedFaces_mapPlanar_automaticUVShader"` "ADDselectPlanarButton";
+
+	button -e -en `objExists "includedFaces_mapPlanar_automaticUVShader"` groupManagerButton;
+
+
+return "";
+}
+
+
+//
+//-----<<>>-----
+//
+
+
+global proc int baus_deleteAttributes(int $switch){
+
+	global string $planarMappedFaces[];
+	global int $planarMappedFacesIndex;
+	global string $groupManagerName;
+
+	string $selected[] = `ls -sl -fl`;
+	string $buffer[];
+	string $buffer2[];
+
+
+
+	if ( (`size($selected)` == 0) || ( size(`filterExpand -sm 34`) == 0 ) ){
+		warning "Please select some Faces";
+		return 0;		
+	
+	}
+
+
+	if(!`objExists includedFaces_mapPlanar_automaticUVShader`){
+		select $selected;
+		hyperShade -assign lambert1;
+		}
+	else
+		{
+		
+		if(`objExists "includedFaces_automaticUVShader"`){
+			hyperShade -objects includedFaces_automaticUVShader;
+		
+			$buffer = au_ArrayIntersector(`ls -sl -fl`,$selected);		
+
+			if( `size($buffer)` != 0){
+				select $buffer;
+				hyperShade -assign lambert1;
+
+				select $selected;
+				select -d $buffer;
+				$selected = `ls -sl -fl`;
+				}
+
+			}
+
+	
+		
+
+		if(`objExists "excludedFaces_automaticUVShader"`){
+			hyperShade -objects excludedFaces_automaticUVShader;
+		
+			$buffer = au_ArrayIntersector(`ls -sl -fl`,$selected);		
+
+			if( `size($buffer)` != 0){
+				select $buffer;
+				hyperShade -assign lambert1;
+
+				select $selected;
+				select -d $buffer;
+				$selected = `ls -sl -fl`;
+				}
+
+			}
+
+		//die PlanarMappedFaces bearbeiten und Array Aktualisieren		
+
+		if($switch == 0){
+	
+			for ($i = 0; $i < size($planarMappedFaces); $i++){
+			
+				tokenizeList($planarMappedFaces[$i],$buffer);
+			
+				
+								
+				$buffer2 = au_ArrayIntersector($buffer,$selected);
+				
+				if( `size($buffer2)` != 0){
+
+					$planarMappedFaces[$i] = "";
+
+					select $buffer;
+					select -d $buffer2;
+
+					$buffer = `ls -sl -fl`;
+
+					for($item in $buffer)
+						$planarMappedFaces[$i] = ($planarMappedFaces[$i] + $item + " ");
+											
+					select $buffer2;
+					hyperShade -assign lambert1;
+
+					}
+
+				}
+		
+			}
+		else
+			{
+			
+			for ($i = 0; $i < size($planarMappedFaces); $i++){
+			
+				tokenizeList($planarMappedFaces[$i],$buffer);
+			
+				
+								
+				$buffer2 = au_ArrayIntersector($buffer,$selected);
+				
+				if( `size($buffer2)` != 0){
+				
+					$planarMappedFaces[$i] = "";
+					select $buffer;
+
+					hyperShade -assign lambert1;
+
+					}
+
+
+				}
+
+			}
+
+		//PMF säubern
+		
+		rebuildPMFArray;
+
+		
+	
+		if(`window -ex $groupManagerName`)
+			GM_updateIcons;
+
+			
+			if( ($planarMappedFacesIndex == 0) && (`window -ex $groupManagerName`) ){
+				deleteUI $groupManagerName;
+				button -e -en 0 groupManagerButton;
+				}
+		}
+
+
+
+
+//----------------------------
+
+
+	
+
+	if (`objExists "includedFaces_automaticUVShader"`){
+		
+		hyperShade -objects "includedFaces_automaticUVShader";
+	
+		if(size(`ls -sl`) == 0){
+			delete "includedFaces_automaticUVShader";
+			delete "includedFaces_automaticUVShaderSG";
+		}
+	}
+
+	if (`objExists "excludedFaces_automaticUVShader"`){
+	
+		hyperShade -objects "excludedFaces_automaticUVShader";
+
+		if(size(`ls -sl`) == 0){
+			delete "excludedFaces_automaticUVShader";
+			delete "excludedFaces_automaticUVShaderSG";
+		}
+	}
+
+
+	if (`objExists "includedFaces_mapPlanar_automaticUVShader"`){
+
+		hyperShade -objects "includedFaces_mapPlanar_automaticUVShader";
+
+		if(size(`ls -sl`) == 0){
+			delete "includedFaces_mapPlanar_automaticUVShader";
+			delete "includedFaces_mapPlanar_automaticUVShaderSG";
+			checkBox -e -en 0 separatePMFClustersButton;
+
+		
+			
+		}
+	}
+
+	button -e -en `au_isAttrMapAssigned` resetButton;
+	button -e -en `au_isAttrMapAssigned` deleteAttributesButton;
+
+
+	
+	
+
+
+
+selectButtonCheck;
+
+select -cl;
+
+return 1;
+	
+}
+
+
+//
+//-----<<>>-----
+//
+
+
+global proc int createGroupManagerWindow(){
+
+	
+	
+	global string $groupManagerName;
+
+	
+	
+	
+	if( `window -ex $groupManagerName` )
+		return 0;
+
+	$groupManagerName = `window -title "Groupmanager" -w 150 -h 150 -rtf 1 -s 0`;
+
+	
+	rowColumnLayout -nc 1 -cw 1 157;
+	
+		rowColumnLayout 
+			-nc 2 
+			-cw 1 27		
+  			-cw 2 130;
+
+		
+		
+		intField -cc "if(`intField -q -v GM_IntField` < 11) intSlider -e -v `intField -q -v GM_IntField` GM_intSlider; frameLayout -e -l (\"Groups ( \" + ((`intField -q -v GM_IntField` * 9) - 8) + \" - \" + (`intField -q -v GM_IntField` * 9) + \" )\" ) GM_RangeText; GM_updateIcons" -max 100 -min 1 -v 1 GM_IntField;
+		intSlider -dc "intField -e -v `intSlider -q -v GM_intSlider` GM_IntField; frameLayout -e -l (\"Groups ( \" + ((`intSlider -q -v GM_intSlider` * 9) - 8) + \" - \" + (`intSlider -q -v GM_intSlider` * 9) + \" )\") GM_RangeText; GM_updateIcons" -max 10 -min 1 GM_intSlider;
+
+		setParent ..;
+
+		separator -style "none";
+		separator -style "none";
+
+		separator -w 150;
+
+		separator -style "none";
+		separator -style "none";
+
+	frameLayout -l "Groups ( 1 - 9 )   " -labelAlign "center" GM_RangeText;		
+
+		rowColumnLayout 
+			-nc 3 
+			-cw 1 50
+			-cw 2 50		
+  			-cw 3 50;
+
+	
+		iconTextButton -style "iconOnly" -c "GM_onClick(1)" GM_Button1; iconTextButton -style "iconOnly" -c "GM_onClick(2)" GM_Button2;iconTextButton -style "iconOnly" -c "GM_onClick(3)" GM_Button3;
+		iconTextButton -style "iconOnly" -c "GM_onClick(4)" GM_Button4; iconTextButton -style "iconOnly" -c "GM_onClick(5)" GM_Button5;iconTextButton -style "iconOnly" -c "GM_onClick(6)" GM_Button6;
+		iconTextButton -style "iconOnly" -c "GM_onClick(7)" GM_Button7; iconTextButton -style "iconOnly" -c "GM_onClick(8)" GM_Button8;iconTextButton -style "iconOnly" -c "GM_onClick(9)" GM_Button9;
+
+		GM_updateIcons;
+
+		setParent ..;
+
+	setParent ..;
+
+	separator -style "none";
+	separator -style "none";
+	
+	separator -w 150;
+
+	separator -style "none";
+	separator -style "none";
+	
+
+		rowColumnLayout 
+			-nc 3 
+			-cw 1 60
+			-cw 2 60
+			-co 3 "left" 3		
+  			-cw 3 30;
+
+		button -l "Delete All" -c "string $buffer[]; for($item in $planarMappedFaces){tokenizeList($item,$buffer); select $buffer; hyperShade -assign lambert1;} clear $planarMappedFaces; $planarMappedFacesIndex = 0; select $baseMesh; deleteUI $groupManagerName; button -e -en 0 groupManagerButton";
+		button -l "Delete Sel" baus_deleteSelectedButton;
+		checkBox -l "+" deleteWholeGroupCheck;
+
+		button -e -c "baus_deleteAttributes(`checkBox -q -v deleteWholeGroupCheck`)" baus_deleteSelectedButton;
+
+
+	setParent ..;
+
+	
+
+	showWindow;
+
+	window -e -w 165 -h 270 $groupManagerName;
+
+return 1;
+
+}
+
+//
+//-----<<>>-----
+//
+
+global proc GM_updateIcons(){
+
+	global string $planarMappedFaces[];
+	
+	int $arrayWindow = `intField -q -v GM_IntField`;
+
+
+	for($i = ($arrayWindow * 9) - 8; $i < ($arrayWindow * 9) + 1; $i++)
+
+		if( $planarMappedFaces[$i - 1] == "")
+			iconTextButton -e -image1 ("GM_Leer_" + ($i - ($arrayWindow - 1) * 9) + ".bmp" ) ("GM_Button" + ($i - ($arrayWindow - 1) * 9) );
+		else
+			iconTextButton -e -image1 ("GM_Voll_" + ($i - ($arrayWindow - 1) * 9) + ".bmp" ) ("GM_Button" + ($i - ($arrayWindow - 1) * 9) );
+
+
+
+}
+
+//
+//-----<<>>-----
+//
+
+global proc int GM_onClick(int $buttonNumber){
+
+	global string $planarMappedFaces[];
+	global int $planarMappedFacesIndex;
+
+	global string $groupManagerName;
+
+	int $arrayWindow = `intField -q -v GM_IntField` - 1;
+	string $buffer[];
+
+	string $selected[];
+
+	int $stop = 0;
+
+	if($planarMappedFaces[$buttonNumber + ( $arrayWindow * 9 ) - 1] == ""){
+
+		$selected = `filterExpand -sm 34`;
+
+		if( `size($selected)` == 0 ){
+			warning "Please select some Faces";
+			return 0;
+			}
+			
+			
+
+		for($item in $selected)
+			$planarMappedFaces[$buttonNumber + ( $arrayWindow * 9 ) - 1] = ($planarMappedFaces[$buttonNumber + ( $arrayWindow * 9 ) - 1] + $item + " ");
+
+		$planarMappedFacesIndex = `size($planarMappedFaces)`;
+
+		hyperShade -assign "includedFaces_mapPlanar_automaticUVShader";
+
+		iconTextButton -e -image1 ("GM_Voll_" + $buttonNumber + ".bmp") ("GM_Button" + $buttonNumber);
+
+		}
+	else
+		{
+		tokenizeList($planarMappedFaces[$buttonNumber + ( $arrayWindow * 9 ) - 1],$buffer);
+		select $buffer;
+		}
+
+
+	//planarMappedFaces neu aufbauen, damit die reihenfolge stimmt
+	
+		rebuildPMFArray;
+		
+		GM_updateIcons;
+
+return 1;
+}
+
+//
+//-----<<>>-----
+//
+
+global proc rebuildPMFArray(){
+
+	global string $planarMappedFaces[];
+	global int $planarMappedFacesIndex;
+	
+	string $buffer[];
+
+	for ($i = 0; $i < size($planarMappedFaces);$i++)
+	
+			if($planarMappedFaces[$i] != "")
+				$buffer[size($buffer)] = $planarMappedFaces[$i];
+
+		$planarMappedFaces = $buffer;
+		$planarMappedFacesIndex = `size($planarMappedFaces)`;
+
+
+
+}
+//
+//-----<<>>-----
+//
+
+global proc int au_isBaseMeshAvailable(){
+
+	global string $baseMesh;
+
+	if ($baseMesh == "")
+		return 0;
+	else
+		return 1;
+
+	}
+
+
+//
+//-----<<>>-----
+//
+
+
+global proc int au_isAttrMapAssigned(){
+
+	if ( (`objExists "includedFaces_automaticUVShader"`) ||  (`objExists "excludedFaces_automaticUVShader"`) || (`objExists "includedFaces_mapPlanar_automaticUVShader"`) )
+		return 1;
+	else
+		return 0;
+
+}
+
+
+//
+//-----<<>>-----
+//
+
+
+
+global proc int au_createUVValid(){
+
+	global string $baseMesh;
+	
+	if ( $baseMesh == "" )
+
+		return 0;
+
+	else
+		
+		return 1;
+
+}	
+
+
+//
+//-----<<>>-----
+//
+
+
+
+global proc string au_modifyEdge(string $mode){
+
+	string $selected[] = `filterExpand -sm 32`;
+
+	if (size($selected) == 0){
+
+		warning "Please select some Edges";
+		return "";
+	}
+
+	if ($mode == "hard"){	
+
+		polySoftEdge -a 0 -ch 1;
+
+		return "";
+
+	}
+	else
+	{
+	
+		polySoftEdge -a 180 -ch 1;
+			
+		return "";
+
+	}
+}
+
+
+//
+//-----<<>>-----
+//
+
+
+global proc string au_deleteUVSet() {
+	
+	global string $baseMesh;
+
+	int $selectedItem[] = `textScrollList -q -sii au_uvSetScroller`;     
+
+	select $baseMesh;	
+
+	polyUVSet -delete; 
+
+	getUVSetList; 
+
+	if (`textScrollList -q -ni au_uvSetScroller` > $selectedItem[0]){ 
+
+	textScrollList -e -sii $selectedItem[0] au_uvSetScroller; 
+
+	polyUVSet -uvs `textScrollList -q -si au_uvSetScroller` -cuv $baseMesh;}
+
+	 else { 
+
+	textScrollList -e -sii `textScrollList -q -ni au_uvSetScroller` au_uvSetScroller; 
+
+	polyUVSet -uvs `textScrollList -q -si au_uvSetScroller` -cuv $baseMesh;}
+
+return "";
+}
+
+
+//
+//-----<<>>-----
+//
+
+
+global proc string au_renameUVSet(){
+	
+	global string $baseMesh;
+	string $entry;
+	string $temp[] = `polyUVSet -q -cuv $baseMesh`; 
+	
+	string $result = `promptDialog
+		-text $temp[0]
+		-title "Rename UVSet"
+   		-message "Enter Name:"
+   		-button "Rename" -button "Do not rename"
+    		-defaultButton "Rename" -cancelButton "Do not rename"
+    		-dismissString "Cancel"`;
+
+	if ($result == "Rename") {
+		$entry = `promptDialog -q`;
+		polyUVSet -rename -uvs `textScrollList -q -si "au_uvSetScroller"` -nuv $entry $baseMesh;
+		getUVSetList;
+	}
+
+	return "";
+
+}
+
+
+//
+//-----<<>>-----
+//
+
+
+global proc string getUVSetList(){
+
+	
+
+	global string $baseMesh;
+	string $temp[];
+	
+	
+	if ($baseMesh == ""){
+		warning "Please select an Object to operate on";
+		return "";
+	}
+	
+	string $uvSets[] = `polyUVSet -q -auv $baseMesh`;
+	
+	textScrollList -e -ra "au_uvSetScroller";
+
+	for ($item in $uvSets)
+		textScrollList -e -a $item "au_uvSetScroller";
+
+	textScrollList -e -si `polyUVSet -q -cuv $baseMesh` "au_uvSetScroller";
+	
+	
+	$temp = `textScrollList -q -si au_uvSetScroller`;
+	text -e -l ("Current UVSet: " + $temp[0]) UVNameText;
+	
+	//button -e -l ("Current Mesh:     " + $baseMesh + "    (Click to use selected") "baseMeshButton";
+
+return "";
+
+}
+
+
+//
+//-----<<>>-----
+//
+
+
+global proc string getBaseMesh(){
+
+
+	global string $baus_mainWindowName ;
+	global string $baseMesh;
+	string $temp[];
+	global string $workBaseMesh;
+
+	
+	pickWalk -d up;
+	string $selected[] = `ls -sl`;
+
+	global string $au_origEdgesSave[];
+
+	clear $au_origEdgesSave;
+
+	global string $planarMappedFaces[];
+	clear $planarMappedFaces;
+
+	global int $planarMappedFacesIndex;
+	$planarMappedFacesIndex = 0;
+
+	if ( (size(`filterExpand -sm 12`) == 0) || (size($selected) > 1) ){
+		warning "Please select one Polygon Object";
+		return "";
+	}
+
+
+	$workBaseMesh = "";
+
+	if($baseMesh == "")
+		$baseMesh = $selected[0];
+	
+	else
+		{
+		select $baseMesh;
+		hyperShade -assign "lambert1";
+		select $selected;
+		$baseMesh = $selected[0];
+		}
+
+	button -e -l ("Current Mesh:     " + $baseMesh + "   (Click again to use selected)  ") "baseMeshButton";
+
+
+	baus_buttonEnabler( int(0) );
+
+
+	getUVSetList;
+
+
+	//wenn BaseMesh gelöscht wird, wird Script zurückgesetzt
+
+		
+
+	return "";
+}
+
+
+//
+//-----<<>>-----
+//
+
+global proc baus_buttonEnabler(int $switch){
+
+			button -e -en 0 selectPlanarButton;
+			button -e -en 0 ADDselectPlanarButton;
+
+			button -e -en 0 selectIncludedButton;
+			button -e -en 0 ADDselectIncludedButton;
+
+			button -e -en 0 selectExcludedButton;
+			button -e -en 0 ADDselectExcludedButton;
+
+			button -e -en 0 groupManagerButton;
+
+
+			if($switch){
+				
+				button -e -l "Use Selected"  baseMeshButton;
+				text -e -l "No mesh selected" UVNameText;
+				
+				
+				
+				radioButtonGrp -e -sl 1 -en1 1 -en2 1 sewMethodSelector;
+				
+				checkBox -e -en 0 -v 0 afterStrokeAssigner;
+				button -e -en 0 assignShaderButton;
+				}
+
+			textScrollList -e -m `au_isBaseMeshAvailable` au_uvSetScroller;
+	
+			checkBoxGrp -e -en `au_isBaseMeshAvailable` -v1 0 au_enableAdvancedCheckBox;
+
+			checkBoxGrp -e -en 0 au_advancedCheckBox;
+		
+			
+
+			button -e -en `au_isBaseMeshAvailable` tViewButton;
+
+			button -e -en `au_isBaseMeshAvailable` renameUVButton;
+
+			button -e -en `au_isBaseMeshAvailable` deleteUVButton;
+
+			button -e -en `au_isBaseMeshAvailable` createUVSetButton;
+
+			button -e -en `au_isBaseMeshAvailable` hardEdgeButton;
+	
+			button -e -en `au_isBaseMeshAvailable` softEdgeButton;
+
+			button -e -en `au_createUVValid` createUVButton;
+
+			button -e -en `au_isBaseMeshAvailable` outlineSelectButton;
+	
+			button -e -en `au_isBaseMeshAvailable` blendSetFacesButton;
+
+			button -e -en `au_isBaseMeshAvailable` selectHardEdgesButton;
+
+			button -e -en `au_isBaseMeshAvailable` -l "Save Original Edges" saveOriginalEdgesButton;
+
+			button -e -en 0 restoreOriginalEdgesButton;
+
+			button -e -en `au_isBaseMeshAvailable` paintSelectEnableButton;
+			
+			button -e -en `au_isBaseMeshAvailable` lookButton;
+	
+
+
+
+}
+//
+//-----<<>>-----
+//
+
+
+global proc string resetAttributes(){
+
+	global int $planarMappedFacesIndex;
+	global string $planarMappedFaces[];
+	global string $baseMesh;
+	global string $groupManagerName;
+	
+
+
+	$planarMappedFacesIndex = 0;
+	clear $planarMappedFaces;
+	
+	select $baseMesh;
+	
+	hyperShade -assign "lambert1";
+
+	if (`objExists "includedFaces_automaticUVShader"`){
+		delete "includedFaces_automaticUVShader";
+		delete "includedFaces_automaticUVShaderSG";
+	}
+
+	if (`objExists "excludedFaces_automaticUVShader"`){
+		delete "excludedFaces_automaticUVShader";
+		delete "excludedFaces_automaticUVShaderSG";
+	}
+
+
+	if (`objExists "includedFaces_mapPlanar_automaticUVShader"`){
+		delete "includedFaces_mapPlanar_automaticUVShader";
+		delete "includedFaces_mapPlanar_automaticUVShaderSG";
+	}
+
+	button -e -en `au_isAttrMapAssigned` resetButton;
+	button -e -en `au_isAttrMapAssigned` deleteAttributesButton;
+
+
+	
+	checkBox -e -en 0 separatePMFClustersButton;
+
+	selectButtonCheck;
+
+	
+	if(`window -ex $groupManagerName`){
+		deleteUI $groupManagerName;
+		button -e -en 0 groupManagerButton;
+		}
+
+return "";
+}
+
+
+//
+//-----<<>>-----
+//
+
+
+global proc string assignPolygonAttributes(){
+
+	global string $planarMappedFaces[];
+	
+	global int $planarMappedFacesIndex;
+	global string $groupManagerName;
+			
+	
+	string $selectedFaces[] = `filterExpand -sm 34`;
+	
+	if (`size($selectedFaces)` == 0){
+		warning "Please select some of the objects faces";
+		return "";
+		}	
+
+	
+	int $isIncluded = `checkBoxGrp -q -v1 au_advancedCheckBox`;
+	int $isExcluded = `checkBoxGrp -q -v2 au_advancedCheckBox`;
+	int $mapPlanar = `checkBoxGrp -q -v3 au_advancedCheckBox`;
+	
+	string $shaderName;
+	
+	
+
+	if ($isIncluded)
+		$shaderName = "includedFaces";
+	
+
+	if ($isExcluded)
+		$shaderName = "excludedFaces";
+
+	if ($mapPlanar){
+		$shaderName += "_mapPlanar";
+		for ($i = 0; $i < size($selectedFaces); $i++){
+				$planarMappedFaces[$planarMappedFacesIndex] = ($planarMappedFaces[$planarMappedFacesIndex] + $selectedFaces[$i] + " ");
+				
+				;
+			}
+
+			$planarMappedFacesIndex++;
+		
+		
+	}
+
+		
+		
+
+	$shaderName += "_automaticUVShader";
+
+	if (`objExists $shaderName`)
+		hyperShade -assign $shaderName;
+	else {
+		string $initialName = `shadingNode -asShader lambert`;
+		rename $initialName $shaderName;
+		select $selectedFaces;
+		hyperShade -assign $shaderName;
+
+		if ($isIncluded)
+			setAttr ($shaderName + ".colorG") 1;
+
+		if ($isExcluded)
+			setAttr ($shaderName + ".colorR") 1;
+		
+		if ($mapPlanar)
+			setAttr ($shaderName + ".colorB") 1;
+			
+	}
+		
+	
+	select -cl;
+
+	button -e -en `au_isAttrMapAssigned` resetButton;
+	button -e -en `au_isAttrMapAssigned` deleteAttributesButton;
+
+	checkBox -e -en `objExists "includedFaces_mapPlanar_automaticUVShader"` separatePMFClustersButton;
+
+
+	selectButtonCheck;
+
+	
+	if(`window -ex $groupManagerName`){
+		GM_updateIcons;
+
+		if( $planarMappedFacesIndex > `intSlider -q -v GM_intSlider` * 9 )
+			intSlider -e -v ( (( $planarMappedFacesIndex - ($planarMappedFacesIndex % 9) ) / 9) + 1 ) GM_intSlider;
+			intField -e -v ( (( $planarMappedFacesIndex - ($planarMappedFacesIndex % 9) ) / 9) + 1 ) GM_IntField;
+			frameLayout -e -l ("Groups ( " + ((`intSlider -q -v GM_intSlider` * 9) - 8) + " - " + (`intSlider -q -v GM_intSlider` * 9) + " )" ) GM_RangeText;
+			GM_updateIcons;
+		}
+
+
+return "";
+}
+
+
+global proc au_createAnimCurve(){
+
+	if ( !(`objExists "au_customFalloff"`) ){
+
+		string $initName = `createNode "animCurveTA"`;
+		rename $initName "au_customFalloff";
+		
+		setKeyframe -t 0 -v 1 "au_customFalloff";
+		setKeyframe -t 1 -v 0 "au_customFalloff";
+	
+	}
+
+}
+
+
+
+//
+//-----<<>>-----
+//
+
+global proc SST_editTangents(int $switch){
+
+	switch($switch){
+	
+	case 1:{
+		keyTangent -e -a -t 0 -outAngle 0 -outWeight 1 SST_Falloff; keyTangent -e -a -t 1 -inAngle 0 -inWeight 1 SST_Falloff ;
+		break;
+		}
+	case 2:{
+		keyTangent -e -a -t 0 -outAngle -45 -outWeight 1 SST_Falloff; keyTangent -e -a -t 1 -inAngle 0 -inWeight 1 SST_Falloff ;
+		break;
+		}
+	case 3:{
+		keyTangent -e -a -t 0 -outAngle 0 -outWeight 1 SST_Falloff; keyTangent -e -a -t 1 -inAngle -60 -inWeight 1 SST_Falloff ;
+		break;
+		}
+	case 4:{
+		keyTangent -e -a -t 0 -outAngle -45 -outWeight 1 SST_Falloff; keyTangent -e -a -t 1 -inAngle -45 -inWeight 1 SST_Falloff ;
+		break;
+		}
+	}
+
+}
+
+//
+//-----------------------------------------------------End of-->>>> UI global procedures <<<<--End of---------------------------------------------
+//
+
+
+//---------------------------OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO--------------------------
+
+
+//
+//------------------------------------------------------------>>>> Other global procedures <<<<---------------------------------------------------
+//
+
+
+global proc string[] generateAttributeBasedBaseMeshSelection(){
+
+	global string $planarMappedFaces[];
+	global int $planarMappedFacesIndex;
+	
+	global string $baseMesh;
+	string $buffer[];
+	string $includedFaces[];
+	string $excludedFaces[];
+	int $intTempArray[];
+	
+	global string $validFaces[];
+	clear $validFaces;
+		
+
+
+
+
+
+
+	
+	select -cl;
+	
+	if (`objExists "includedFaces_automaticUVShader"`)
+		hyperShade -objects "includedFaces_automaticUVShader";
+
+	if ( (`objExists "includedFaces_automaticUVShader"`) && ( (size(`ls -sl`)) != 0) ){
+		
+		
+
+		$includedFaces = `ls -sl`;
+//zur Sicherheit mal die SelectionList säubern ...
+//
+		select -cl;
+		
+		
+		}	
+	
+	else	{
+
+		$intTempArray = `polyEvaluate -f $baseMesh`;
+		int $baseFaceCount = $intTempArray[0];
+	
+		//BaseMeshFaceNummern in Array eintragen
+	
+		for ($s = 0; $s < $baseFaceCount; $s++){
+			$buffer[$s] = $s;
+			$includedFaces[$s] = generateValidFaceNamesArray($buffer[$s], $baseMesh);
+		}
+		
+		select -cl;		
+
+		if (`objExists "includedFaces_mapPlanar_automaticUVShader"`)				//Wenn PMFShader GÄNZLICH überschrieben wurde, aber noch existiert, wird sein effekt deaktiviert.
+			hyperShade -objects "includedFaces_mapPlanar_automaticUVShader";
+
+
+
+		if ( size(`ls -sl`) != 0 ){
+	
+
+			if (`objExists "includedFaces_mapPlanar_automaticUVShader"`){
+			
+		
+
+				select $includedFaces;
+		
+				for ($i = 0; $i < size($planarMappedFaces); $i++){
+				
+					tokenizeList ($planarMappedFaces[$i], $buffer);
+
+
+				
+					for ($a = 0; $a < `size($buffer)`; $a++)
+				
+						select -d $buffer[$a];
+
+				}
+			
+			$includedFaces = `ls -sl`;
+		
+			}
+				
+		}
+	}
+
+
+	
+	
+
+	if (`objExists "excludedFaces_automaticUVShader"`){
+		
+		hyperShade -objects "excludedFaces_automaticUVShader";
+
+		$excludedFaces = `ls -sl`;
+
+		select -cl;
+		
+		}
+
+	select $includedFaces;
+	select -d $excludedFaces;
+
+	clear $includedFaces;
+	$includedFaces = `filterExpand -sm 34`;	
+
+
+	select -cl;
+	
+	if(`objExists "includedFaces_mapPlanar_automaticUVShader"`)					//Wenn PMFShader GÄNZLICH überschrieben wurde, aber noch existiert, wird sein effekt deaktiviert.
+		hyperShade -objects "includedFaces_mapPlanar_automaticUVShader";
+
+	
+	if( size(`ls -sl`) != 0 )
+		$validFaces = stringArrayCatenate($includedFaces, $planarMappedFaces);
+	else	{
+		clear $planarMappedFaces;
+		$planarMappedFacesIndex = 0;
+		$validFaces = $includedFaces;
+		}
+
+return $validFaces;
+}
+	
+
+//
+//-----<<>>-----
+//
+
+
+global proc string generateValidFaceNamesArray (string $faceString, string $meshName){
+
+//generiert aus string mit zahl(en) "1 2 5 1 5 7 8" string mit baseMeshFaceNamen und gibt string mit Namen aus
+//	
+	
+	string $validBaseFaces;
+	string $numberList[];
+
+	tokenizeList($faceString, $numberList);
+	
+	
+	if ( (size($numberList) == 1) || (size($numberList) == 2)  )
+		$validBaseFaces += ($meshName + ".f[" + $numberList[0] + "] ");
+
+	else
+	
+		for ($i = 0; $i < (size($numberList)); $i++)
+			$validBaseFaces += ($meshName + ".f[" + $numberList[$i] + "] ");
+		
+
+	
+return $validBaseFaces;
+}
+
+
+//
+//-----<<>>-----
+//
+
+
+
+
+global proc string au_appropriateBaseMesh(){
+
+	global string $baseMesh;
+	global string $workBaseMesh;
+
+	if ($workBaseMesh == "")
+		return $baseMesh;
+
+	else
+		return $workBaseMesh;
+
+}
+
+
+//
+//------->><<<------
+//
+
+global proc string[] conformFaceNamesToMeshName(string $inputFaces[]){
+
+	string $meshName = `au_appropriateBaseMesh`;
+	string $buffer[];
+	string $buffer2[];
+	string $buffer3[];
+	int $a = 0;
+	string $outputFaces[];
+	global int $planarMappedFacesIndex;
+
+	
+	for ($i = 0; $i < ( `size($inputFaces)` - $planarMappedFacesIndex ); $i++){
+
+		tokenize $inputFaces[$i] "[" $buffer;
+		
+		$outputFaces[$i] = ($meshName + ".f[" + $buffer[1]);
+	
+	}
+
+	for ($i = ( `size($inputFaces)` - $planarMappedFacesIndex ); $i < `size($inputFaces)`; $i++){
+
+		
+		tokenizeList ($inputFaces[$i], $buffer);
+		
+		for ($item in $buffer){
+			tokenize $item "[" $buffer2;
+			$buffer3[$a] = ($buffer3[$a] + $meshName + ".f[" + $buffer2[1] + " ");
+		}
+	$a++;
+
+	}
+	
+	$outputFaces = stringArrayCatenate($outputFaces, $buffer3);
+
+return $outputFaces;
+
+}
+
+
+//
+//------->><<<------
+//
+
+
+
+
+
+global proc string[] conformFaceArrayToName(string $inputFaces[], string $meshName){
+
+	
+	global string $gMainProgressBar;
+	string $buffer[];
+	string $buffer2[];
+	string $buffer3[];
+	int $a = 0;
+	string $outputFaces[];
+
+	
+
+	int $sizeInputFaces = size($inputFaces);
+	
+
+	progressBar -e -bp -max $sizeInputFaces $gMainProgressBar;
+
+	
+	for ($i = 0; $i < $sizeInputFaces ; $i++){
+
+		tokenize $inputFaces[$i] "[" $buffer;
+	
+		progressBar -e -step 1 -status ("Conforming Array Element " + $a + " of " + $sizeInputFaces) $gMainProgressBar;
+
+		
+		$outputFaces[$i] = ($meshName + ".f[" + $buffer[1]);
+	
+		$a++;
+	}
+	
+		progressBar -e -ep $gMainProgressBar;
+
+return $outputFaces;
+
+
+}
+
+
+
+global proc string[] conformVertexArrayToName(string $inputFaces[], string $meshName){
+
+	global string $gMainProgressBar;
+	string $buffer[];
+	string $buffer2[];
+	string $buffer3[];
+	int $a = 0;
+	string $outputFaces[];
+
+	
+
+	int $sizeInputFaces = size($inputFaces);
+	
+
+	progressBar -e -bp -max $sizeInputFaces $gMainProgressBar;
+
+	
+	for ($i = 0; $i < $sizeInputFaces ; $i++){
+
+		tokenize $inputFaces[$i] "[" $buffer;
+	
+		progressBar -e -step 1 -status ("Conforming Array Element " + $a + " of " + $sizeInputFaces) $gMainProgressBar;
+
+		
+		$outputFaces[$i] = ($meshName + ".vtx[" + $buffer[1]);
+	
+		$a++;
+	}
+	
+		progressBar -e -ep $gMainProgressBar;
+
+return $outputFaces;
+
+}
+
+//
+//------->><<<------
+//
+
+global proc au_mapFaces(int $switch){
+
+	global string $validFaces[];
+	global string $baseMesh;
+	global string $smoothMesh;
+	global string $workBaseMesh;
+	global int $planarMappedFacesIndex;
+	global string $gMainProgressBar;
+
+
+	
+	string $facesToMap[];
+	int $index = 0;
+		
+
+	int $sizeValidFaces;
+	string $meshName;
+	string $buffer[];
+	
+	
+
+
+	if ( (`checkBox -q -v preserveHistoryCheck`) && ( !(`objExists($workBaseMesh)`) ) ){
+		
+		generateAttributeBasedBaseMeshSelection;
+		duplicate -n ("workCopyOf" + $baseMesh) $baseMesh;
+		$workBaseMesh = ("workCopyOf" + $baseMesh);
+		$validFaces = `conformFaceNamesToMeshName($validFaces)`;
+		//print $validFaces;
+
+	}
+	else
+	{
+		generateAttributeBasedBaseMeshSelection;
+		select $baseMesh;
+		DeleteHistory;
+	}
+	
+	
+	
+		$sizeValidFaces = size($validFaces);
+		
+	
+
+
+	$meshName = `au_appropriateBaseMesh`;
+
+	if ($switch){
+//
+//SmoothMesh soll UVs erhalten
+//	
+	
+	}
+	else {
+//
+//Nur BaseMesh soll UVs erhalten
+//
+		
+
+		progressBar -e -maxValue $sizeValidFaces -status "Mapping Faces" -bp $gMainProgressBar;
+		
+		for ($i = 0; $i < ( $sizeValidFaces - $planarMappedFacesIndex ); $i++){
+			progressBar -e -step 1 -status ("Mapped " + $index++ + " of " + $sizeValidFaces + "Faces") $gMainProgressBar;
+			select $validFaces[$i];
+			polyProjection -ch 0 -type Planar -ibd off -icx 0.5 -icy 0.5 -ra 0 -isu 1 -isv 1 -kir  -md b $validFaces[$i];
+		//	print ("Mapping " + $validFaces[$i] + "\n"); //Debug
+			}
+		
+		
+		
+
+
+		for ($i = ( $sizeValidFaces - $planarMappedFacesIndex ); $i < $sizeValidFaces; $i++){
+			
+			progressBar -e -step 1 -status ("Mapped " + $index++ + " of " + $sizeValidFaces + "Faces") $gMainProgressBar;
+			tokenizeList ($validFaces[$i], $buffer);
+			select $buffer;
+			polyProjection -ch 0 -type Planar -ibd off -icx 0.5 -icy 0.5 -ra 0 -isu 1 -isv 1 -kir  -md b $buffer;
+	
+			
+		}
+		progressBar -edit -endProgress $gMainProgressBar;
+
+	}
+
+
+}
+
+
+//
+//------->><<<------
+//
+
+global proc au_restoreRelativePeaceSize(int $smoothSelected){
+
+	global string $validFaces[];
+	global int $planarMappedFacesIndex;
+	int $index = 0;
+
+	global string $facesWithMultiOne;
+	global string $gMainProgressBar;
+
+	global string $PMF[];
+	global string $PMFCopy[];
+	
+	global string $PMFSelection[];
+	int $PMFInSelection;
+	string $buffer[];
+	string $intersectedFaces[];	
+
+	
+	global string $au_currentSelection[];
+	clear $au_currentSelection;
+	string $growSelection[];
+	
+	global int $UVIndex;
+	
+	int $lastScaleCount;
+	
+	int $sizeValidFaces = size($validFaces);
+	int $scaleCount = 0;
+
+	
+
+	global string $UVAndMultiplierSave[];
+	
+	select -cl;	
+
+	$index = 0;
+
+	
+	if ( `objExists("includedFaces_mapPlanar_automaticUVShader")` ){			//wenn PlanarMappedFaces vorhanden
+
+	for ($i = ( $sizeValidFaces - $planarMappedFacesIndex ); $i < $sizeValidFaces; $i++)  //gültige planarMappedFaces in Arbeitsarray eintragen
+		$PMF[$index++] = $validFaces[$i];
+
+//		print $PMF;
+//		print ("---------- == Inhalt PMF == -----------");
+		
+
+		$PMFCopy = $PMF;
+
+		$PMF = au_findSelectRemoveBiggestPMF($PMF);
+	
+	
+		$index = 0;
+
+		for ($string in $PMF){
+			tokenizeList $string $buffer;								//Selektierbaren PMFArray erstellen, der alle PMF enthält, ohne dass man die Cluster noch voneinander unterscheiden könnte
+
+			for ($item in $buffer)
+				$PMFSelection[$index++]	= $item;	
+
+		}	
+	}
+
+	if ( size(`ls -sl`) == 0 ){							//Wenn keine PMF, dann Face 1 anwählen
+		select $validFaces[0];
+		$facesWithMultiOne = ($validFaces[0] + " ");
+	}
+	
+
+
+
+	progressBar -e -maxValue ($sizeValidFaces - 1) -status "Restoring relative sizes" -bp $gMainProgressBar;
+
+	while ( $scaleCount < ( $sizeValidFaces - 1) ){
+
+		$au_currentSelection = `ls -sl -fl`;
+		//print $au_currentSelection;
+		//print "------>>>currentSelection ENde <<<------ \n"; //debug
+
+		PolySelectTraverse 1;						//GrowSelection
+		
+		$growSelection = `ls -sl -fl`;
+
+		//print $growSelection;
+		//print "---------->>>GrowSelection ENde <<<---------- \n"; //Debug
+
+		if ( `objExists("includedFaces_mapPlanar_automaticUVShader")` ){
+			$intersectedFaces = au_ArrayIntersector($growSelection, $PMFSelection);
+
+			if (  size($intersectedFaces) > 0  )
+				$PMFInSelection = 1;
+		//		print ($PMFInSelection + " == PMF in Selection \n");
+		}
+		
+		$lastScaleCount = $scaleCount;	
+	
+		$scaleCount += au_getSetScaleValue($growSelection, $PMFInSelection, $intersectedFaces, $smoothSelected);
+		
+	
+	
+		if ($scaleCount == $lastScaleCount){
+			
+			$au_currentSelection = `ls -sl -fl`;
+			$scaleCount += au_getSetScaleValue($growSelection, 0, $intersectedFaces, $smoothSelected);
+			//break;
+			}
+
+		// print ("Zahl der rescaleten Faces: " + $scaleCount + "\n"); //Debug
+		
+		if ($scaleCount == $lastScaleCount){
+			error "Critical Error Occured ... global process aborted :(. Please read the "Limitation" Section in the BAU-Tools Docs to possibly get a workaround";
+
+			break;
+		}
+		    
+		        	$PMFInSelection = 0;
+		}
+
+	
+	
+	
+	
+
+	progressBar -edit -endProgress $gMainProgressBar;
+	$UVIndex = 0;
+	
+	
+}
+
+//
+//------->><<<------
+//
+
+
+
+global proc int au_getSetScaleValue(string $growSelection[], int $PMFInSelection, string $intersectedFaces[], int $smoothSelected){
+
+	int $result;  //diese global procedur growed alles
+	int $index;	
+	int $clusterNumber[];
+	int $sizePMF;
+
+	int $switch;
+	
+	global string $au_currentSelection[];
+	global string $au_outlineEdges[];
+	clear $au_outlineEdges;
+	global string $gMainProgressBar;
+	global string $validFaces[];
+
+	global int $planarMappedFacesIndex;	
+
+	string $addSelectArray[];
+	clear $addSelectArray;
+	string $deselectArray[];
+	clear $deselectArray;
+	string $sharedEdges[];
+
+	string $validSingleFaces[];
+	int $sizeValidFaces = `size($validFaces)`;
+		
+	global string $validFaces[];
+	int $sizeValidFaces = size($validFaces);
+
+	global string $PMFSelection[];
+	global string $PMF[];
+	
+	
+
+	int $zeroSharedEdges[];
+	string $buffer[];
+	
+
+	string $growDifferenceSelection[];
+
+	$growDifferenceSelection = stringArrayRemove($au_currentSelection, $growSelection);
+
+
+
+	
+
+	if ($PMFInSelection){					//findet heraus, welch/e(er) der Cluster sich mit den intersected Faces schneidet und speichert die Indizes ab.
+
+		$sizePMF = size($PMF);
+
+		for ($i = 0; $i < $sizePMF; $i++){
+		
+			tokenizeList $PMF[$i] $buffer;
+
+			if ( size(au_ArrayIntersector($buffer, $intersectedFaces) ) != 0 )
+
+					$clusterNumber[$index++] = $i;
+			}
+
+	}
+
+
+//Hier könnte man die SelectValidFaces global proc benutzen ...
+
+	if ( (`objExists "includedFaces_automaticUVShader"`) || (`objExists "excludedFaces_automaticUVShader"`) ){    //sorgt dafür, dass ScaleFaces nicht ins "Leere" greift
+
+		for ($i = 0; $i < ($sizeValidFaces - $planarMappedFacesIndex); $i++)
+			$validSingleFaces[$i] = $validFaces[$i];	
+
+		select $growDifferenceSelection;
+		select -d $validSingleFaces;
+
+
+
+		if (`objExists "includedFaces_mapPlanar_automaticUVShader"`){
+
+			for ($index in $clusterNumber){
+				tokenizeList $PMF[$index] $buffer;
+				select -d $buffer;
+			}
+
+		}
+
+
+	
+		string $buffer[] = `ls -sl -fl`;
+
+		$growDifferenceSelection = stringArrayRemove($buffer, $growDifferenceSelection);
+
+		
+
+		
+		
+	}
+
+	$au_outlineEdges = au_queryOutline($au_currentSelection);
+
+	
+	
+
+
+	clear $zeroSharedEdges; //zur Sicherheit
+
+
+
+
+	if ($PMFInSelection){
+		
+		
+
+		for ($index in $clusterNumber){
+
+			$sharedEdges = au_edgesSharedWithOutlinePMF($PMF[$index]);
+			
+			//print $sharedEdges;
+			//print ("----- sharedEdges Inhalt -------\n"); 
+			
+			tokenizeList $PMF[$index] $buffer;
+		
+			if (size($sharedEdges) != 0){
+			
+				progressBar -e -step 1 -status ("Rescaled Face" + `progressBar -q -pr $gMainProgressBar` + " of " + ($sizeValidFaces - 1) + " Faces") $gMainProgressBar;
+			
+				
+				$addSelectArray = stringArrayCatenate($buffer, $addSelectArray);
+
+				
+		
+				setScaleValuePMF($sharedEdges, $buffer, $smoothSelected, $index);
+				$result++;
+			
+				$PMFSelection = stringArrayRemove($buffer, $PMFSelection);
+				
+				
+				
+								
+
+				clear $buffer;
+
+				for ($i = 0; $i < size($PMF); $i++)
+					if ($i == $index)
+						$buffer[$i] = "";
+					else
+						$buffer[$i] = $PMF[$i];
+						
+				
+				$PMF = $buffer;
+				
+				
+		
+				}
+			else
+				$deselectArray = stringArrayCatenate($buffer, $deselectArray);
+				
+		}	
+
+		clear $buffer;
+		
+		
+		
+
+		
+
+		//baut PMF neu auf
+
+		for ($item in $PMF)
+			if($item != "")
+				$buffer[size($buffer)] = $item;
+
+		$PMF = $buffer;
+
+
+			
+	
+		
+
+		
+		//print $zeroSharedEdges;
+		//print "------------Inhalt von ZeroSharedEdges----------\n";
+	
+		//print $PMF;
+		//print "-------------Inhalt PMF nach Aktualisiserung -----\n";
+	
+		
+
+
+
+
+	}
+	else {
+		
+		for ($face in $growDifferenceSelection){
+		
+		$sharedEdges = au_edgesSharedWithOutline($face);
+	
+			if ( `size($sharedEdges)` > 0){
+				
+				progressBar -e -step 1 -status ("Rescaled Face" + `progressBar -q -pr $gMainProgressBar` + " of " + ($sizeValidFaces - 1) + " Faces") $gMainProgressBar;
+				$addSelectArray[size($addSelectArray)] = $face;
+				setScaleValue($sharedEdges, $face, $smoothSelected);
+				$result++;
+
+
+			}
+			
+			else
+				$deselectArray[size($deselectArray)] = $face;
+		
+		
+
+		}
+	
+
+
+	}
+
+	//print $addSelectArray;
+	//print "----------<<<<addSelectArray Ende>>>>-------- \n"; //Debug
+	//print $deselectArray;
+	//print "----------<<<<eselectArray Ende>>>>-------- \n";  //Debug
+	select $au_currentSelection;
+	select -add $addSelectArray;
+	select -d $deselectArray;
+
+
+	
+
+return $result++;
+}
+
+//
+//------->><<<------
+//
+
+
+
+global proc string setScaleValuePMF(string $sharedEdges[], string $scaleCluster[], int $smoothMesh, int $clusterIndex){
+
+	global string $au_currentSelection[];
+
+	string $currentFace;
+	$currentFace = "";
+
+	string $currentFaceUVs[];
+	string $scaleFaceUVs[];
+		
+	string $scaleFaceAllUVs[];
+	string $sharedEdgeUVs[];
+	
+	string $scaleFace;
+
+	string $buffer[];
+
+
+	int $index;	
+
+	float $scaleValues[];
+	float $multiplier;
+	
+	global int $UVIndex;
+	
+	
+	
+	float $finalScaleValue;
+	
+	global string $PMF[];
+	
+
+
+	for ($edge in $sharedEdges){
+		
+		$buffer = au_getProperNames(`polyInfo -ef $edge`, "f");
+
+		for ($item in $buffer){
+
+				if (size(au_ArrayIntersector({$item}, $scaleCluster)) == 0)
+					$currentFace = $item;
+				else
+					$scaleFace = $item;
+		}
+		
+		select $edge;
+		PolySelectConvert 4;
+		$sharedEdgeUVs = `ls -sl -fl`;		
+
+		select $currentFace;
+		PolySelectConvert 4;
+		$currentFaceUVs = au_ArrayIntersector($sharedEdgeUVs, `ls -sl -fl`);
+
+		select $scaleFace;
+		PolySelectConvert 4;
+		$scaleFaceAllUVs = `ls -sl -fl`;
+		$scaleFaceUVs = au_ArrayIntersector($sharedEdgeUVs, $scaleFaceAllUVs);
+		
+		$scaleValues[$index++] = au_calculateScaleValues($currentFaceUVs, $scaleFaceUVs);
+		//print ("scaleValue ALLEIN hat Wert von " + $scaleValue[($index - 1)] + "\n");		
+
+
+	}
+
+	//AverageScaleValues
+
+	for ($value in $scaleValues)
+		$finalScaleValue += $value;
+
+	$finalScaleValue = $finalScaleValue / `size($scaleValues)`;
+
+
+		
+	//gesamte UVs für ScaleCluster bekommen
+	
+	select $scaleCluster;
+	PolySelectConvert 4;
+	$scaleFaceAllUVs = `ls -sl -fl`;
+
+
+
+	polyEditUV -su $finalScaleValue -sv $finalScaleValue $scaleFaceAllUVs ;  
+
+
+return "";
+
+}
+
+
+
+
+//
+//------->><<<------
+//
+
+
+global proc string[] au_edgesSharedWithOutlinePMF(string $faceCluster){
+
+	string $result[];
+
+	string $buffer[];
+
+	string $faceClusterOutline[];
+	global string $au_outlineEdges[];
+
+	
+
+	tokenizeList $faceCluster $buffer;
+
+	$faceClusterOutline = au_queryOutline($buffer);	
+
+	$result = au_ArrayIntersector($faceClusterOutline, $au_outlineEdges);
+
+	return $result;
+
+}
+//
+//------->><<<------
+//
+
+
+global proc string setScaleValue(string $sharedEdges[], string $scaleFace, int $smoothMesh){
+
+	global string $au_currentSelection[];
+
+	string $currentFace;
+	$currentFace = "";
+
+	string $currentFaceUVs[];
+	string $scaleFaceUVs[];
+		
+	string $scaleFaceAllUVs[];
+	string $sharedEdgeUVs[];
+	
+	string $buffer[];
+
+	float $scaleValue;
+	float $multiplier;
+	
+	global int $UVIndex;
+	
+	global string $UVAndMultiplierSave[];
+	
+
+	
+
+
+
+	
+		
+		$buffer = au_getProperNames(`polyInfo -ef $sharedEdges[0]`, "f");
+
+		for ($item in $buffer)
+
+			if ($item != $scaleFace)
+				$currentFace = $item;
+
+		select $sharedEdges[0];
+		PolySelectConvert 4;
+		$sharedEdgeUVs = `ls -sl -fl`;		
+
+		select $currentFace;
+		PolySelectConvert 4;
+		$currentFaceUVs = au_ArrayIntersector($sharedEdgeUVs, `ls -sl -fl`);
+
+		select $scaleFace;
+		PolySelectConvert 4;
+		$scaleFaceAllUVs = `ls -sl -fl`;
+		$scaleFaceUVs = au_ArrayIntersector($sharedEdgeUVs, $scaleFaceAllUVs);
+		
+		$scaleValue = au_calculateScaleValues($currentFaceUVs, $scaleFaceUVs);
+		//print ("scaleValue ALLEIN hat Wert von " + $scaleValue + "\n");		
+
+		
+
+		//print ($scaleFace + " hat ScaleValue von " + $scaleValue + "\n");
+		
+	
+	polyEditUV -su $scaleValue -sv $scaleValue $scaleFaceAllUVs ;  
+
+
+return "";
+
+}
+
+
+//
+//------->><<<------
+//
+
+global proc string[] au_getProperNames(string $input[], string $switch){
+
+	string $buffer[];
+		
+
+	global string $workBaseMesh;
+	global string $baseMesh;
+
+	string $meshName;
+	
+
+	if (`checkBox -q -v preserveHistoryCheck`)
+		$meshName = $workBaseMesh;
+	else
+		$meshName = $baseMesh;
+
+	tokenize $input[0] " " $buffer;
+
+	for ($i = 2; $i < (size($buffer) - 1); $i++)
+		$result[$i - 2] = ($meshName + "." + $switch + "[" + $buffer[$i] + "]");
+
+	
+return $result;
+}
+
+
+
+
+//
+//------->><<<------
+//
+
+
+//
+//------->><<<------
+//
+
+global proc string[] au_getProperNamesMod(string $input[], string $switch, string $meshName){
+
+	string $buffer[];
+		
+
+	tokenize $input[0] " " $buffer;
+
+	for ($i = 2; $i < (size($buffer) - 1); $i++)
+		$result[$i - 2] = ($meshName + "." + $switch + "[" + $buffer[$i] + "]");
+
+	
+return $result;
+}
+
+
+
+
+//
+//------->><<<------
+//
+global proc float au_calculateScaleValues(string $currentFaceUVs[], string $scaleFaceUVs[]){
+
+	float $result;
+	
+	float $UVValues[]; //[0] und [1] = U und V Value point 1, [2] und [3] = U und V Value point 2,
+	
+	vector $myVector;
+	
+	float $distanceBetCurrentUVs;
+	float $distanceBetScaleUVs;
+
+	$result = 0;
+	clear $UVValues;
+	$myVector = 0;
+	$distanceBetCurrentUVs = 0;
+	$distanceBetScaleUVs = 0;
+	
+	
+	$UVValues = `polyEditUV -q -u -v $currentFaceUVs`;
+	$myVector = <<$UVValues[2] - $UVValues[0], $UVValues[3] - $UVValues[1], 0>>;
+	$distanceBetCurrentUVs = `mag($myVector)`;
+		
+	$UVValues = `polyEditUV -q -u -v $scaleFaceUVs`;
+	$myVector = <<$UVValues[2] - $UVValues[0], $UVValues[3] - $UVValues[1], 0>>;
+	$distanceBetScaleUVs = `mag($myVector)`;
+
+	$result = $distanceBetCurrentUVs / $distanceBetScaleUVs;	
+
+
+
+
+
+return $result;
+}
+
+
+
+
+
+//
+//------->><<<------
+//
+
+global proc au_moveAndSewEdges(){
+
+	global string $validFaces[];
+
+	
+
+	
+	string $meshName = `au_appropriateBaseMesh`;
+
+	int $tempFaces[];
+
+	int $tempEdges[] = `polyEvaluate -edge $meshName `;
+
+	string $outlineEdges[];
+	string $hardEdges[];
+
+	string $outlineVerts[];
+	string $hardEdgeVerts[];	
+
+	string $invalidEdges[];	
+
+	global int $au_nSidedFacesExists;
+	global string $PMFCopy[];
+
+	string $buffer[];
+
+	string $currentSelection[];
+	string $growSelection[];
+
+
+
+	
+	
+	global string $gMainProgressBar;
+
+	
+
+		
+	
+	
+	if ( `radioButtonGrp -q -sl sewMethodSelector` == 1){
+
+		$hardEdges =  au_queryHardEdges($tempEdges[0]);
+
+		if( (`checkBox -q -v separatePMFClustersButton`) && (`objExists "includedFaces_mapPlanar_automaticUVShader"`) ) 				//hardEdges Cutten UVs, wenn gewünscht und PMF existieren
+			polyMapCut -ch 0;
+
+		select ($meshName + ".e[0:" + ($tempEdges[0] - 1) + "]");
+
+		select -d $hardEdges;
+
+	
+		if (size (`ls -sl`) != 0)
+			polyMapSewMove -nf 1 -lps 0 -ch 0;
+	
+		}
+	else
+		{
+
+		$hardEdges =  au_queryHardEdges($tempEdges[0]);
+
+		if( (`checkBox -q -v separatePMFClustersButton`) && (`objExists "includedFaces_mapPlanar_automaticUVShader"`) ) 				//hardEdges Cutten UVs, wenn gewünscht und PMF existieren
+			polyMapCut -ch 0;
+
+		if ( size($PMFCopy) != 0 ){
+				
+				select -cl;
+				
+				for ($cluster in $PMFCopy){
+					
+					tokenizeList ($cluster, $buffer);
+					select -add $buffer;
+				
+				}
+	
+
+			}
+		else
+			select $validFaces[0];
+	
+		PolySelectConvert 2;
+
+		$currentSelection = `ls -sl`;
+
+			while ( ( size($growSelection) ) - ( size($currentSelection) ) != 0 ){
+
+				$currentSelection = `ls -sl -fl`;
+
+				select -d $hardEdges;
+
+				polyMapSewMove -nf 13 -lps 0 -ch 0;
+
+				select $currentSelection;
+
+				PolySelectTraverse 1;
+
+				$growSelection = `ls -sl -fl`;
+
+				}
+
+
+			if($au_nSidedFacesExists){
+	
+				select ($meshName + ".e[0:" + ($tempEdges[0] - 1) + "]");		//Zur SIcherheit, da bei NSidedFaces immer ungesewte Kannten zurückbleiben.
+
+				select -d $hardEdges;
+
+				if (size (`ls -sl`) != 0)
+					polyMapSewMove -nf 1 -lps 0 -ch 0;
+				}
+	
+
+		}
+
+
+		
+	
+
+//clear $PMFCopy;
+
+
+}
+
+
+
+
+//
+//------->><<<------
+//
+
+global proc string[] au_queryHardEdges(int $edgeCount){
+
+	string $meshName = `au_appropriateBaseMesh`;	
+
+	string $result[];
+	
+	select $meshName;
+
+	setSelectMode components Components;
+
+	selectType -pe 1;
+	
+	select ($meshName + ".e[0:" + ($edgeCount - 1) + "]");
+
+	polySelectConstraint -m 3 -t 0x8000 -sm 1;
+
+	
+	resetPolySelectConstraint;
+
+
+	$result = `ls -sl`;
+
+return $result;
+
+}
+
+//
+//------->><<<------
+//
+
+global proc string[] au_edgesSharedWithOutline(string $face){
+
+	string $result[];
+	
+	
+	string $faceEdges[];
+	global string $au_outlineEdges[];
+
+	$faceEdges =  au_getProperNames(`polyInfo -fe $face`, "e");	
+	
+	$result = au_ArrayIntersector( $faceEdges, $au_outlineEdges );
+	
+return $result;
+}
+
+
+//
+//------->><<<------
+//
+
+global proc string[] au_queryOutline(string $selectedFaces[]){
+
+	string $growSelection[];
+	string $growEdges[];
+	string $result[];
+
+	select $selectedFaces;
+
+	PolySelectTraverse 1;
+
+	$growSelection = `ls -sl`;
+
+	select -d $selectedFaces;
+
+	PolySelectConvert 2;
+
+	$growEdges = `ls -sl -fl`;
+
+	select $selectedFaces;
+
+	PolySelectConvert 2;
+
+	$result = au_ArrayIntersector($growEdges, `ls -sl -fl`);
+
+	return $result;
+}
+
+
+
+
+
+//
+//------->><<<------
+//
+
+//
+//	Selects the biggest PMFCluster and returns a PMFArray without this cluster
+//
+global proc string[] au_findSelectRemoveBiggestPMF(string $PMF[]){
+
+	int $a;
+	float $sizes[];
+	float $floatTemp[];	
+	string $cmd;
+	string $buffer[];
+
+	for ($cluster in $PMF){
+		
+		$cmd = ("polyEvaluate -a " + $cluster);
+		
+
+		$floatTemp = eval($cmd);
+		$sizes[$a++] = $floatTemp[0];
+
+	}
+		
+	
+	//den index mit den größten AreaWerten finden
+	$a = 0;
+	
+	for ($i = 1; $i < size($sizes); $i++)
+			
+			if ($sizes[0] <	$sizes[$i]){
+				$sizes[0] = $sizes[$i];
+				$a = $i;
+			}
+
+	//größten PMF Cluster anwählen
+
+	tokenizeList $PMF[$a] $buffer;
+	select $buffer;
+
+	//größten PMFCluster von $PMF entfernen
+
+	clear $buffer;
+	$buffer[0] = $PMF[$a];
+
+	$PMF = stringArrayRemove ($buffer, $PMF);
+
+	return $PMF;
+
+}
+
+
+
+//
+//------->><<<------
+//
+
+
+//0 = Alle ValidFaces, 1 = nur singles, 2 nur PMFs
+global proc au_selectvalidFaces(int $switch, string $operation){
+
+	global int $planarMappedFacesIndex;
+	global string $validFaces[];
+
+	int $sizeValidFaces = size($validFaces);
+	string $buffer[];
+
+	
+	
+	if( ($switch == 0) || ($switch == 1) )
+		for ($i = 0; $i < ( $sizeValidFaces - $planarMappedFacesIndex ); $i++)
+			eval("select -" + $operation + " " + $validFaces[$i]);
+			
+	
+	if( ($switch == 0) || ($switch == 2) ){
+		for ($i = ( $sizeValidFaces - $planarMappedFacesIndex ); $i < $sizeValidFaces; $i++){
+			tokenizeList ($validFaces[$i], $buffer);
+					
+			if($operation == "add")
+				select -add $buffer;
+			else
+				select -d $buffer;
+		}
+	}	
+
+}
+
+
+
+//
+//------->><<<------
+//
+
+
+//Der Input muss ne geflatete Selectionlist sein
+
+global proc int[] au_extractArrayNumber(string $input[]){
+
+	int $result[];
+
+	string $buffer[];
+	string $buffer2[];
+
+	int $counter = 0;
+
+	
+	for ($item in $input){
+	
+			tokenize $item "[" $buffer;
+
+			tokenize $buffer[1] "]" $buffer2;
+
+			$result[$counter++] = $buffer2[0];
+
+		}
+
+
+
+
+return $result;
+}
+
+
+
+//
+//------->><<<------
+//
+
+global proc SST_init(){
+
+	global int $killID_GSS = -1;
+		
+
+	global int $SST_fileID;
+
+	if(!(`scriptJob -ex $killID_GSS`) )
+		$killID_GSS = `scriptJob -e "SelectionChanged" "SST_getSoftSelected" `;
+
+
+	if ( !(`objExists "SST_Falloff"`) ){
+
+		string $initName = `createNode "animCurveTA"`;
+		rename $initName "SST_Falloff";
+		
+		setKeyframe -t 0 -v 1 "SST_Falloff";
+		setKeyframe -t 1 -v 0 "SST_Falloff";
+
+		keyTangent -e -a -t 0 -outAngle 0 -outWeight 1 SST_Falloff; 
+		keyTangent -e -a -t 1 -inAngle 0 -inWeight 1 SST_Falloff ;
+	
+	}
+
+	
+
+	if ( size(`filterExpand -sm 35`) != 0)
+		SST_getSoftSelected;
+
+	
+	string $fileName = ( `internalVar -userTmpDir` + "output.cmd" );
+	$SST_fileID = `cmdFileOutput -o $fileName`;
+		
+
+}
+
+
+//
+//------->><<<------
+//
+
+global proc int SST_getSoftSelected(){
+
+	string $center[];
+	string $buffer[];
+
+	
+
+	global int $killID_GSS;
+
+	global string $SST_AreaSelection[];
+	global float $SST_AreaValues[];
+	
+
+
+	clear $SST_AreaSelection;
+	clear $SST_AreaValues;
+
+
+	
+	
+
+	global string $gMainProgressBar;
+
+
+	float $UVPos[];
+	float $centerPos[];
+	
+
+	string $myCurrentSelection[];
+	string $myGrowSelection[];
+	string $myDifferenceSelection[];
+	int $lastDifferenceSize;
+
+	
+	float $floatTemp[];
+	float $bb[];
+	
+	int $growCounter = 0;
+	int $stop = 0;
+	
+
+	
+	
+	float $validRadius = 2000000;
+	int $validEdgeDistance = 2000000;
+	
+	int $counter = 0;
+
+	float $temp = 0;
+
+
+	float $tempfloats[];
+	float $tempDistance;
+	float $UVFactor;
+	
+
+	float $edgeDivisor = 1;
+
+
+	int $edgeOrDistance;
+
+	
+	setToolTo selectSuperContext;
+
+
+	$center = `filterExpand -sm 35`;
+	int $sizeCenter = `size($center)`;
+
+
+
+
+	if( $sizeCenter == 0 ){
+		warning "Please select at least one UV Point";
+		return 0;	
+		}
+
+
+	if( $sizeCenter == 1){
+		
+		$centerPos = `polyEditUV -q -u -v $center[0]`;
+		
+	}
+	
+	if ( ($sizeCenter > 1) && ( $edgeOrDistance != 2) )
+		SST_findBorderUV($center);		
+	
+	
+	
+
+	if(`radioCollection -q -sl soft_radiusType` == "SST_radiusRadio")
+		$edgeOrDistance = 1;
+	else
+		$edgeOrDistance = 2;
+
+
+	if( $edgeOrDistance == 2)
+			
+		$validEdgeDistance = `intField -q -v SST_edgeField`;
+			
+			
+	else	
+			
+		$validRadius = `floatField -q -v SST_radiusField`;
+			
+
+	
+
+	
+
+	
+
+	$myCurrentSelection = $center;
+
+	float $startTime = `timerX`;
+
+	while ($stop == 0){
+
+		
+		
+		select $myCurrentSelection;
+
+		if ( $growCounter < $validEdgeDistance ){
+			PolySelectTraverse 1;
+			$myGrowSelection = `ls -sl -fl`;
+			$growCounter++;
+		}
+		else
+			break;
+		
+		
+		select -d $myCurrentSelection;
+		$myDifferenceSelection = `ls -sl -fl`;
+
+		$sizeMyDifferenceSelection = size($myDifferenceSelection);
+
+		
+
+
+
+		if($sizeMyDifferenceSelection == $lastDifferenceSize)				// ==SicherheitsCheck für den Fall, dass Grow nich mehr weitergeht und die notwendige AbbruchDistance nie erreicht wird
+			break;
+		
+		
+
+
+
+		for ($UV in $myDifferenceSelection){ 
+
+			
+			
+			
+			if ($edgeOrDistance == 2 ){
+					
+					
+					$UVFactor = $edgeDivisor / $validEdgeDistance;
+					$tempfloats = `keyframe -t $UVFactor -q -eval "SST_Falloff"`;	
+	
+					$SST_AreaSelection[size($SST_AreaSelection)] = $UV;
+					$SST_AreaValues[size($SST_AreaValues)] = $tempfloats[0];						
+					
+				}
+			else
+				{
+					
+
+
+
+					
+					if( $sizeCenter > 1 ){
+							$centerPos = `SST_findClosestBorderUVPos($UV)`;
+							}
+					
+					$UVPos =  `polyEditUV -q -u -v $UV`;
+					
+						
+	
+					$tempDistance = `mag(<< ($UVPos[0] - $centerPos[0]) , ($UVPos[1] - $centerPos[1]) , 0.0 >>)`;
+
+										
+
+					
+
+
+
+
+					if ($tempDistance < $validRadius){
+
+					
+				
+						$tempfloats = `keyframe -t ($tempDistance / $validRadius) -q -eval "SST_Falloff"`;
+						
+						$SST_AreaSelection[size($SST_AreaSelection)] = $UV;
+						$SST_AreaValues[size($SST_AreaValues)] = $tempfloats[0];	
+
+					}
+					else
+						$stop = 1;
+
+				}
+
+
+			}
+		
+		$myCurrentSelection = $myGrowSelection;
+		$myLastDifferenceSelection = $myDifferenceSelection;
+		$lastDifferenceSize = $sizeMyDifferenceSelection;
+		$edgeDivisor++;
+
+	}	
+
+
+
+select $center;
+
+float $finalTime = `timerX -st $startTime`;
+print ($finalTime + " == Zeit für's Einlesen \n");
+
+setToolTo moveSuperContext;
+
+return 1;
+
+}
+
+//
+//------->><<<------
+//
+
+
+global proc SST_findBorderUV(string $center[]){
+
+
+	
+	string $outline[];
+	
+	global string $SST_borderUV[];
+
+	
+
+
+	select $center;
+
+	textureWindow -e -selectInternalFaces `getPanel -sty polyTexturePlacementPanel`;
+	
+	$outline = au_queryOutline(`filterExpand -sm 34`);
+
+	select $outline;
+
+	PolySelectConvert 4;	
+
+	$SST_borderUV = au_ArrayIntersector($center, `ls -sl -fl`);
+
+	
+
+
+
+}
+
+//
+//------->><<<------
+//
+
+global proc float[] SST_findClosestBorderUVPos(string $UV){
+
+	global string $SST_borderUV[];
+
+	float $closestBorderUVPos[];
+	
+	float $lastDistance = 50111;
+	float $currentDistance = 0;
+	
+	float $borderPos[];
+	float $UVPos[] = `polyEditUV -q -u -v $UV`;
+
+
+
+	for($item in $SST_borderUV){
+	
+		$borderPos = `polyEditUV -q -u -v $item`;
+		
+		$currentDistance = mag(<< ($UVPos[0] - $borderPos[0]), ($UVPos[1] - $borderPos[1]) , 0 >>);
+		
+
+		if ( $currentDistance < $lastDistance ){
+			$closestBorderUVPos = $borderPos;
+			$lastDistance = $currentDistance;
+			}
+	}
+
+return $closestBorderUVPos;
+
+}
+//
+//------->><<<------
+//
+
+global proc int SST_Update(){
+	
+	global string $gMainProgressBar;
+	
+	global string $SST_AreaSelection[];
+	global float $SST_AreaValues[];
+	global int $SST_fileID;
+
+	int $sizeArray = `size($SST_AreaSelection)`;
+
+	string $currentTool = `currentCtx`;
+
+	string $buffer[];
+	string $polyEditSaver[];
+
+	float $floatValues[];
+	string $line;
+	
+
+	
+	
+
+	string $fileName = ( `internalVar -userTmpDir` + "output.cmd" );
+	int $ID = `fopen $fileName "r"`;
+
+//letzte Zeile mit PolyEditUV finden
+
+	progressBar -e -bp -status "Moving UVs" -max $sizeArray $gMainProgressBar;
+
+	$line = `fgetline $ID`;
+	while ( size( $line ) > 0 ) {
+		if(`match "polyEditUV" $line` != "")
+			$polyEditSaver[size($polyEditSaver)] = $line;	
+		
+		$line = `fgetline $ID`;		
+	}
+
+	fclose $ID;
+	
+	 
+
+
+	if(size($polyEditSaver) == 0){
+		error "UVs could not be moved";
+		return 0;
+		}
+
+		tokenizeList ($polyEditSaver[size($polyEditSaver) - 1],$buffer);
+
+		if( $currentTool == "moveSuperContext"){
+			$floatValues[0] = $buffer[2];
+			$floatValues[1] = $buffer[4];
+
+			
+
+			float $startTime = `timerX`;
+
+			for($i = 0; $i < $sizeArray; $i++){
+				polyEditUV -r 1 -u ($SST_AreaValues[$i] * $floatValues[0]) -v ($SST_AreaValues[$i] * $floatValues[1]) $SST_AreaSelection[$i];
+				progressBar -e -step 1 -status ("Moving UVs") $gMainProgressBar;
+				}
+
+			float $finalTime = `timerX -st $startTime`;
+
+			print ($finalTime + " == Zeit für's Verschieben \n");			
+
+			}
+			
+
+		else if( $currentTool == "RotateSuperContext"){
+			$floatValues[0] = $buffer[2];
+			$floatValues[1] = $buffer[4];
+			$floatValues[2] = $buffer[6];
+
+			
+			float $startTime = `timerX`;
+	
+			for($i = 0; $i < $sizeArray; $i++){
+				polyEditUV -pu $floatValues[0] -pv $floatValues[1] -a ($SST_AreaValues[$i] * $floatValues[2]) $SST_AreaSelection[$i];
+				progressBar -e -step 1 -status ("Rotating UVs") $gMainProgressBar;
+				}			
+
+
+			float $finalTime = `timerX -st $startTime`;
+
+			print ($finalTime + " == Zeit für's Rotieren \n");
+			}
+
+			
+
+		else if( $currentTool == "scaleSuperContext"){
+			$floatValues[0] = $buffer[2];
+			$floatValues[1] = $buffer[4];
+			$floatValues[2] = $buffer[6];
+			$floatValues[3] = $buffer[8];
+
+			
+			$floatValues[2] -= 1;
+			$floatValues[3] -= 1;
+
+			float $startTime = `timerX`;
+			for($i = 0; $i < $sizeArray; $i++){
+				polyEditUV -pu $floatValues[0] -pv $floatValues[1] -su ($SST_AreaValues[$i] * $floatValues[2] + 1) -sv ($SST_AreaValues[$i] * $floatValues[3] + 1) $SST_AreaSelection[$i];
+				progressBar -e -step 1 -status ("Scaling UVs") $gMainProgressBar;
+				}
+
+			float $finalTime = `timerX -st $startTime`;
+
+			print ($finalTime + " == Zeit für's Skalieren \n");
+			
+			}
+
+	progressBar -e -ep $gMainProgressBar;
+	tokenize $SST_AreaSelection[0] "." $buffer;
+	int $harry[] = `polyEvaluate -uv $buffer[0]`;
+	print ("Habe insgesamt " + `size($SST_AreaSelection)` + " von " + $harry[0] + " UV-Punkten verschoben \n");
+
+
+		
+
+
+return 1;
+
+}
+//
+//------->><<<------
+//
+
+global proc SST_killInitSJ(int $override){
+
+	global int $killID_GSS;
+	
+	global int $SST_fileID;
+
+	if(`scriptJob -ex $killID_GSS`){
+		scriptJob -kill $killID_GSS;
+		$kilID_GSS = -1;
+		}
+
+	if(`button -ex SST_modeButton`)
+		if( (`button -q -l SST_modeButton` == "Automatically") || ($override) )
+			cmdFileOutput -c $SST_fileID;
+	else
+		if( $override )
+			cmdFileOutput -c $SST_fileID;
+
+}
+
+//
+//------->><<<------
+//
+
+
+global proc string au_createUVs(){
+
+	global string $PMFCopy[];
+	clear $PMFCopy;
+	
+
+	global int $au_nSidedFacesExists;
+	global string $baseMesh;
+	global string $workBaseMesh;
+	
+	string $meshName = `au_appropriateBaseMesh`;
+	global string $UVAndMultiplierSave[];
+	clear $UVAndMultiplierSave;
+
+
+	global string $perClusterUVWeights[];
+	clear $perClusterUVWeights;
+
+	
+	global string $validFaces[];
+
+	
+	global string $referenceCopy;
+	string $buffer[];
+
+constructionHistory -toggle 0;
+undoInfo -st 0;
+//Wenn UVs nur für BaseMesh erstellt werden sollen ... 
+//
+
+
+
+	
+		
+		
+		setToolTo selectSuperContext;			//Bewirkt, dass man die Progressbar ordentlich lesen kann
+		
+		resetPolySelectConstraint;	//Zur Sicherheit (für den Fall, dass der User noch nen Constraint an hatte)	
+
+		
+		int $faceCount[] = `polyEvaluate -f $baseMesh`;	 			//Wenn NsidedFaces vorhanden, dann fragen, ob User nich doch lieber auf PieceSew umschalten will, wenn nicht schon gemacht
+	
+		global string $au_nSidedFaces[];
+
+		select $baseMesh;
+
+		setSelectMode components Components;
+
+		selectType -pe 1;
+	
+		select ($baseMesh + ".f[0:" + ($faceCount[0] - 1) + "]");
+
+		polySelectConstraint -m 3 -t 8 -sz 3;
+
+		resetPolySelectConstraint;
+		
+		$au_nSidedFacesExists = 0;
+
+		if( (size(`ls -sl`) != 0) && (`radioButtonGrp -q -en sewMethodSelector` != 0) && (`radioButtonGrp -q -en sewMethodSelector` != 2) ){
+
+		$au_nSidedFacesExists = 1;
+
+		string $result = `confirmDialog 
+				-title "Warning" 
+				-message "Your Mesh has nSided Faces. You will only get the expected results when you choose the \n PieceByPiece Method." 
+				-button "Use PieceByPiece" 
+				-button "Continue ..." 
+				-defaultButton "Use PieceByPiece" 
+				-cancelButton "Continue ..." 
+				-dismissString "Continue ..."`; 
+			
+			
+			if ($result == "Use PieceByPiece") 
+				radioButtonGrp -e -sl 2 sewMethodSelector;
+			
+				
+				
+				
+			}
+
+	
+
+
+
+		waitCursor -state on;
+		
+		au_mapFaces(0);
+		
+		if (`checkBox -q -v rescaleFacesCheck`)		
+			au_restoreRelativePeaceSize(0);
+
+		
+		
+		if (`checkBox -q -v moveAndSewCheck`)
+			au_moveAndSewEdges;
+		
+
+
+
+	
+
+		
+		
+				
+
+
+
+		if( `checkBox -q -v layoutAndNormalizeResultCheck` ){
+					
+			if(`objExists($workBaseMesh)`)
+				$meshName = $workBaseMesh;
+			else
+				$meshName = $baseMesh;
+				
+			int $tempFaces[] = `polyEvaluate -f $meshName`;
+			
+			select ($meshName + ".f[0:" + ($tempFaces[0] - 1) + "]");
+			polyLayoutUV -l 2 -sc 0 -se 0 -rbf 0 -fr 1 -ps 0.4 -ch 1;
+			polyNormalizeUV -normalizeType 1 -preserveAspectRatio on ;
+			
+			}		
+
+
+
+
+
+		if(`checkBox -q -v preserveHistoryCheck`){
+			select -cl;
+			polyTransfer -uv 1 -ch 1 -ao $workBaseMesh $baseMesh;
+			delete $workBaseMesh;
+		}
+
+		
+
+		
+		
+
+
+		
+		waitCursor -state off;	
+		select $baseMesh;			
+	
+		
+
+	//Wenn SmoothMesh Aktiviert ist
+
+	
+undoInfo -st 1;
+constructionHistory -toggle 1;
+	
+return "Successfull";
+}
+
+
+
+//
+//------->><<<------
+//
+
+//
+//-----------------------------------------------------End of-->>>> Other global procedures <<<<--End of------------------------------------------
+//
+
+//
+//------------------------------------------------------------>>>> MJPolyTools global procedures <<<<---------------------------------------------------
+//
+
+
+global proc string[] au_ArrayIntersector(string $array1[] ,string $array2[] )
+{
+    string $myIntersector = `stringArrayIntersector`;
+    stringArrayIntersector -edit -intersect $array1 $myIntersector;
+    stringArrayIntersector -edit -intersect $array2 $myIntersector;
+    string $result[]	= `stringArrayIntersector -query $myIntersector`;
+    stringArrayIntersector -edit -reset $myIntersector;
+    return $result;
+}
+
+
+//
+//------->><<<------
+//
+
+
+
+
+//
+//----------------------------------------------------End of-->>>> MJPolyTools global procedures <<<<--End of-------------------------------------------
+//
+
+

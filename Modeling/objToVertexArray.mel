@@ -1,0 +1,158 @@
+// objToVertexArray.mel 
+
+global proc objToVertexArray () {
+
+// open the obj file
+
+	// open dialog to point to file
+	string $filename = `fileDialog`;
+	print ($filename + "\n");
+
+	string $fileStringArray[];
+	
+	// create an array to store the vertex positions
+	string $vertexList[];
+	string $vertexNormalList[];
+	string $faceIndices[];
+	string $vertexTextureList[];
+
+	string $vertexNormalListSorted[];
+	string $vertexTextureListSorted[];
+
+
+	// open file
+	$fileId=`fopen $filename "r"`;
+
+	// run each line with error suppression
+
+	string $nextLine = `fgetline $fileId`;
+	while ( size( $nextLine ) > 0 ) {
+		if (substring($nextLine,1,1)=="v"){
+			if (substring($nextLine,2,2)==" "){
+				// its a vertex, parse it as such
+				string $tokenBuffer[];
+				if (endsWith($nextLine, "\n"))
+					$nextLine = substring($nextLine,1,size($nextLine)-1);
+				tokenize $nextLine " " $tokenBuffer;
+				string $vtxCoord[] = {$tokenBuffer[1],$tokenBuffer[2],$tokenBuffer[3]};
+				for ($n=0;$n<3;$n++){
+					$vertexList[size($vertexList)] = $vtxCoord[$n];
+				}
+			}
+			else if (substring($nextLine,2,2)=="n"){
+				// its a vertex normal, parse it as such
+				string $tokenBuffer[];
+				if (endsWith($nextLine, "\n"))
+					$nextLine = substring($nextLine,1,size($nextLine)-1);
+				tokenize $nextLine " " $tokenBuffer;
+				string $vtxNormalCoord[] = {$tokenBuffer[1],$tokenBuffer[2],$tokenBuffer[3]};
+				for ($n=0;$n<3;$n++){
+					$vertexNormalList[size($vertexNormalList)] = $vtxNormalCoord[$n];
+				}				
+			}
+			else if (substring($nextLine,2,2)=="t"){
+				// its a vertex texture coord, parse it as such
+				string $tokenBuffer[];
+				if (endsWith($nextLine, "\n"))
+					$nextLine = substring($nextLine,1,size($nextLine)-1);
+				tokenize $nextLine " " $tokenBuffer;
+				string $vtxTextureCoord[] = {$tokenBuffer[1],$tokenBuffer[2]};
+				for ($n=0;$n<2;$n++){
+					$vertexTextureList[size($vertexTextureList)] = $vtxTextureCoord[$n];
+				}
+			}
+		}
+		else if (substring($nextLine,1,1)=="f"){
+			// its a face, parse it as such
+			string $tokenBuffer[];
+			if (endsWith($nextLine, "\n"))
+				$nextLine = substring($nextLine,1,size($nextLine)-1);
+			tokenize $nextLine " " $tokenBuffer;
+			string $faceGroups[] = {$tokenBuffer[1],$tokenBuffer[2],$tokenBuffer[3]};
+			for ($n=0;$n<3;$n++){
+				tokenize $faceGroups[$n] "/" $tokenBuffer;
+				int $vertexNumber = int($tokenBuffer[0]); //912
+				int $normalNumber = int($tokenBuffer[2]); //904
+				int $textureNumber = int($tokenBuffer[1]); //1009
+				$faceIndices[size($faceIndices)] =  $vertexNumber-1;//2733 
+				$vertexNormalListSorted[($vertexNumber-1)*3] =$vertexNormalList[($normalNumber-1)*3]; //3024 (oor)
+				$vertexNormalListSorted[(($vertexNumber-1)*3)+1] =$vertexNormalList[(($normalNumber-1)*3)+1];
+				$vertexNormalListSorted[(($vertexNumber-1)*3)+2] =$vertexNormalList[(($normalNumber-1)*3)+2];
+				$vertexTextureListSorted[($vertexNumber-1)*2] =$vertexTextureList[($textureNumber-1)*2]; 
+				$vertexTextureListSorted[(($vertexNumber-1)*2)+1] =$vertexTextureList[(($textureNumber-1)*2)+1];
+			}
+			
+		}
+    		$nextLine = `fgetline $fileId`;
+	}
+	fclose $fileId;
+
+
+	// output file
+	print ("outputting file\n");
+
+	$fileId=`fopen ($filename+".h") "w"`;
+	fprint $fileId ("#ifndef NAME_H\n");
+	fprint $fileId ("#define NAME_H\n\n");
+	fprint $fileId ("const int num_name_indices = "+size($faceIndices)+";\n");
+	fprint $fileId ("const int num_name_vertices = "+size($vertexList)+";\n");
+	fprint $fileId ("const int num_name_normals = "+size($vertexNormalList)+";\n\n");
+
+	fprint $fileId ("float name_vertices[] = {\n");
+	for ($i=0;$i<size($vertexList);$i=$i+3){
+		fprint $fileId ("\t"+$vertexList[$i]+","+$vertexList[$i+1]+","+$vertexList[$i+2]+",\n");
+	}
+	
+	fprint $fileId "};\n\n";	
+
+	fprint $fileId ("float name_normals[] = {\n");
+	for ($i=0;$i<size($vertexNormalListSorted);$i=$i+3){
+		if ($i>0) fprint $fileId ",\n";
+		fprint $fileId ("\t"+$vertexNormalListSorted[$i]+","+$vertexNormalListSorted[$i+1]+","+$vertexNormalListSorted[$i+2]);
+	}
+	
+	fprint $fileId "};\n\n";	
+
+	fprint $fileId ("float name_texture[] = {\n");
+	for ($i=0;$i<size($vertexTextureListSorted);$i=$i+2){
+		if ($i>0) fprint $fileId ",\n";
+		fprint $fileId ("\t"+$vertexTextureListSorted[$i]+","+$vertexTextureListSorted[$i+1]);
+	}
+	
+	fprint $fileId "};\n\n";
+
+	/*
+	fprint $fileId ("short name_indices[] = {\n");
+	for ($i=size($faceIndices)-1;$i>-1;$i=$i-8){
+		fprint $fileId ("\t"+$faceIndices[$i]+","+$faceIndices[$i-1]+","+$faceIndices[$i-2]+","+$faceIndices[$i-3]+","+$faceIndices[$i-4]+","+$faceIndices[$i-5]+","+$faceIndices[$i-6]+","+$faceIndices[$i-7]+",\n");
+	}
+	*/
+
+	fprint $fileId ("short name_indices[] = {\n");
+	for ($i=0;$i<size($faceIndices);$i=$i+8){
+		if ($i>0) fprint $fileId ",\n";
+		fprint $fileId ("\t"+$faceIndices[$i]+","+$faceIndices[$i+1]+","+$faceIndices[$i+2]+","+$faceIndices[$i+3]+","+$faceIndices[$i+4]+","+$faceIndices[$i+5]+","+$faceIndices[$i+6]+","+$faceIndices[$i+7]);
+	}
+
+	fprint $fileId "};\n\n";
+
+
+	fprint $fileId "#endif // NAME_H";
+
+	fclose $fileId;
+
+
+
+
+
+// read through each line
+
+	// if line starts with v its a vertex
+
+	// if line starts with a vt its a UV coord
+
+	// if line starts with a van its a vertex normal
+
+	// if it starts with a f its a face
+
+}

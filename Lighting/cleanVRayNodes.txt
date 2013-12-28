@@ -1,0 +1,4 @@
+Clears out duplicate vrayEnvironmentPreview Nodes from scene 
+ 
+ 
+ 

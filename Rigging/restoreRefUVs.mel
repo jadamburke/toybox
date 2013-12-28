@@ -1,0 +1,34 @@
+// restoreRefUVs
+global proc restoreRefUVs () {
+
+	string $objs[] = `ls -sl -type "transform"`;
+
+	for ($each in $objs){
+		string $shapeNodes[] = `listRelatives -fullPath -shapes $each`;
+		string $referencedShape = $shapeNodes[0];
+		int $uvCount = evalEcho("getAttr -size \""+$referencedShape+".uvst[0].uvsp\"");
+		string $uvAttr = ($referencedShape+".uvst[0].uvsp[0:"+($uvCount-1)+"]");
+		float $result[];
+		if ($uvCount > 0){
+			$result = `getAttr $uvAttr`;
+		
+		
+
+		if (size($shapeNodes)>1){
+			for ($i=1;$i<size($shapeNodes);$i++){
+				
+				string $cmd = ("setAttr "+$shapeNodes[$i]+".uvSet[0].uvSetPoints -s "+$uvCount+";\n");
+				$cmd += ("setAttr "+$shapeNodes[$i]+".uvst[0].uvsp[0:"+($uvCount-1)+"] -type \"float2\" ");
+				float $every = 0;
+				for ($every in $result){
+            					$cmd+=($every+" ");
+        			}
+
+				catch(evalEcho($cmd));
+			}
+
+		}
+		}
+	}
+
+}

@@ -1,0 +1,4 @@
+restores the shader on deformed objects which haven't updated their shader 
+ 
+ 
+ 

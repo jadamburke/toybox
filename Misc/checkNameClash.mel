@@ -1,0 +1,212 @@
+// checkNameClash
+// Created by: adam
+// Date: 2012/03/29 18:56:48
+
+global proc checkNameClash(){
+	// list all dag objects with full path names
+	// assumption that clashing nodes when queried with ls command will return full dag paths
+
+	// check in scene objects
+	select -clear;
+	select -add `ls -dag`;
+	select -deselect `ls -sl -dag -referencedNodes`;
+	select -deselect `ls -sl -dag -lockedNodes`;
+    $nodesToTest = `ls -sl`;
+    select -clear;
+	//select -deselect `ls -sl -shapes`;
+	clashCheckThese ($nodesToTest, 2, "IN SCENE");
+
+	// check for clashes in referenced or locked nodes
+	//select -clear;
+	//select -add `ls -dag -referencedNodes`;
+	//select -add `ls -dag -lockedNodes`;
+	//clashCheckThese (`ls -sl `, 3, "READ ONLY");
+
+	
+
+}
+
+// iteratively goes through clashing names and renames them to the next aval <name><#> 
+global proc fixClashNodes (string $clashNodes[]){
+	for ($each in $clashNodes){
+		select -clear;
+		select -add `ls -r 1 $each`;
+		select -deselect `ls -sl -dag -referencedNodes`;
+		select -deselect `ls -sl -dag -lockedNodes`;
+		string $duplicates[] = `ls -sl`;
+		if (size($duplicates)>1){
+			for ($i=1;$i<size($duplicates);$i++){
+				$every = $duplicates[$i];
+				string $tokenBuffer[];
+				tokenize $every "|" $tokenBuffer;
+				if (size($tokenBuffer) > 1){
+					string $nodeName = $tokenBuffer[size($tokenBuffer)-1];
+
+					string $endNums = `match "[0-9]+$" $nodeName`;
+					int $nameSize = size($nodeName) - size($endNums);
+					string $nameNoNums = `substring $nodeName 1 $nameSize`;
+					// na
+					int $num = 1;
+					string $newName = ($nameNoNums+$num);
+					while (`objExists $newName`){
+						$num++;
+						$newName = ($nameNoNums+$num);
+					}
+					print ("Fixing "+$every+" to "+$newName+"\n");
+					if (`objExists $every`){
+						rename $every $newName;
+						if (`objExists $newName`){
+							if (`objectType $newName` == "transform"){
+								// check the first shape node to match it to the transform
+								string $shapes[] = `listRelatives -shapes $newName`;
+								for ($every in $shapes){
+
+									string $namePath[] = `ls $newName`;
+									string $shapePath = ($namePath[0]+"|"+$every);
+									string $shapeName = ($nameNoNums+"Shape"+$num);
+									//print ("Shape Fix "+$shapePath+" to "+$shapeName+"\n");
+									rename $shapePath $shapeName;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// this renames shape nodes to match the maya spec for automatic naming
+global proc correctShapeNames(){
+}
+
+// checks clashes on a list of objects. fixIt=0:don't fix fixIt=1: force fix it: fixIt=2: prompt user fixIt=3: warn about read only
+global proc clashCheckThese (string $objects[], int $fixIt, string $type){
+
+	string $clashNodes[];
+	string $list[];
+
+	string $each;
+	for ($each in $objects){
+		string $tokenBuffer[];
+		tokenize $each "|" $tokenBuffer;
+		if (size($tokenBuffer) > 1){
+			$clashNodes[size($clashNodes)] = $tokenBuffer[size($tokenBuffer)-1];
+
+		}
+
+	}
+	if (size($clashNodes) > 0){
+		string $noDupeNodes[] =  stringArrayRemoveDuplicates($clashNodes);
+		//print $noDupeNodes;
+
+		int $foundTrueClashes = 0;
+		// print the clashes for checking
+		for ($each in $noDupeNodes){
+			if (`objExists $each`){
+				string $duplicates[] = `ls -r 1 $each`;
+				// if it only returns 1 dag path to name then it is an instance and should be ignored
+				if (size ($duplicates)>1){
+					print ("// ========CLASH FOUND: "+$each+"\n");
+					$list[size($list)] = ("========CLASH FOUND: "+$each);
+					for ($every in $duplicates){
+						$foundTrueClashes = 1;
+						print ("// "+$every+"\n");
+						$list[size($list)] = ($every);
+					}
+					print ("// =====================\n");
+					$list[size($list)] = ("=====================");
+				}
+			}
+		}
+
+		if ($foundTrueClashes){
+			string $result = "Ignore";
+			if ($fixIt == 2){
+				$listStr = stringArrayToString($list, ",");
+
+				print ("size="+size ($listStr)+"\n");
+				if (size($listStr)>20000){
+					$listStr = "TOO MANY TO REPORT HERE. See Script Editor for list of clashing nodes.";
+				}
+
+				print ("checkNameClashReportPrompt \"You have "+size($noDupeNodes)+" clashes in your scene. What would you like to do?\" \""+$listStr+"\";\n");
+				$result = `layoutDialog -title "Clash Check" -ui ("checkNameClashReportPrompt \"You have "+size($noDupeNodes)+" clashes in your scene. What would you like to do?\" \""+$listStr+"\";")`;
+				//$result = `confirmDialog -title "Clash Check" -message ("You have "+size($noDupeNodes)+" clashes in your scene. Check the script editor for details. What would you like to do?") -button "Manually Fix" -button "Auto Fix" -button "Ignore" -defaultButton "Manually Fix" -cancelButton "Ignore" -dismissString "Ignore"`;
+			}
+			else if ($fixIt == 3){
+				$result = `confirmDialog -title "Clash Check" -message ("There are "+size($noDupeNodes)+" clashes in referenced scenes files or read-only nodes. Please have the appropriate artists fix the referenced scenes IMMEDIATELY! Check Script Editor for Details.") -button "OK" -defaultButton "OK" -cancelButton "OK" -dismissString "OK"`;
+			}
+
+			if ($result == "Manually Fix" && $fixIt == 2){
+				error("User Aborted Save to manually fix name clashes.");
+			}
+			else if ($result == "Auto Fix" || $fixIt == 1){
+				fixClashNodes $noDupeNodes;
+			}
+		}
+		else{
+			print ("// NO "+$type+" CLASHES FOUND //\n");
+		}
+		
+	}
+	else{
+		print ("// NO "+$type+" CLASHES FOUND //\n");
+	}
+
+
+
+}
+
+global proc checkNameClashReportPrompt(string $message, string $list)
+{
+    // Get the dialog's formLayout.
+    string $form = `setParent -q`;
+
+    formLayout -e -width 500 -height 300 $form;
+
+    string $t = `scrollField reportPromptSF`;
+
+    string $lbl = `text -ww 1 -label $message`;
+
+    string $newList = substituteAllString($list, ",", "\n");
+    scrollField -e -text $newList $t;
+
+    string $b1 = `button -l "Manual Fix" -c "layoutDialog -dismiss \"Manual Fix\""`;
+    string $b2 = `button -l "Auto Fix" -c "layoutDialog -dismiss \"Auto Fix\""`;
+    string $b3 = `button -l "Cancel" -c "layoutDialog -dismiss \"Cancel\""`;
+
+    int $spacer = 5;
+    int $top = 5;
+    int $edge = 5;
+
+    formLayout -edit
+
+
+        -attachForm            $t   "top"    $top 
+        -attachForm            $t   "left"   $edge
+        -attachControl         $t   "bottom"  20 $lbl
+        -attachForm            $t   "right"  $edge
+
+        -attachNone            $lbl   "top"   
+        -attachForm            $lbl   "left"   ($edge+20)
+        -attachControl         $lbl   "bottom" ($spacer+20) $b1
+        -attachForm            $lbl   "right"  ($edge+20)
+
+        -attachOppositeForm    $b1  "top"    (-25-$spacer)
+        -attachForm            $b1  "left"   $edge
+        -attachNone            $b1  "bottom"
+        -attachPosition        $b1  "right"  $spacer 33
+
+        -attachOppositeForm    $b2  "top"    (-25-$spacer)
+        -attachPosition        $b2  "left"   $spacer 33
+        -attachNone            $b2  "bottom"
+        -attachPosition        $b2  "right" $spacer 66
+
+        -attachOppositeForm    $b3  "top"    (-25-$spacer)
+        -attachPosition        $b3  "left"   $spacer 66
+        -attachNone            $b3  "bottom"
+        -attachForm            $b3  "right" $edge
+
+    $form;
+}

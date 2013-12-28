@@ -1,0 +1,86 @@
+// arcLengthCurve
+global proc arcLengthParam () {
+
+	vector $objectPosBuff[];
+	int $divisions = 20;
+	float $uVal = 0;
+	float $xyzPos[] = {0,0,0};
+	
+
+	string $selectedCurves[] = `ls -sl`;
+	
+	// create arc length dimension shape
+	string $arcLenNode = `arcLengthDimension ($selectedCurves[0] +".u[0]")`;
+
+	$uVal = `getAttr ($arcLenNode+".upv")`;
+	$xyzPos = `pointOnCurve -pr $uVal -p $selectedCurves[0]`;
+	$objectPosBuff[0] = <<$xyzPos[0],$xyzPos[1],$xyzPos[2]>>;
+
+	// determine arc length of curve
+	float $curveLength = `arclen $selectedCurves[0]`;
+	
+
+	float $curLen[];
+
+	// get the number of knots
+	string $curveShapeNodes[] = `listRelatives -shape $selectedCurves[0]`;
+	int $numKnots = `getAttr ($curveShapeNodes[0]+".spans")`;
+	
+	// for each knot 
+	for ($i = 0; $i < size($numKnots); $i++){
+		// get its param
+		// $uVal = NO WAY TO GET EP's uval
+		
+		// get its xyz coord
+		// set arcLenDimension to param
+		setAttr ($arcLenNode+".upv") ($uVal);
+		// get arcLenDimension value
+		$curLen[$i] = `getAttr ($arcLenNode+".al")`;
+
+		// store xyz coord in array
+		$curXYZ[$i] = <<$xyzval[0],$xyzval[0],$xyzval[0]>>;
+	}
+
+	// build curve setting each knot to respective param and xyz coord
+
+
+
+	// increment a.l. dimension's u value until output length exceeds count number
+	for ($i = 1; $i<=$divisions;$i++){
+		float $step = ($curveLength / $divisions)*$i;
+		float $curLen = `getAttr ($arcLenNode+".al")`;
+		while ($curLen < $step){
+			$uVal = `getAttr ($arcLenNode+".upv")`;
+			setAttr ($arcLenNode+".upv") ($uVal+0.001);
+			$curLen = `getAttr ($arcLenNode+".al")`;
+		}
+
+		// get xyz position of u value and store it in an array
+		$xyzPos = `pointOnCurve -pr $uVal -p $selectedCurves[0]`;
+		$objectPosBuff[$i] = <<$xyzPos[0],$xyzPos[1],$xyzPos[2]>>;
+
+	}
+	
+
+	// generate curve
+
+	// create curve
+	string $curveCommand = "curve -p 0 0 0 -k 0 -p 0 .1 0 -k 0 -k 0";
+	for ($j = 0; $j < (size($objectPosBuff)-2); $j++) {
+		$curveCommand = ($curveCommand + " -p 0 0 0 -k " + ($j+1));
+	}
+	$curveCommand = ($curveCommand + " -p 0 0 0 -k " + ($j+1) + " -p 0 0 0 -k " + ($j+1) + "-k " + ($j+1));
+	string $curveName ="";
+
+	$curveName = eval($curveCommand);
+	eval("setAttr " + $curveName + ".overrideEnabled 1");
+	eval("setAttr " + $curveName + ".overrideColor 6");
+
+	for ($k = 0; $k <= size($objectPosBuff); $k++){
+		eval("select " + $curveName + ".ep[" + $k + "]");
+		//print ("select " + $curveName + ".ep[" + $k + "]\n");
+		//print ("\n"+$objectPosBuff[$k]);
+		eval ("move -r -ws -wd " + ($objectPosBuff[$k]));
+	}
+
+}

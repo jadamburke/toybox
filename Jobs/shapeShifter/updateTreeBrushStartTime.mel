@@ -1,0 +1,47 @@
+// updateTreeBrushStartTime
+
+global proc updateTreeBrushStartTime () {
+
+	$selected = `ls -sl`;
+	string $each = "";
+	for ($each in $selected){
+		if (`gmatch $each "*GOD*"`){
+			print ("GOD node found\n");
+			string $tokenBuffer[];
+			tokenize $each "_" $tokenBuffer;
+			string $charName = "";
+			string $seperator = "";
+			if (size($tokenBuffer) > 1){
+				$charName = $tokenBuffer[0];
+				$seperator = "_";
+			}
+			//treeLongTrunk1_trunkJoint01
+			//treeMapleSapling_trunkJoint01
+			//treeRainforest10_trunkJoint_01
+
+			string $jointRoot = ($charName+$seperator+"trunkJoint_01");
+			if (!`objExists $jointRoot`)
+				$jointRoot = ($charName+$seperator+"trunkJoint01");
+				
+
+			float $startTime = `findKeyframe -which first $jointRoot`;
+			print ("startTime = "+$startTime+"\n");
+			float $startTimeSeconds = ($startTime)/24;
+			
+			
+		
+		
+			string $brushCtrls[] = `listRelatives -children ($charName+$seperator+"twigBrushCTRL_grp")`;
+			for ($every in $brushCtrls){
+				float $oldStartSeconds = `getAttr ($every+".startTime")`;
+				//float $newStartSeconds = (($oldStartSeconds-4.2083)+$startTimeSeconds);
+				float $newStartSeconds = ($startTimeSeconds-$oldStartSeconds);
+				print ("newStartSeconds = "+$newStartSeconds+"\n");
+				//setAttr ($every+".startOffset") $newStartSeconds ;
+				setAttr ($every+".startOffset") 0 ;
+				//keyframe -e -a -valueChange $newStartSeconds ($every+".startTime");
+			}
+		}
+	}
+
+}

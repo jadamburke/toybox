@@ -1,0 +1,11 @@
+// togglePB
+
+
+if (`playbackOptions -q -ps` == 0){
+	playbackOptions -ps 1;
+	print ("Real-Time Playback\n");
+}
+else{
+	playbackOptions -ps 0;
+	print ("Play-Every-Frame Playback\n");
+	}

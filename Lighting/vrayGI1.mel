@@ -1,0 +1,77 @@
+// vrayGI1
+// Created by: raphe
+// Date: 2012/03/09 11:17:18
+
+global proc vrayGI1(){
+	if(! `pluginInfo -q -l "vrayformaya"`){
+		loadPlugin -addCallback "vrayGI1PostLoadLOW" "vrayformaya";
+		print ("loading plugin\n");
+	}else{
+		vrayGI1PostLoadLOW("vrayformaya");
+		print ("didnt have to load plugin\n");
+	}
+}
+
+global proc vrayGI1PostLoadLOW(string $pluginName){
+	
+	$anim = `confirmDialog -t "Animation" -m "What kind of GI?" -button "Single frame" -button "Camera move" -button "Animated geo" -defaultButton "Single Frame" -cancelButton "No"`;
+	//$anim = `confirmDialog -t "Animation" -m "What kind of GI?" -button "Single frame" -button "Animated geo" -defaultButton "Single Frame" -cancelButton "No"`;
+	
+	if ($anim == "Single frame"){
+	
+		evalDeferred("setCurrentRenderer vray;");
+		evalDeferred("unifiedRenderGlobalsWindow;");
+		evalDeferred -lowestPriority ("applyPresetToNode \"vraySettings\" \"\" \"\" (`getenv MAYA_PPTOOLS`+\"/presets/attrPresets/GI/VRaySettingsNode/GI1SingleFrame.mel\") 1");
+		evalDeferred -lowestPriority ("applyPresetToNode \"defaultRenderGlobals\" \"\" \"\" (`getenv MAYA_PPTOOLS`+\"/presets/attrPresets/GI/renderGlobals/GI1.mel\") 1");
+		
+		$empty = `confirmDialog -t "Next Step" -m "Baking unecessary. Ready to render. No need to click button 2 or 3" -button "Okay" -defaultButton "Okay" -cancelButton "No"`;
+	
+	}else if ($anim == "Animated geo"){
+		
+		evalDeferred("setCurrentRenderer vray;");
+		evalDeferred("unifiedRenderGlobalsWindow;");
+		
+		string $cmd = ("setAttr \"vraySettings.secondaryEngine\" 3;");
+		evalDeferred -lowestPriority ($cmd);
+		
+		$empty = `confirmDialog -t "Next Step" -m "Click button 2" -button "Okay" -defaultButton "Okay" -cancelButton "No"`;
+	
+	}else if ($anim == "Camera move"){
+		
+		$suffixBox = `promptDialog -t "Animation" -m "What prefix?" -button "Okay" -defaultButton "Okay"`;
+		$suffix = `promptDialog -q -text`;
+		
+		string $filePath = "";
+		
+		string $scenePath = `file -q -sn`;
+		string $scenePath = `workspace -pp $scenePath`;
+		string $tokenBuffer[];
+		tokenize $scenePath "/" $tokenBuffer;
+		
+		string $shotsFolder = $tokenBuffer[1];
+		string $seq = $tokenBuffer[2];
+		string $shotName = $tokenBuffer[3];
+		string $deptName = $tokenBuffer[4];
+		
+		string $folderPath = (`workspace -q -rd`+"scenes/"+$shotsFolder+"/"+$seq+"/"+$shotName+"/"+$deptName+"/irMaps/");
+		string $filePath = $folderPath + "GIButtonCamMove_" + $suffix + "_.vrlmap";
+		
+		if (!`filetest -d $folderPath`){
+			sysFile -makeDir $folderPath;
+		}
+		
+		evalDeferred("setCurrentRenderer vray;");
+		evalDeferred("unifiedRenderGlobalsWindow;");
+		evalDeferred -lowestPriority ("applyPresetToNode \"vraySettings\" \"\" \"\" (`getenv MAYA_PPTOOLS`+\"/presets/attrPresets/GI/VRaySettingsNode/GI1.mel\") 1");
+		evalDeferred -lowestPriority ("applyPresetToNode \"defaultRenderGlobals\" \"\" \"\" (`getenv MAYA_PPTOOLS`+\"/presets/attrPresets/GI/renderGlobals/GI1.mel\") 1");
+
+		string $cmd = ("setAttr -type \"string\" \"vraySettings.autoSaveFile\" \""+$filePath+"\";");
+		//$cmd += ("setAttr -type \"string\" \"vraySettings.pmap_autoSaveFile\" \""+$filePath+"\";");
+		
+		print ($cmd);
+		evalDeferred -lowestPriority ($cmd);
+		
+		$empty = `confirmDialog -t "Next Step" -m "Click render. Wait. Then click button 2" -button "Okay" -defaultButton "Okay" -cancelButton "No"`;
+		
+	}
+}

@@ -1,0 +1,58 @@
+// replaceWireRigCurve
+global proc replaceWireRigCurve () {
+
+	// get selected curve and selected rig wire
+	$sel = `ls -type transform -sl`;
+
+	if (size($sel) != 2 ){
+		error ("Please select the Rig Wire, then the replacement wire in that order");
+	}
+	else {
+		string $rigCurve = $sel[0];
+		string $rigCurveBase = ($sel[0]+"BaseWire");
+		string $replaceCurve = $sel[1];
+		
+
+		
+		string $rigCurveShape[] = `listRelatives -s $rigCurve`;
+		string $rigCurveBaseShape[] = `listRelatives -s $rigCurveBase`;
+		string $replaceCurveShape[] = `listRelatives -s $replaceCurve`;
+
+		// matches the arc length of the replace curve to avoid scaling issues with wire deformer
+		float $arcLength = `arclen $replaceCurve`;
+		float $pntPos[] = {-72.279075,(-72.279075+($arcLength/4)),(-72.279075+(($arcLength/4)*3)),(-72.279075+$arcLength)};
+		curve -name ($replaceCurve+"BaseWire") -d 3 -p $pntPos[0] 0 0 -p $pntPos[1] 0 0 -p $pntPos[2] 0 0 -p $pntPos[3] 0 0 -k 0 -k 0 -k 0 -k 1 -k 1 -k 1;
+		string $replaceCurveBase = 	($replaceCurve+"BaseWire");	
+
+		/*
+		$dupeResult  = `duplicate -name ($replaceCurve+"BaseWire") $rigCurveBase`;
+		string $replaceCurveBase = $dupeResult[0];
+		parent -w $replaceCurveBase;
+		
+		*/
+
+		string $replaceCurveBaseShape[] = `listRelatives -s $replaceCurveBase`;
+
+		int $replaceCurveSpans = `getAttr ($replaceCurveShape[0]+".spans")`;
+		
+		
+		// reparameterize the replace curve to between 0 and 1;
+		rebuildCurve -ch 0 -rpo 1 -rt 5 -end 1 -kr 0 -kcp 1 -kep 1 -kt 1 -s $replaceCurveSpans -d 3 -tol 0.01 $replaceCurve;
+
+		
+		// rebuild the replaceCurveBase to match the knots of the replaceCurveBase
+		rebuildCurve -ch 0 -rpo 1 -rt 0 -end 1 -kr 0 -kcp 0 -kep 0 -kt 0 -s $replaceCurveSpans -d 3 -tol 0.01 $replaceCurveBase;
+
+
+		
+		
+
+		connectAttr -f ($replaceCurveShape[0]+".worldSpace[0]") ($rigCurveShape[0]+".create");
+		connectAttr -f ($replaceCurveBaseShape[0]+".worldSpace[0]") ($rigCurveBaseShape[0]+".create");
+		
+
+		
+
+	}
+
+}

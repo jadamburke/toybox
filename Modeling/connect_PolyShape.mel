@@ -1,0 +1,1 @@
+if( `window -q -exists cps_ui` ){if( `window -q -iconify cps_ui` )window -e -iconify 0 cps_ui;else if( !`window -q -visible cps_ui` )window -e -visible 1 cps_ui;else deleteUI cps_ui;}else connectPolyShape;

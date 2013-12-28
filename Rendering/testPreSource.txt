@@ -1,0 +1,4 @@
+Test script to pre source other scripts 
+C:/Documents and Settings/aburke/My Documents/maya/Toybox Scripts/comet/snaps.mel 
+testPreSource2 
+test 

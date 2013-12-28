@@ -1,0 +1,23 @@
+string $selectedCurve[] = `ls -sl`;
+if (size($selectedCurve) > 1) {
+	if (gmatch($selectedCurve[0],"*Shape*")){
+		string $nameSpaceBuffer[];
+		tokenize $selectedCurve[1] ":" $nameSpaceBuffer;
+		if (size($nameSpaceBuffer)<2){
+			eval("connectAttr -f "+$selectedCurve[0]+".worldSpace[0] motionPath1.geometryPath");
+			eval("connectAttr -f "+$selectedCurve[0]+".worldSpace[0] motionPath2.geometryPath");
+			setAttr "Whole_Train.FlowPath" 1;
+		}
+		else {
+			eval("connectAttr -f "+$selectedCurve[0]+".worldSpace[0] "+$nameSpaceBuffer[0]+":motionPath1.geometryPath");
+			eval("connectAttr -f "+$selectedCurve[0]+".worldSpace[0] "+$nameSpaceBuffer[0]+":motionPath2.geometryPath");
+			eval ("setAttr \""+$nameSpaceBuffer[0]+":Whole_Train.FlowPath\" 1");
+		}
+	}
+	else{
+		error ("Adam is lazy. Please select the curve SHAPE node and then the Train_GOD node");
+	}
+}
+else {
+	error ("Please select the curve SHAPE node and then the Train_GOD node");
+}

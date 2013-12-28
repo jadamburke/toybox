@@ -1,0 +1,12 @@
+global proc leHideLayout ()
+{
+	if (`getAttr mentalrayGlobals.preRenderMel` == "")
+		setAttr -type "string" mentalrayGlobals.preRenderMel "setAttr LE_Layout.displayMode 0;";
+	else 
+		print ("PreRender MEL already exists\n");
+
+	if (`getAttr mentalrayGlobals.postRenderMel` == "")
+		setAttr -type "string" mentalrayGlobals.postRenderMel "setAttr LE_Layout.displayMode 2;";
+	else 
+		print ("PostRender MEL already exists.\n");	
+}

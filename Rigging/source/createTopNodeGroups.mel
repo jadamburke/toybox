@@ -1,0 +1,19 @@
+//     create the top Node groups
+//
+global proc createTopNodeGroups ()
+{
+// check if the sets already exist
+if (`objExists GOD`)
+        error "GOD already exists, and there cannont be more than one";
+
+group -em -n BODY;
+group -n DIRECTION BODY;
+group -n GOD DIRECTION;
+group -em -n RIG;
+group -em -n GEO;
+parent RIG GOD;
+parent GEO GOD;
+//
+setAttr "RIG.inheritsTransform" 0;
+setAttr "GEO.inheritsTransform" 0;
+}

@@ -1,0 +1,22 @@
+// selectAllInNamespace
+// Created by: adam
+// Date: 2012/03/27 18:26:41
+
+// given selected objects it gets their namepsace and then selects all objects with that root namespace
+// maya's own tools don't let you do this easily
+global proc selectAllInNamespace(){
+$selObjs = `ls -sl`;
+select -clear;
+string $tokenBuffer[];
+string $each;
+for ($each in $selObjs){
+	namespace -set ":";
+	string $tokenBuffer[];
+	tokenize $each ":" $tokenBuffer;
+	string $rootNS = $tokenBuffer[0];
+	namespace -set $rootNS;
+	string $dagNSObjs[] =  `namespaceInfo -dagPath -lod -r`;
+	select -ne -add $dagNSObjs;
+	namespace -set ":";
+}
+}

@@ -1,0 +1,103 @@
+// animateGravity
+
+global proc animateGravity () {
+
+	/*
+	$sel = `ls -sl`;
+	float $frameNum = `currentTime -q`;
+	float $startFrame = `currentTime -q`;
+	float $endFrame = $startFrame + 68;
+	for ($each in $sel){
+		
+		//currentTime -e $startFrame;
+		float $pos[] = `xform -q -ws -a -t $each`;
+		currentTime -e ($startFrame-1);
+		float $prevPos[] = `xform -q -ws -a -t $each`;
+		currentTime -e ($startFrame);
+					
+		float $velocityX = $pos[0] - $prevPos[0];
+		float $velocityY = $pos[1] - $prevPos[1];
+		float $velocityZ = $pos[2] - $prevPos[2];
+
+		vector $objVelocity = <<$velocityX,$velocityY,$velocityZ>>;
+
+		
+
+		$newVelocity = $objVelocity;
+		
+		print ("$objVel="+($objVelocity.x)+":"+($objVelocity.y)+" "+($objVelocity.z)+"\n");
+
+		for ($i=$startFrame+1; $i<$endFrame; $i++){
+			$pos = `xform -q -ws -a -t $each`;
+			currentTime -e ($i);
+			
+			$newPosX = $pos[0] + ($newVelocity.x);
+			$newPosY = $pos[1] + ($newVelocity.y);
+			$newPosZ = $pos[2] + ($newVelocity.z);
+			$newVelocity = $newVelocity + ($gravity*($i-$startFrame));
+			xform -ws -a -t $newPosX $newPosY $newPosZ $each;
+			
+		}
+		
+	}
+	*/
+
+	$sel = `ls -sl`;
+	float $frameNum = `currentTime -q`;
+	float $startFrame = `currentTime -q`;
+	float $endFrame = $startFrame + 68;
+
+	vector $gravity = <<0,-0.1,0>>;
+	vector $prevPosition[];
+	vector $newVelocity[];
+	int $index = 0;
+
+	for ($i=$startFrame-1; $i<$endFrame; $i++){
+		
+		$index = 0;
+		for ($each in $sel){
+			
+			vector $objVelocity;
+			if ($i==$startFrame-1){
+				currentTime -e ($i);
+				float $prevPos[] = `xform -q -ws -a -t $each`;
+				$prevPosition[$index] = <<$prevPos[0],$prevPos[1],$prevPos[2]>>;
+				print ("PrevPosition:"+$prevPosition[$index]+"\n");
+			}
+			else if ($i==$startFrame){
+				currentTime -e ($i);
+				float $pos[] = `xform -q -ws -a -t $each`;				
+				vector $previousPosition = $prevPosition[$index];
+					
+				float $velocityX = ($pos[0] - ($previousPosition.x));
+				float $velocityY = ($pos[1] - ($previousPosition.y));
+				float $velocityZ = ($pos[2] - ($previousPosition.z));
+
+				$objVelocity = <<$velocityX,$velocityY,$velocityZ>>;
+				$newVelocity[$index] = $objVelocity;
+				$prevPosition[$index] = <<$pos[0],$pos[1],$pos[2]>>;
+			}
+			else{
+
+				//$pos = `xform -q -ws -a -t $each`;
+				currentTime -e ($i);
+				vector $newVelocityTemp = $newVelocity[$index];
+				vector $prevPositionTemp = $prevPosition[$index];
+			
+				$newPosX = ($prevPositionTemp.x) + ($newVelocityTemp.x);
+				$newPosY = ($prevPositionTemp.y) + ($newVelocityTemp.y);
+				$newPosZ = ($prevPositionTemp.z) + ($newVelocityTemp.z);
+
+				$newVelocityTemp = $newVelocityTemp + ($gravity*($i-$startFrame));
+				$newVelocity[$index] = $newVelocityTemp;
+				xform -ws -a -t $newPosX $newPosY $newPosZ $each;
+				$prevPosition[$index] = <<$newPosX,$newPosY,$newPosZ>>;
+				setKeyframe -at "tx" -at "ty" -at "tz" $each;
+			}
+			$index++;
+
+		}
+
+	}
+	print ("Size of:"+size($prevPosition)+"\n");
+}

@@ -1,0 +1,8 @@
+global proc makeFileNodesLocal(){
+    $sel = `ls -type file`;
+    for ($each in $sel){
+        
+        string $filePath = `getAttr ($each+".ftn")`;
+        setAttr -type "string" ($each+".ftn") `workspace -pp $filePath`;
+    }
+}

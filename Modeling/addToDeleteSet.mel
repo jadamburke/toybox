@@ -1,0 +1,15 @@
+// addToDeleteSet
+// Created by: adam
+// Date: 2012/04/19 13:58:47
+
+global proc addToDeleteSet(){
+	$sel = `ls -sl`;
+	
+	select -clear;
+	
+	if (!`objExists deleteSet`)
+		sets -name deleteSet;
+		
+	select $sel;
+	sets -add deleteSet;
+}

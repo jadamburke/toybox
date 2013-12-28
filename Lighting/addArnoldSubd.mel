@@ -1,0 +1,17 @@
+// addArnoldSubd.mel
+// Created by: raphe
+// Date: 2012/08/29 16:58:53
+
+global proc addArnoldSubd(){
+	string $surface;
+	pickWalk -d down;
+	string $surfaces[] = `ls -sl`;
+	for ($surface in $surfaces){
+		string $myCmdA = "setAttr \"" + $surface + ".aiSubdivType\" 1";
+		string $myCmdB = "setAttr \"" + $surface + ".aiSubdivIterations\" 2";
+		string $myCmdC = "displaySmoothness -divisionsU 0 -divisionsV 0 -pointsWire 4 -pointsShaded 1 -polygonObject 1";
+		eval($myCmdA);
+		eval($myCmdB);
+		eval($myCmdC);
+	}
+}

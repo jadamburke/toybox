@@ -1,0 +1,22 @@
+// abxRefScrub
+
+global proc abxRefScrub () {
+	
+	// list reference nodes in scene
+
+	// have an exclusion outliner list
+
+	// search and keep, search and remove
+
+	// clear failed edits
+
+	// clear all edits of type: parent, setAttr, connectAttr, disconnectAttr, addAttr
+
+	// clear visibility edits
+
+	// shader edits
+
+
+}
+
+

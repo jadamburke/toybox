@@ -1,0 +1,78 @@
+// clearReferenceEditOnSelected
+// referenceEdit -failedEdits true -successfulEdits true -editCommand connectAttr -removeEdits "|plantFiddleHeadFrond10_GOD|plantFiddleHeadFrond10_DIRECTION|plantFiddleHeadFrond10_BODY|plantFiddleHeadFrond10_fern5Ctrl|plantFiddleHeadFrond10_fernMesh5_animated|plantFiddleHeadFrond10_fernSingle1Leaf5|plantFiddleHeadFrond10_polySurface133|plantFiddleHeadFrond10_polySurfaceShape133.instObjGroups.objectGroups[1]";
+
+
+global proc clearReferenceEditOnSelected() {
+	
+	string $sel[] = `ls -l -sl`;
+	string $refNodes[];
+	string $shapeNodes[];
+
+
+	for ($each in $sel){
+		$refNodes[size($refNodes)] = `referenceQuery -rfn $each`;
+		
+		string $temp[] = `listRelatives -shapes -f $each`;
+		//if (size ($temp)>0){
+			$shapeNodes[size($shapeNodes)] = $temp[0];
+			print ("shapeNode="+$temp[0]+"\n");
+		//}
+		//else {
+		//	$shapeNodes[size($shapeNodes)] = "";
+		//}
+
+		
+	}
+
+	$referenceNodesFromSelected = `getSelectedObjRefNode`;
+	for ($each in $referenceNodesFromSelected){
+		int $index = 0;
+		// unload reference node
+		file -unloadReference $each;
+		for ($every in $sel){
+			
+			// if the selected item is in current ref node then do something
+			//print("referenceQuery -rfn "+$every+"\n");
+
+			
+			
+			if ($refNodes[$index] == $each){
+				print ("referenceEdit -failedEdits true -successfulEdits true -editCommand connectAttr -removeEdits "+$every+"\n");
+				referenceEdit -failedEdits true -successfulEdits true -editCommand connectAttr -removeEdits $every;
+				
+				//if ($shapeNodes[$index] != ""){
+					print ("referenceEdit -failedEdits true -successfulEdits true -editCommand connectAttr -removeEdits "+$shapeNodes[$index]+"\n");
+					referenceEdit -failedEdits true -successfulEdits true -editCommand connectAttr -removeEdits $shapeNodes[$index];
+				//}
+			}
+
+
+			$index++;
+		}
+		// reload ref node
+		file -loadReference $each;
+
+	}
+	
+
+	select $sel;
+
+}
+
+global proc string[] getSelectedObjRefNode() {
+
+
+	string $referenceList[];
+
+	string $sel[] = `ls -l -sl`;
+	for ($each in $sel){
+
+		$referenceNode = `referenceQuery -rfn $each`;
+		// if ref node is not in mail list array already
+		if (stringArrayContains($referenceNode, $referenceList) == 0)
+			// add reference node to main list array
+			$referenceList[size($referenceList)] = $referenceNode;
+	}
+	return $referenceList;
+
+}

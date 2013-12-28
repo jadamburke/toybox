@@ -1,0 +1,106 @@
+// playblastHUD
+
+
+global proc playblastHUD (){
+
+	if (!`headsUpDisplay -q -exists HUDSceneName`){
+		initSceneNameHUD();
+		//headsUpDisplay -e -vis 1 HUDSceneName;
+	}
+	if (`headsUpDisplay -q -vis HUDSceneName`){
+			print ("turning off\n");
+			headsUpDisplay -e -vis 0 HUDSceneName;
+			headsUpDisplay -e -vis 0 HUDSceneTimecode;
+			headsUpDisplay -e -vis 0 HUDCurrentFrame;
+			//headsUpDisplay -e -vis 0 HUDFocalLength;
+
+
+			if (`headsUpDisplay -q -vis HUDCameraNames`){
+				headsUpDisplay -e -vis 0 HUDCameraNames;
+			}
+			if (`headsUpDisplay -q -vis HUDHQCameraNames`){
+				headsUpDisplay -e -vis 0 HUDHQCameraNames;
+			}
+			headsUpDisplay -e -labelFontSize "small" -dataFontSize "small"  HUDCameraNames;
+			headsUpDisplay -e -labelFontSize "small" -dataFontSize "small"  HUDHQCameraNames;
+			headsUpDisplay -e -vis 1 HUDCameraNames;
+			headsUpDisplay -e -vis 1 HUDHQCameraNames;
+
+
+			headsUpDisplay -e -vis 1 HUDViewAxis;
+
+
+	}
+	else {
+			print ("turning on\n");
+			headsUpDisplay -e -vis 1 HUDSceneName;
+
+			if (`headsUpDisplay -q -vis HUDSceneTimecode`){
+				headsUpDisplay -e -vis 0 HUDSceneTimecode;
+			}
+			headsUpDisplay -e -vis 1 -lw 30 -label "TC:" -labelFontSize "large" -dataFontSize "large" HUDSceneTimecode;
+
+			if (`headsUpDisplay -q -vis HUDCurrentFrame`){
+				headsUpDisplay -e -vis 0 HUDCurrentFrame;
+			}
+			headsUpDisplay -e -vis 1 -lw 30 -label "FR:" -labelFontSize "large" -dataFontSize "large"  HUDCurrentFrame;
+
+
+			//headsUpDisplay -e -vis 1 -lw 30 -label "FL:" -labelFontSize "large" -dataFontSize "large"  HUDFocalLength;
+
+			if (`headsUpDisplay -q -vis HUDCameraNames`){
+				headsUpDisplay -e -vis 0 HUDCameraNames;
+			}
+			if (`headsUpDisplay -q -vis HUDHQCameraNames`){
+				headsUpDisplay -e -vis 0 HUDHQCameraNames;
+			}
+			headsUpDisplay -e -labelFontSize "large" -dataFontSize "large"  HUDCameraNames;
+			headsUpDisplay -e -labelFontSize "large" -dataFontSize "large"  HUDHQCameraNames;
+			headsUpDisplay -e -vis 1 HUDCameraNames;
+			headsUpDisplay -e -vis 1 HUDHQCameraNames;
+
+			headsUpDisplay -e -vis 0 HUDViewAxis;
+
+	}
+
+
+}
+
+global proc string getSceneName (){
+
+	return ` file -q -shn -sn`;
+}
+
+global proc string getDateModified (){
+	
+	return `date -format "YY/MM/DD hh:mm"`;
+
+}
+
+
+global proc initSceneNameHUD () {
+
+	headsUpDisplay 
+		-vis		0
+               -section          5
+               -block `headsUpDisplay -nfb 5`
+               -blockSize        "medium"
+		-dataFontSize    "large"
+               -command          "getSceneName()"
+		-event "RecentCommandChanged"
+               HUDSceneName;
+
+	// set hud inactive display color to white for better vis
+	displayColor -dormant headsUpDisplayLabels 16;
+}
+
+
+//  -event            "timeChanged"
+
+//  -event		"NameChanged" 
+
+// -event "ModelPanelSetFocus"
+
+//NO -event "postSceneCallbacks"
+
+// -event "SceneSegmentChanged"

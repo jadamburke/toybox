@@ -1,0 +1,42 @@
+// shatterKeyBlendMatch
+
+global proc shatterKeyBlendMatch () {
+
+	$sel = `ls -sl`;
+	for ($each in $sel){
+	
+		if (`attributeExists ("blendParent1") $each`){
+			float $blendStartFrame = `findKeyframe -which first ($each+".blendParent1")`;
+			float $attrStartFrame = `findKeyframe -which first ($each+".translateX")`;
+
+			float $tempAttrValue = `getAttr -t $blendStartFrame ($each+".tx")`;
+			setKeyframe -t $attrStartFrame -v $tempAttrValue ($each+".tx");
+			keyframe -t $attrStartFrame -a -tc $blendStartFrame  ($each+".tx");
+
+			$tempAttrValue = `getAttr -t $blendStartFrame ($each+".ty")`;
+			setKeyframe -t $attrStartFrame -v $tempAttrValue ($each+".ty");
+			keyframe -t $attrStartFrame -a -tc $blendStartFrame  ($each+".ty");
+
+			$tempAttrValue = `getAttr -t $blendStartFrame ($each+".tz")`;
+			setKeyframe -t $attrStartFrame -v $tempAttrValue ($each+".tz");
+			keyframe -t $attrStartFrame -a -tc $blendStartFrame  ($each+".tz");
+
+			$tempAttrValue = `getAttr -t $blendStartFrame ($each+".rx")`;
+			setKeyframe -t $attrStartFrame -v $tempAttrValue ($each+".rx");
+			keyframe -t $attrStartFrame -a -tc $blendStartFrame  ($each+".rx");
+
+			$tempAttrValue = `getAttr -t $blendStartFrame ($each+".ry")`;
+			setKeyframe -t $attrStartFrame -v $tempAttrValue ($each+".ry");
+			keyframe -t $attrStartFrame -a -tc $blendStartFrame  ($each+".ry");
+
+			$tempAttrValue = `getAttr -t $blendStartFrame ($each+".rz")`;
+			setKeyframe -t $attrStartFrame -v $tempAttrValue ($each+".rz");
+			keyframe -t $attrStartFrame -a -tc $blendStartFrame  ($each+".rz");
+			
+
+		}
+
+	}
+
+
+}

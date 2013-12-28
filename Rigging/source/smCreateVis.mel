@@ -1,0 +1,35 @@
+global proc smCreateVis ()
+	{
+	curve -name vis -d 1 -p 0.00156207 -0.943749 0 -p -0.878125 1.4 0 -p -1.3 1.4 0 -p -0.19375 -1.4 0 -p 0.193751 -1.4 0 -p 1.3 1.4 0 -p 0.878126 1.4 0 -p 0.00156207 -0.943749 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 ;
+	rename `listRelatives -s -c -f "vis"` "visShape";
+// add the attrs for showing and hiding movers
+
+string $sels[] = `ls -sl`;
+string $each;
+for ($each in $sels)
+           {
+                addAttr -at bool -k 1 -ln "main" -dv 1 $each;
+                	setAttr -cb 1 ($each + ".main");
+                addAttr -at bool -k 1 -ln eye $each;
+                	setAttr -cb 1 ($each + ".eye");
+                addAttr -at bool -k 1 -ln ears $each;
+                	setAttr -cb 1 ($each + ".ears");
+	        addAttr -at bool -k 1 -ln head $each;
+	        	setAttr -cb 1 ($each + ".head");
+	        addAttr -at bool -k 1 -ln body $each;
+	        	setAttr -cb 1 ($each + ".body");
+	        addAttr -at bool -k 1 -ln armIk $each;
+	        	setAttr -cb 1 ($each + ".armIk");
+	        addAttr -at bool -k 1 -ln armFk $each;
+	        	setAttr -cb 1 ($each + ".armFk");
+	        addAttr -at bool -k 1 -ln legIk $each;
+	        	setAttr -cb 1 ($each + ".legIk");
+	        addAttr -at bool -k 1 -ln legFk $each;
+	        	setAttr -cb 1 ($each + ".legFk");
+                addAttr -at double -k 1 -min 0 -max 3 -dv 0 -ln "divisions" $each;
+                	setAttr -cb 1 ($each + ".divisions");
+
+            }
+     }
+
+

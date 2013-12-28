@@ -1,0 +1,8 @@
+// RavReset.mel
+// Created by: rafael
+// Date: 2012/06/18 10:36:31
+
+global proc RavReset(){
+python("import ravreset");
+python("ravreset.act()");
+}

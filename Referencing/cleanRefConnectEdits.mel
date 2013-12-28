@@ -1,0 +1,108 @@
+// clearReferenceSGEdits
+
+global proc cleanRefConnectEdits() {
+
+
+	$sel = `ls -sl`;
+	select -clear;
+	
+	
+	for ($referenceNode in $sel){
+
+	int $initialRefLoadState = `file -rfn $referenceNode -q -deferReference`;
+
+	if ($initialRefLoadState == 0){
+		file -unloadReference $referenceNode;
+	}
+
+	string $editCommands[] = `referenceQuery -failedEdits true -successfulEdits true -editStrings $referenceNode`;
+	print (size($editCommands)+"\n");
+	
+	int $amount = 0;
+	int $index = 0;
+	progressWindow -title ("Cleaning References of "+$referenceNode) -progress $amount -status "Preparing to Clean" -min 0 -max 100 -isInterruptable true;
+
+	for ($each in $editCommands){
+		
+		if ( `progressWindow -query -isCancelled` ) break;
+		$amount = (float($index)/float(size($editCommands)))*100;
+		progressWindow -edit -progress $amount -status ("Cleaning: "+$amount+"%");
+		
+		$index++;
+		
+		string $editCmdTokenBuffer[];
+		tokenize $each " " $editCmdTokenBuffer;
+		string $editCommand = $editCmdTokenBuffer[0];
+		string $destination = "";
+
+		if ($editCommand == "setAttr"){
+			if (`gmatch $editCmdTokenBuffer[1] "*.visibility*"` == 1){
+				$destination = $editCmdTokenBuffer[1];
+			}
+		}
+		else if ($editCommand == "connectAttr"){
+
+			if (`gmatch $editCmdTokenBuffer[1] "*.output*"` == 1){
+				// ignores connections to anim curves
+				$destination = "";
+				//print ("keeping:"+$editCmdTokenBuffer[1]+"\n");
+			}
+			else if (`gmatch $editCmdTokenBuffer[1] "*.specifiedManipLocation*"` == 1){
+				$destination = "";
+
+			}
+			else if (`gmatch $editCmdTokenBuffer[2] "*.transMinusRotatePivot*"` == 1){
+				$destination = "";
+
+			}
+			else if (`gmatch $editCmdTokenBuffer[1] "*.outTranslate*"` == 1){
+				$destination = "";
+
+			}
+			else if (`gmatch $editCmdTokenBuffer[1] "*.outRotate*"` == 1){
+				$destination = "";
+
+			}
+			else {
+				$destination = $editCmdTokenBuffer[1];
+			}
+			
+
+			// pull out quotation marks
+			if ($destination != ""){
+				$destination = `substring $destination 2 (size($destination)-1)`;
+			}
+			//$destination = "";
+		}
+		else if ($editCommand == "disconnectAttr"){
+			$destination = $editCmdTokenBuffer[1];
+			if ($editCmdTokenBuffer[1] == "-na"){
+				$destination = $editCmdTokenBuffer[2];
+			}
+			// pull out quotation marks
+			$destination = `substring $destination 2 (size($destination)-1)`;
+			//$destination = "";
+		}
+		else if ($editCommand == "addAttr"){
+			$destination = $editCmdTokenBuffer[(size($editCmdTokenBuffer)-1)];
+		}
+
+		if ($destination !=""){
+			//print ("referenceEdit -failedEdits true -successfulEdits true -editCommand "+$editCommand+" -removeEdits "+$destination+"\;\n");
+			referenceEdit -failedEdits true -successfulEdits true -editCommand $editCommand -removeEdits $destination;
+		}
+		//}
+		
+	}
+
+	progressWindow -endProgress;
+
+	//referenceEdit -failedEdits true -successfulEdits true -editCommand disconnectAttr -removeEdits "SG" $referenceNode;
+
+	//referenceEdit -failedEdits true -successfulEdits true -editCommand disconnectAttr -removeEdits "|plantFiddleHeadFrond10_GOD|plantFiddleHeadFrond10_DIRECTION|plantFiddleHeadFrond10_BODY|plantFiddleHeadFrond10_fern5Ctrl|plantFiddleHeadFrond10_fernSingle1MeshGroup5|plantFiddleHeadFrond10_fernMesh5_static1|plantFiddleHeadFrond10_fernSingle1Leaf8|plantFiddleHeadFrond10_fernSingle1Leaf5Shape8.instObjGroups";
+	
+	if ($initialRefLoadState == 0){
+		file -loadReference $referenceNode;
+	}
+	}
+}

@@ -1,0 +1,39 @@
+// clearObjRefEdits
+// Created by: adambu
+// Date: 2011/11/30 15:36:34
+
+global proc clearObjRefEdits(){
+	$sel = `ls -sl`;
+
+	$referenceNodesFromSelected = `getSelectedObjRefNode`;
+	for ($each in $referenceNodesFromSelected) {
+		file -unloadReference $each;
+	}
+
+	for ($each in $sel){
+		referenceEdit -failedEdits true -successfulEdits true -removeEdits $each;
+	}
+
+	for ($each in $referenceNodesFromSelected) {
+		file -loadReference $each;
+	}
+
+}
+
+global proc string[] getSelectedObjRefNode() {
+
+
+	string $referenceList[];
+
+	string $sel[] = `ls -l -sl`;
+	for ($each in $sel){
+
+		$referenceNode = `referenceQuery -rfn $each`;
+		// if ref node is not in mail list array already
+		if (stringArrayContains($referenceNode, $referenceList) == 0)
+			// add reference node to main list array
+			$referenceList[size($referenceList)] = $referenceNode;
+	}
+	return $referenceList;
+
+}

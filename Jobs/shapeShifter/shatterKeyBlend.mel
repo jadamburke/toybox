@@ -1,0 +1,43 @@
+// shatterKeyBlendMatch
+
+global proc shatterKeyBlend () {
+
+	$sel = `ls -sl`;
+	for ($each in $sel){
+	
+		if (`attributeExists ("blendParent1") $each`){
+			float $blendStartFrame = `findKeyframe -which first ($each+".blendParent1")`;
+			float $blendEndFrame = `findKeyframe -which last ($each+".blendParent1")`;
+			float $attrLastFrame = `findKeyframe -which last ($each+".translateX")`;
+
+			float $tempAttrValue = `getAttr -t $blendEndFrame ($each+".tx")`;
+			setKeyframe -t $attrLastFrame -v $tempAttrValue ($each+".tx");
+			keyframe -t $attrLastFrame -a -tc $blendEndFrame  ($each+".tx");
+
+			$tempAttrValue = `getAttr -t $blendEndFrame ($each+".ty")`;
+			setKeyframe -t $attrLastFrame -v $tempAttrValue ($each+".ty");
+			keyframe -t $attrLastFrame -a -tc $blendEndFrame  ($each+".ty");
+
+			$tempAttrValue = `getAttr -t $blendEndFrame ($each+".tz")`;
+			setKeyframe -t $attrLastFrame -v $tempAttrValue ($each+".tz");
+			keyframe -t $attrLastFrame -a -tc $blendEndFrame  ($each+".tz");
+
+			$tempAttrValue = `getAttr -t $blendEndFrame ($each+".rx")`;
+			setKeyframe -t $attrLastFrame -v $tempAttrValue ($each+".rx");
+			keyframe -t $attrLastFrame -a -tc $blendEndFrame  ($each+".rx");
+
+			$tempAttrValue = `getAttr -t $blendEndFrame ($each+".ry")`;
+			setKeyframe -t $attrLastFrame -v $tempAttrValue ($each+".ry");
+			keyframe -t $attrLastFrame -a -tc $blendEndFrame  ($each+".ry");
+
+			$tempAttrValue = `getAttr -t $blendEndFrame ($each+".rz")`;
+			setKeyframe -t $attrLastFrame -v $tempAttrValue ($each+".rz");
+			keyframe -t $attrLastFrame -a -tc $blendEndFrame  ($each+".rz");
+			
+
+		}
+
+	}
+
+
+}

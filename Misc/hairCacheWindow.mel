@@ -1,0 +1,65 @@
+global proc hairCacheWindow()
+{
+    window -title "Cache dat shit" hairCacheWindow;
+    rowColumnLayout -numberOfColumns 3;
+    radioButtonGrp -numberOfRadioButtons 3
+        -label "Cache from" -labelArray3 "render settings" "time slider" "start/end" timeRangeType;
+        
+    //radioCollection -edit -select $timeSlider $timeRangeType;
+        textField start;
+        textField end;
+        
+     button -c "theHairCache" -label "cache";
+     button -c "deleteTheHairCache" -label "delete cache";
+ showWindow hairCacheWindow;
+}
+
+global proc theHairCache()
+{
+    string $char[] = `ls -sl`;
+    string $parts[];
+    tokenize($char[0],":",$parts);
+    string $tag = $parts[0];
+    
+    int $selected = `radioButtonGrp -q -select timeRangeType`;
+    print $selected;
+    int $son = 2;
+    string $start = `textField -q -text start`;
+    string $end = `textField -q -text end`;
+    int $x = $start;
+    int $y = $end;
+    print $x;
+    
+    select ($tag+":hairSystem1");
+    
+    if($selected == 1)
+    {
+    doHairDiskCache 1 { "1", 1, 1, 1, 1 } ;
+    }
+    
+    if($selected == 2)
+    {
+    doHairDiskCache 1 { "2", 1, 1, 1, 1 } ;
+    }
+    
+    if($selected == 3)
+    {
+    doHairDiskCache 1 { "3", 1, $x, $y, 1 } ;
+    }
+    
+    
+    select -cl;
+    
+}
+
+global proc deleteTheHairCache()
+{
+    string $char[] = `ls -sl`;
+    string $parts[];
+    tokenize($char[0],":",$parts);
+    string $tag = $parts[0];
+    select ($tag+":hairSystem1");
+    DeleteHairCache;
+    select -cl;
+    
+}

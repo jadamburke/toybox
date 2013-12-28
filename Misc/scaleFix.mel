@@ -1,0 +1,120 @@
+// scaleFix
+// Created by: adam
+// Date: 2012/03/19 17:38:16
+
+// this corrects animation scenes that are the wrong scale 1/5 scale
+
+global proc scaleFix(){
+
+	if (`window -ex ppScaleFixWindow` != true)
+	{
+		window -w 210 -h 110 -t "ScaleFix" -in "scaleFix" -menuBar true -s true -tb true ppScaleFixWindow;
+		formLayout ppScaleFixFrmLyt;
+		frameLayout -lv 0 -borderStyle "out" ppScaleFixtFrmeLyt;
+		columnLayout  ppScaleFixCL;
+		
+			floatSliderGrp -field true -label "Scale" -min -0 -max 200 -value 75 -step 1
+				-adj 3
+				sldrScalePercent;
+			floatFieldGrp -numberOfFields 3 -label "ScaleOrigin"  -value1 0 -value2 0 -value3 0 ppScaleFixOriginFFG;
+			checkBoxGrp -l "Scale Translation Values" -v1 1  ppScaleFixTransCB;
+			checkBoxGrp -l "Scale Scale Values" -v1 0  ppScaleFixScaleCB;	
+			
+		setParent ppScaleFixFrmLyt;
+		rowLayout -numberOfColumns 3 -columnWidth3 100 100 100 -columnAttach 1 "both" 0 -columnAttach 2 "both" 0 -columnAttach 3 "both" 0 ppScaleFixRL;
+		button -label "Scale Fix"  -c "ppScaleFixSelected;window -e -vis 0 ppScaleFixWindow;";
+		button -label "Apply" -c "ppScaleFixSelected";
+		button -label "Cancel" -c "window -e -vis 0 ppScaleFixWindow" ;
+		
+		formLayout -e 
+			-af ppScaleFixtFrmeLyt "left" 3
+			-af ppScaleFixtFrmeLyt "top" 3
+			-af ppScaleFixtFrmeLyt "bottom" 35
+			-af ppScaleFixtFrmeLyt "right" 3
+
+			-af ppScaleFixRL "left" 0
+			-ac ppScaleFixRL  "top" 0 ppScaleFixtFrmeLyt
+			-af ppScaleFixRL "bottom" 3
+			-af ppScaleFixRL "right" 3
+			ppScaleFixFrmLyt;
+
+		window -e -w 210 -h 110 ppScaleFixWindow;
+		showWindow ppScaleFixWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 210 -h 110 ppScaleFixWindow;
+		showWindow ppScaleFixWindow;
+    	}
+
+
+}
+
+global proc ppScaleFixSelected () {
+
+	float $scale = `floatSliderGrp -q -v sldrScalePercent`;
+	
+	float $ox = `floatFieldGrp -q -v1 ppScaleFixOriginFFG`;
+	float $oy = `floatFieldGrp -q -v2 ppScaleFixOriginFFG`;
+	float $oz = `floatFieldGrp -q -v3 ppScaleFixOriginFFG`;
+	
+	int $doTrans = `checkBoxGrp -q -v1 ppScaleFixTransCB`;
+	int $doScale= `checkBoxGrp -q -v1 ppScaleFixScaleCB`;
+	
+	string $doWhich = "both";
+	if ($doTrans == 0)
+		$doWhich = "scale";
+	if ($doScale == 0)
+		$doWhich = "translate";
+		
+	
+	string $sel[] = `ls -sl`;
+	// for selected objects
+	for ($each in $sel){
+		ppScaleFixNode($each,$scale,$doWhich,$ox ,$oy,$oz);
+	}
+}
+
+global proc ppScaleFixNode (string $xFormNode, float $scale, string $scaleWhat, float $originX, float $originY, float $originZ){
+
+	if ($scaleWhat== "both" || $scaleWhat == "translate")
+		$scaleTranslate = 1;
+		
+	if ($scaleWhat== "both" || $scaleWhat == "scale")
+		$scaleScale = 1;
+	
+
+	if ($scaleTranslate){
+		ppScaleFixScaleAttr ($xFormNode,"tx",$scale,$originX);
+		ppScaleFixScaleAttr ($xFormNode,"ty",$scale,$originY);
+		ppScaleFixScaleAttr ($xFormNode,"tz",$scale,$originZ);
+	}
+	if ($scaleScale){
+		ppScaleFixScaleAttr ($xFormNode,"sx",$scale,0);
+		ppScaleFixScaleAttr ($xFormNode,"sy",$scale,0);
+		ppScaleFixScaleAttr ($xFormNode,"sz",$scale,0);	
+	}
+
+}
+
+global proc int ppScaleFixScaleAttr (string $node, string $attr,float $scale, float $origin){
+	string $sourceConnections[] = `listConnections -s 1  ($node+"."+$attr)`;
+	// if its animated then scale the animation curves
+	if (size($sourceConnections)){
+		if (isAnimCurve($sourceConnections[0]) ){
+			scaleKey -valuePivot $origin -valueScale $scale ($node+"."+$attr);
+			return 1;
+		}
+			
+	}
+	// else just scale the translation values
+	else{
+		float $tx = `getAttr  ($node+"."+$attr)`;
+		float $scaled = (($tx-$origin)*$scale)+$origin;
+		setAttr ($node+"."+$attr) $scaled;
+		return 1;
+	}
+	
+	return 0;
+	
+}

@@ -1,0 +1,16 @@
+// selectPercentage
+global proc selectPercentage() {
+	string $sel[] = `ls -sl`;
+	string $newList[];
+	int $i = 0;
+	for ($each in $sel){
+		float $randVal = rand(0,1);
+		if ($randVal < .9){
+			$newList[$i] = $each;
+			$i++;
+		} 
+	}
+	select $newList;
+
+
+}

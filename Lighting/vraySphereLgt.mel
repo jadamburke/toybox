@@ -1,0 +1,9 @@
+// vraySphereLgt
+// Created by: raphe
+// Date: 2012/03/09 09:57:51
+
+global proc vraySphereLgt(){
+
+	file -import -type "mayaAscii" -ra true -namespace "VRay_sphereLgt_01" -options "v=0"  -pr -loadReferenceDepth "all" (`getenv MAYA_PPTOOLS`+"/sceneTemplates/import_VRay_sphereLight_01.ma");
+
+}

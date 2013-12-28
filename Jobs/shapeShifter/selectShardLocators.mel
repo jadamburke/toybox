@@ -1,0 +1,12 @@
+// selectShardLocators
+
+global proc selectShardLocators () {
+	$selected  = `ls -sl`;
+	select -clear;
+	for ($each in $selected){
+		if (`objExists ($each+"_loc")`){
+			select -add ($each+"_loc");
+		}
+	}
+
+}

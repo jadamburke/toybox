@@ -1,0 +1,18 @@
+// playblastMMirror.mel
+// Created by: raphe
+// Date: 2013/04/04 12:19:45
+
+global proc playblastMMirror(){
+
+	string $scenePath = `file -q -sn`;
+	string $scenePath = `workspace -pp $scenePath`;
+	string $tokenBuffer[];
+	tokenize $scenePath "/" $tokenBuffer;
+	
+	// string $shotsFolder = $tokenBuffer[1];
+	string $seq = $tokenBuffer[2];
+	string $shotName = $tokenBuffer[3];
+	// string $deptName = $tokenBuffer[4];
+
+	playblast  -format iff -filename ("M:/Skylanders2013_PP10102/3D/Skylanders2013_maya/images/_ALL_SHOTS/" + $seq + "/" + $shotName + "/ANM/mirror") -sequenceTime 0 -clearCache 1 -viewer 1 -showOrnaments 1 -fp 4 -percent 75 -compression "jpg" -quality 70 -widthHeight 931 691;
+}

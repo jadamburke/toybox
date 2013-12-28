@@ -1,0 +1,85 @@
+[shotViewShotWindow]>
+string $editorName = "shotViewShotWindow";>
+            modelEditor -e 
+                -camera "S3_040_CAM_V02" 
+                -useInteractiveMode 0
+                -displayLights "default" 
+                -displayAppearance "smoothShaded" 
+                -activeOnly 0
+                -ignorePanZoom 0
+                -wireframeOnShaded 1
+                -headsUpDisplay 1
+                -selectionHiliteDisplay 1
+                -useDefaultMaterial 0
+                -bufferMode "double" 
+                -twoSidedLighting 1
+                -backfaceCulling 0
+                -xray 0
+                -jointXray 0
+                -activeComponentsXray 0
+                -displayTextures 0
+                -smoothWireframe 0
+                -lineWidth 1
+                -textureAnisotropic 0
+                -textureHilight 1
+                -textureSampling 2
+                -textureDisplay "modulate" 
+                -textureMaxSize 4096
+                -fogging 0
+                -fogSource "fragment" 
+                -fogMode "linear" 
+                -fogStart 0
+                -fogEnd 100
+                -fogDensity 0.1
+                -fogColor 0.5 0.5 0.5 1 
+                -maxConstantTransparency 1
+                -rendererName "base_OpenGL_Renderer" 
+                -colorResolution 256 256 
+                -bumpResolution 512 512 
+                -textureCompression 0
+                -transparencyAlgorithm "frontAndBackCull" 
+                -transpInShadows 0
+                -cullingOverride "none" 
+                -lowQualityLighting 0
+                -maximumNumHardwareLights 1
+                -occlusionCulling 0
+                -shadingModel 0
+                -useBaseRenderer 0
+                -useReducedRenderer 0
+                -smallObjectCulling 0
+                -smallObjectThreshold -1 
+                -interactiveDisableShadows 0
+                -interactiveBackFaceCull 0
+                -sortTransparent 1
+                -nurbsCurves 0
+                -nurbsSurfaces 1
+                -polymeshes 1
+                -subdivSurfaces 0
+                -planes 0
+                -lights 0
+                -cameras 0
+                -controlVertices 1
+                -hulls 1
+                -grid 0
+                -joints 0
+                -ikHandles 0
+                -deformers 0
+                -dynamics 0
+                -fluids 0
+                -hairSystems 0
+                -follicles 0
+                -nCloths 0
+                -nParticles 0
+                -nRigids 0
+                -dynamicConstraints 0
+                -locators 0
+                -manipulators 1
+                -dimensions 0
+                -handles 0
+                -pivots 0
+                -textures 0
+                -strokes 0
+                -shadows 0
+                $editorName;
+modelEditor -e -viewSelected 0 $editorName;>
+->

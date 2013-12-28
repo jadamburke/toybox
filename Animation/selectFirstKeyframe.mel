@@ -1,0 +1,14 @@
+// selectFirstKeyframe
+
+global proc selectFirstKeyframe() {
+
+	$selectedAnimCurves = `keyframe -q -name -sl`;
+	selectKey -clear;
+
+	for ($each in $selectedAnimCurves) {
+		float $firstKeyFrame = `findKeyframe -which "first" $each`;
+		selectKey -time $firstKeyFrame -add $each;
+
+	}
+
+}

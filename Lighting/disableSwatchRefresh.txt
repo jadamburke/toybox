@@ -1,0 +1,4 @@
+disables the hypershade swatches from updating 
+ 
+ 
+ 

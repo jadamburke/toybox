@@ -1,0 +1,40 @@
+// scaleCurves
+
+
+// ultimate graph editor functions
+
+// advanced scales
+
+// setup time warps
+
+// push and pull keyframes
+
+// natural curve tangents (based on momentum)
+
+// tangent functions (linear in ease out, easein, linear out. no overshoot)
+
+global proc scaleCurves (){
+	
+	// scale curves based on selected keyframe
+
+	// scale curves based on keyframe index
+
+	// scale curves based on first or last keyframes
+
+
+
+}
+
+global proc scaleCurvesOnKey (int $keyIndex, float $scaleTime, float $scaleVal){
+	
+	$selectedAnimCurves = `keyframe -q -name -sl`;
+
+	for ($each in $selectedAnimCurves){
+
+		float $firstKeyTime[] = `keyframe -index 0 -q $each`;
+		float $firstKeyVal[] = `keyframe -index 0 -q -eval $each`;
+		scaleKey -timePivot $firstKeyTime[0] -timeScale $scaleTime -valuePivot $firstKeyVal[0] -valueScale $scaleVal $each;
+		
+	}
+
+}

@@ -1,0 +1,79 @@
+// listMissingFrames
+// Created by: adam
+// Date: 2012/04/27 11:06:51
+
+global proc listMissingFrames(){
+
+	// prompt for file to search for
+
+	// start in project../../RENDER/
+	string $browserPath = (`workspace -q -rd`+"../../RENDER/");
+	string $file[] = `fileDialog2 -fileFilter "Image Files (*.sgi *.rgb *.iff *.tga *.tif *.exr);;All Files (*.*)" -caption "Check" -fileMode 1 -dir $browserPath`;
+
+	int $missing[] = `getMissingFrames $file[0]`;
+	string $output = ("// Missing: "+$missing[0]);	
+	for ($i=1;$i<size($missing);$i++){
+		$output+=(","+$missing[$i]);
+	}
+	$output+="\n";
+	print $output;
+}
+
+
+
+global proc int[] getMissingFrames (string $file){
+
+	string $basename = `basenameEx $file`;
+	string $dirname = `dirname $file`;
+	string $ext = `fileExtension $file`;
+
+	string $tokenBuffer[];
+	tokenize $basename "." $tokenBuffer;
+
+	$filePrefix = $tokenBuffer[0];
+	//print ($filePrefix+"\n");
+	//print ($dirname+"\n");
+	string $foundFiles[] = `getFileList -fs ($filePrefix+"*") -folder ($dirname+"/")`;
+	
+	//print $foundFiles;
+	$sorted = sort($foundFiles);
+
+	int $missingFrames[];
+
+	if (size($sorted)>0){
+		string $startFile = `basenameEx $sorted[0]`;
+
+		//print ($startFile+"\n");
+		string $tokenBuffer2[];
+		tokenize $startFile "." $tokenBuffer2;
+		int $start = `match "[0-9]+" $tokenBuffer2[1]`;
+
+		string $endFile = `basenameEx $sorted[size($sorted)-1]`;
+		//print ($endFile+"\n");
+		string $tokenBuffer3[];
+		tokenize $endFile "." $tokenBuffer3;
+		int $end = `match "[0-9]+" $tokenBuffer3[1]`;
+
+		int $increment = 1;
+		
+
+		for ($i=$start;$i<$end;$i=$i+$increment){
+			string $frameStr = "";
+			if ($i<10)
+				$frameStr =("000"+$i);
+			else if ($i<100)
+				$frameStr =("00"+$i);
+			else if ($i<1000)
+				$frameStr =("0"+$i);
+			else if ($i<10000)
+				$frameStr =($i);			
+
+			string $fileToTest = ($dirname+"/"+$filePrefix+"."+$frameStr+"."+$ext);
+			if (!`filetest -r $fileToTest`)
+				$missingFrames[size($missingFrames)] = $i;
+				//print ($fileToTest+" not found\n");
+
+		}
+	}
+	return $missingFrames;
+}

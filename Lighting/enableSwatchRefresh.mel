@@ -1,0 +1,6 @@
+// enableSwatchRefresh
+global proc enableSwatchRefresh () {
+
+    optionVar -intValue "ppSwatchUpdate" true;
+    renderThumbnailUpdate `optionVar -q "ppSwatchUpdate"`;
+}

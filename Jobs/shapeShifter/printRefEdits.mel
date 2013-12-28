@@ -1,0 +1,12 @@
+// printRefEdits
+
+global proc printRefEdits() {
+$sel = `ls -sl`;
+	for ($every in $sel){
+		$referenceNode = $every;
+		$refEdits = `referenceQuery -failedEdits false -successfulEdits true -editStrings $referenceNode`;
+		for ($each in $refEdits){
+  			print ($each + "\;\n");
+		} 
+	}
+}

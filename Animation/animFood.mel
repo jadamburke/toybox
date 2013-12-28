@@ -1,0 +1,202 @@
+
+global proc animFood()
+{
+
+int $version = 2;
+
+global int $AFMemory[]; global int $AFMemoryClock;
+
+clear $AFMemory;
+$AFMemory[0] = 999999999;
+$AFMemoryClock = 1;
+
+window -t "Animation Food" -h 400 animFodod;
+menuBarLayout;
+menu -l "Update";
+menuItem -l ("You have version: " + $version + " .... Check for more food!") -c "showHelp -a \"http://fliponline.blogspot.com/2008/04/animfood.html\"";
+
+
+formLayout btTopForm;
+
+rowColumnLayout -w 400 -nc 1 -cw 1 300 btButRow;
+
+button -l "Feed me!" -c "btDisplayInfo \"[Checklist]\"";
+
+setParent btTopForm;
+
+scrollField -ed false -wordWrap true btOutput;
+
+scrollField -e -text " " btOutput;
+
+setParent btTopForm;
+
+
+formLayout -e 
+
+	-af btButRow "left" 3
+	-af btButRow "right" 3
+
+	-ac btOutput "top" 3 btButRow 
+	-af btOutput "left" 1
+	-af btOutput "right" 1
+	-af btOutput "bottom" 3
+
+btTopForm;
+
+showWindow;
+}
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------//
+
+
+global proc btDisplayInfo ( string $type )
+{
+
+global int $AFMemory[]; global int $AFMemoryClock; 
+
+global string $RFData[]; global int $randomQuoteRepeatz[]; global int $randomQuoteRepeatzClock; global int $stepThrough; global string $lastBank;
+
+string $myScriptDir = `internalVar -userScriptDir`;
+
+btReadFromFile ( $myScriptDir + "\animFood.txt") $type 0;
+
+int $bankSize = `size $RFData`;
+
+int $error = 0;
+
+	int $randomQuote = `rand $bankSize`;
+
+	for ( $block in $AFMemory )
+	{
+		if ( $randomQuote == $block )
+		{
+			$error = 1;
+			break;
+		}
+		else{}	
+	}
+
+
+	if ( $error == 0 )
+	{
+
+			string $evalRandomQuote = ( "scrollField -e -text \"" + $RFData[$randomQuote] + "\" btOutput" );
+			catchQuiet ( `eval $evalRandomQuote` );
+			
+			$AFMemory[$AFMemoryClock] = $randomQuote;
+			$AFMemoryClock++;
+
+			if ( $AFMemoryClock == 50 )
+			{
+				clear $AFMemory;
+				$AFMemory[0] = 999999999;
+				$AFMemoryClock = 1;
+			}
+
+			print "";
+
+	}
+	else
+	{
+			btDisplayInfo "[Checklist]";
+	}
+
+}
+
+
+
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------//
+
+global proc btReadFromFile ( string $file, string $bank, int $debug )
+	
+{    
+
+	$fileToRead = $file;
+
+     	$fileId = `fopen $fileToRead "r"`;
+	
+	global string $RFData[]; string $buffer[], $bankText;
+	
+	clear $RFData;
+	
+	int $i, $error;
+	
+	$i = 0;
+	$error = 1;
+	
+   	    string $lineText = "begin"; // start off the search so the WHILE can begin //
+	
+   		while ( size( $lineText ) > 0 ) // continue until $lineText returns nothing (empty line... will only return empty laine at END of file  START FROM START OF FILE + READ WHOLE FILE//
+		{
+			
+			
+    			$lineText = `fgetline $fileId`; // get the line ( entire line and blank space ) //
+								
+				if ( `size $lineText` != 0 ) // if there was text there ( this will always run, so you can have blank lines if you want ) //
+				{
+					
+
+   					tokenize $lineText ">" $buffer;  // remove the white space behind ">" //
+					
+					
+					if ( $buffer[0] == $bank ) // find the block identifier //
+					{
+							$bankText = "start of block";
+							
+							$error = 0;	
+						
+							while ( size( $bankText ) > 0 ) // kick off the line reader ( > 0 means nothing cos of break ... will run till end symbol ) STARTING FROM SPECIFIED BLOCK //
+							{
+						
+								$bankText = `fgetline $fileId`;	  // get the text //
+								
+  								tokenize $bankText ">" $buffer;  // remove the white space behind ">" //
+							
+								if ( $buffer[0] != "-" ) // check for the `end of bank` symbol //
+								{
+									
+									$RFData[$i] = $buffer[0]; // add the result to the array //
+							
+									$i = $i + 1; // shift array on by one //
+									
+								}
+								else
+								{
+									break;
+								}
+						
+							}
+					}
+					else{}
+				}
+		}
+		 
+
+		 
+    fclose $fileId;
+	
+	if ( $error == 1 )
+	{
+		error "the dataBlock wasnt found. Check the block name";
+	}else{}
+	
+	
+    if ( $debug == 1 )
+	{
+		print "----------------------------------- \n";
+		print ( "bank " + $bank + " returned:\n" );
+		print $RFData;
+		print "----------------------------------- \n";
+	}else{}
+	
+	
+}
+
+
+//-----------------------------------------------------------------------------------------------------------------------//
+
+
+	
+
+

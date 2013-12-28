@@ -1,0 +1,49 @@
+// fixPosControls
+
+global proc fixPosControls () {
+
+
+string $target = ("PrevisGirl");
+
+string $oldObjName = ("|"+$target+":ROOT|"+$target+":master_ctl_GRP|"+$target+":master_CTL");
+string $newObjName = ("|"+$target+":ROOT|"+$target+":MOVER");
+string $refEdits[] = `referenceQuery -failedEdits 1 -editStrings $oldObjName`;
+for ($each in $refEdits) {
+    string $cmd = `substitute $oldObjName $each $newObjName`;
+    catch(evalEcho($cmd));
+
+}
+
+$oldObjName = ("|"+$target+":ROOT|"+$target+":master_ctl_GRP|"+$target+":master_CTL|"+$target+":move_ctl_GRP|"+$target+":move_CTL");
+$newObjName = ("|"+$target+":ROOT|"+$target+":MOVER|"+$target+":BODY");
+$refEdits = `referenceQuery -failedEdits 1 -editStrings $oldObjName`;
+for ($each in $refEdits) {
+    string $cmd = `substitute $oldObjName $each $newObjName`;
+    catch(evalEcho($cmd));
+
+}
+
+for ($i = 1;$i<8;$i++){
+	$target = ("PrevisGirl"+$i);
+	$oldObjName = ("|"+$target+":ROOT|"+$target+":master_ctl_GRP|"+$target+":master_CTL");
+	$newObjName = ("|"+$target+":ROOT|"+$target+":MOVER");
+	$refEdits[] = `referenceQuery -failedEdits 1 -editStrings $oldObjName`;
+	for ($each in $refEdits) {
+   		 string $cmd = `substitute $oldObjName $each $newObjName`;
+   		 catch(evalEcho($cmd));
+
+	}
+
+	$oldObjName = ("|"+$target+":ROOT|"+$target+":master_ctl_GRP|"+$target+":master_CTL|"+$target+":move_ctl_GRP|"+$target+":move_CTL");
+	$newObjName = ("|"+$target+":ROOT|"+$target+":MOVER|"+$target+":BODY");
+	$refEdits = `referenceQuery -failedEdits 1 -editStrings $oldObjName`;
+	for ($each in $refEdits) {
+		string $cmd = `substitute $oldObjName $each $newObjName`;
+		catch(evalEcho($cmd));
+
+	}
+
+}
+
+
+}

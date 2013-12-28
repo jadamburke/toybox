@@ -1,0 +1,297 @@
+///////////////////////////////////////////////////////////////////
+global proc leDropShot(){
+	string $tempString;
+	string $leEpisodesDir = "//slinky/cg01/episodes/";
+	string $episodesList[];
+	string $shotsList[];
+	int $numofShotMenus =0;
+	int $i=0,$j=0;	
+	
+    if (`window -ex leDropShotWindow` != true)
+        {
+	window -w 400 -h 150 -ret -t "leDropShot" -in "leDropShot" -s true -tb true leDropShotWindow;
+	
+	formLayout mainLeDropShotForm;
+
+	separator -style "in" -h 3 sep0 ;
+	
+	// get the list of episodes
+	$episodesList = leGetEpisodeList();
+	
+	optionMenu 
+		-l "Episode" 
+		-cc "leGetShotUpdate(`optionMenu -q -sl optLeEpisode`,`optionMenu -q -ni optLeEpisode`);"
+		-w 300 optLeEpisode;
+		
+		// create a menuItem for each episode found
+		for ($i=0;$i<size($episodesList);$i++){
+			menuItem -label $episodesList[$i] ("menuItem"+$episodesList[$i]);
+		}
+
+		// for each Episode menuItem an option Menu is created
+		for ($numofShotMenus=0;$numofShotMenus<size($episodesList);$numofShotMenus++){
+			$shotsList = leGetShotList($leEpisodesDir + $episodesList[$numofShotMenus]);
+			optionMenu -l "Shot" -w 300 -vis 0 ("optLeShot"+$numofShotMenus);
+			
+			// populate each option Menu with the available rendered shots
+			for ($i=0;$i<size($shotsList);$i++){
+				menuItem -label $shotsList[$i] ("menuItem"+$shotsList[$i]);
+			}
+		}
+	string $leOpenFolderSysCmd = ("start explorer "+`leGetShotPath`+";");	
+	button -l "Open Folder"
+		-al "center"
+		-c ("system (\"start explorer \\\"\"+toNativePath((`leGetShotPath`))+\"\\\"\") ")
+		-h 26
+		btnOpenFldr;
+		
+	button -l "Fcheck Shot"
+		-al "center"
+		-c ("launchFcheckCmd((`leGetFcheckSeq`),1)")
+		-h 26
+		btnFcheckShot;
+
+	separator -style "in" -h 3 sep1;
+		
+	button -l "Drop Shot" 
+		-al "center" 
+		-c "leDropShotProc(`optionMenu -q -value optLeEpisode`,`optionMenu -q -value (\"optLeShot\"+(eval(\"optionMenu -q -sl optLeEpisode\")-1))`);deleteUI -window leDropShotWindow;"
+		-h 26 
+		btnDropShot ;
+	button 
+		-l "Apply" 
+		-al "center" 
+		-c "leDropShotProc(`optionMenu -q -value optLeEpisode`,`optionMenu -q -value (\"optLeShot\"+(eval(\"optionMenu -q -sl optLeEpisode\")-1))`);"
+		-h 26 btnApply;
+	button -l "Close" 
+		-c "deleteUI -window leDropShotWindow" 
+		-al "center" 
+		-h 26 btnClose ;
+		
+		
+	
+	formLayout -e
+	    -attachForm sep0 "left" 0 
+	    -attachForm sep0 "right" 0
+	    -attachForm sep0 "top" 0
+	    -attachNone sep0 "bottom"
+
+	    -attachNone optLeEpisode "left" 
+	    -attachPosition optLeEpisode "right" 3 50
+	    -attachControl optLeEpisode "top" 5 sep0
+	    -attachNone optLeEpisode "bottom"
+	    
+	    -attachForm btnOpenFldr "left" 5
+	    -attachPosition btnOpenFldr "right" 3 50
+	    -attachControl btnOpenFldr "top" 5 optLeEpisode
+	    -attachNone btnOpenFldr "bottom"
+	    
+	    -attachPosition btnFcheckShot "left" 3 50
+	    -attachForm btnFcheckShot "right" 5
+	    -attachControl btnFcheckShot "top" 5 optLeEpisode
+	    -attachNone btnFcheckShot "bottom"
+	    
+	    -attachForm sep1 "left" 0 
+	    -attachForm sep1 "right" 0
+	    -attachNone sep1 "top" 
+	    -attachControl sep1 "bottom" 5 btnDropShot
+
+	    -attachForm btnDropShot "left" 5 
+	    -attachPosition btnDropShot "right" 3 33
+	    -attachNone btnDropShot "top"
+	    -attachForm btnDropShot "bottom" 5
+
+	    -attachPosition btnApply "left" 3 33 
+	    -attachPosition btnApply "right" 3 66
+	    -attachNone btnApply "top"
+	    -attachForm btnApply "bottom" 5
+	    
+	    -attachPosition btnClose "left" 3 66
+	    -attachForm btnClose "right" 5
+	    -attachNone btnClose "top"
+	    -attachForm btnClose "bottom" 5
+	
+	    mainLeDropShotForm;
+	    
+	for ($i=0;$i<$numofShotMenus;$i++) {
+	    formLayout -e 
+	    	-attachPosition ("optLeShot"+$i) "left" 3 50
+	    	-attachNone ("optLeShot"+$i) "right" 
+	    	-attachControl ("optLeShot"+$i) "top" 5 sep0
+	    	-attachNone ("optLeShot"+$i) "bottom"
+	    mainLeDropShotForm;
+	 }
+
+	optionMenu -e -sl 1 optLeEpisode;
+	optionMenu -e -vis 1 optLeShot0;
+
+	showWindow leDropShotWindow;
+    }
+    else	// else just pop it up from being minimized again
+    {
+	showWindow leDropShotWindow;
+    }
+	
+}
+
+leDropShot;
+
+/////////////////////////////////////////////////////////////////////////////////
+global proc string[] leGetEpisodeList() {
+	
+	string $leEpisodesDir = "//slinky/cg01/episodes/";
+	string $leEpisodesTempList[] = `getFileList -folder $leEpisodesDir -fs "*.*"`;
+	string $leEpisodesList[];
+	int $i=0, $j=0;
+	
+	// make sure only directories are stored;
+	for ($i=0;$i<size($leEpisodesTempList);$i++) {
+		if (`filetest -d ($leEpisodesDir+$leEpisodesTempList[$i])`) {
+			$leEpisodesList[$j] = $leEpisodesTempList[$i];
+			$j++;
+		}
+	}
+			
+	$leEpisodesList = sort($leEpisodesList);
+			
+	return $leEpisodesList;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+global proc string[] leGetShotList(string $leEpisodeFullPath) {
+	
+	string $leImageSeqPath = ($leEpisodeFullPath+"/images/");
+	string $leImageSeqTempList[] = `getFileList -folder $leImageSeqPath -fs "*.*"`;
+	string $leImageSeqList[];
+	int $i=0, $j=0;
+	
+	for ($i=0;$i<size($leImageSeqTempList);$i++) {
+		if (`filetest -d ($leEpisodeFullPath+"/images/"+$leImageSeqTempList[$i])`){
+			if ($leImageSeqTempList[$i] != "workCP" && $leImageSeqTempList[$i] != ".mayaSwatches"){
+				$leImageSeqList[$j] = $leImageSeqTempList[$i];
+				$j++;
+			}
+		}
+	}
+	
+	$leImageSeqList = sort($leImageSeqList);
+	
+	return $leImageSeqList;
+}
+
+//////////////////////////////////////////////////////////////////////////
+global proc leGetShotUpdate(int $leShotMenu, int $leTotalShotMenus){
+	int $i = 0;
+	for ($i=0;$i<=$leTotalShotMenus-1;$i++){
+		if ($i == ($leShotMenu-1))
+			optionMenu -e -vis 1 ("optLeShot"+$i);
+		else
+			optionMenu -e -vis 0 ("optLeShot"+$i);	
+	}
+	
+	
+}
+
+global proc int leVerifySequence(string $seqPath){
+	
+	string $seqTokenBuf[];
+	int $numOfTokens = 0;
+		
+	// if the pathname doesn't end in a slash, one is added
+	if (endString($seqPath,1) != "/"){
+		$seqPath = ($seqPath + "/");
+	}
+	
+	string $seqFileList[] = `getFileList -folder $seqPath -fs "*.*"`;
+	
+	$seqFileList = sort($seqFileList);
+	
+	$numOfTokens = tokenize($seqFileList[0],".",$seqTokenBuf);
+		string $seqStart = $seqTokenBuf[1];
+	$numOfTokens = tokenize($seqFileList[size($seqFileList)-1],".",$seqTokenBuf);
+	string $seqStop = $seqTokenBuf[1];
+	
+	//print ("start:"+$seqStart+"|end:"+$seqStop+"\n");
+	//print (int(int($seqStop)-1) - int($seqStart)+"|"+size($seqFileList)+"\n");
+	
+	int $leFrameCount = int($seqStop) - (int($seqStart)-1);
+	
+	if (size($seqFileList) < $leFrameCount) {
+		if (`confirmDialog -t "Sequence Check" -message "Image Sequence Missing Frames!" -button "Cancel Dump" -defaultButton "Cancel Dump" -button "Dump Anyway"` == "Cancel Dump")
+			return 0;
+		else
+			return 1;
+	}
+	else {
+		return 1;
+	}
+}
+
+global proc string leGetShotPath(){
+	string $leEpisodesDir = "//slinky/cg01/episodes/";
+	int $leSelectedEpisodeNum = `optionMenu -q -sl optLeEpisode`;
+	string $leOptionBoxName = ("optLeShot"+($leSelectedEpisodeNum-1));
+	string $imageDirFullPath = ($leEpisodesDir+`optionMenu -q -value optLeEpisode`+"/images/"+(eval("optionMenu -q -value "+ $leOptionBoxName))+"/");
+	return $imageDirFullPath;
+	
+}
+
+global proc string leGetFcheckSeq(){
+	
+	string $leImageSeq[] = `getFileList -folder (eval("leGetShotPath")) -fs "*.*"`;
+	return (`leGetShotPath`+$leImageSeq[0]);
+	
+}
+
+///////////////////////////////////////////////////////////////////
+global proc leDropShotProc(string $leEpisode, string $leShot){
+	
+	string $leEpisodesDir = "//slinky/cg01/episodes/";
+	string $imageDirFullPath = ($leEpisodesDir+$leEpisode+"/images/"+$leShot+"/");
+	string $digi01Episodes[] = {"DTV100", "OPEN", "EP101","EP103", "EP105", "EP107"};
+	string $digi02Episodes[] = {"DTV100B", "EP102", "EP104", "EP106", "EP108", "EP128"};
+	string $cgDropbox = "//slinky/digiAnim02/CG Drop Box/";
+	string $imageSeqTemp[];
+	int $i=0;
+
+	// if the current episode is in DigiAnim01 then change the dropbox location accordingly	
+	for ($i=0;$i<size($digi01Episodes);$i++) {
+		if ($leEpisode == $digi01Episodes[$i])
+			$cgDropbox = "//slinky/digiAnim01/CG Drop Box/";
+	}
+	
+	// if the shot folder isn't already in the drop box
+	if (!(`filetest -d ($cgDropbox+$leShot+"/")`)) { 
+		
+		// check the image sequence to see if its missing frames, if not go ahead and dump
+		if (`leVerifySequence $imageDirFullPath`) {
+			// create the directory to copy the files to
+			sysFile -makeDir ($cgDropbox+$leShot+"/"); 
+		
+			// get the list of images in the shot folder
+			$imageSeqTemp = `getFileList -folder ($imageDirFullPath) -fs "*.*"`; 
+		
+			// move each file one by one into the drop box
+			for ($i=0;$i<size($imageSeqTemp);$i++){
+				if (`sysFile -move ($cgDropbox+$leShot+"/"+$imageSeqTemp[$i]) ($imageDirFullPath+$imageSeqTemp[$i])`)
+					print ("sysFile -move \""+($cgDropbox+$leShot+"/"+$imageSeqTemp[$i]+"\" \""+$imageDirFullPath+$imageSeqTemp[$i]+"\"\n"));
+				else 
+					print ("Failed: sysFile -move \""+$imageDirFullPath+$imageSeqTemp[$i]+"\" \""+($cgDropbox+$leShot+"/"+$imageSeqTemp[$i]+"\"")+"\n");
+			}
+			
+			// delete the old directory
+			if (`system ("rmdir \"" + toNativePath($imageDirFullPath)+"\"")`=="")
+				print ("system \"rmdir \""+ toNativePath($imageDirFullPath) +"\"\n");
+			else
+				print ("system \"rmdir \""+ toNativePath($imageDirFullPath) +"\"\n");
+		
+			// remove the shot from the list and update the UI
+			int $currentShotMenuNum = (`optionMenu -q -sl optLeEpisode`-1);
+			deleteUI -menuItem ("menuItem"+`optionMenu -q -value ("optLeShot"+$currentShotMenuNum)`);
+		}
+	}
+	else {
+		error ($leShot+" already in "+ $cgDropbox);
+	}
+
+}

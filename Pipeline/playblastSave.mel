@@ -1,0 +1,52 @@
+// playblastSave
+
+global proc playblastSave () {
+	string $fileWithPath = `file -q -sn`;
+	string $projectPath = `workspace -q -rd`;
+	string $tokenBuffer[];
+	string $tokenBuffer2[];
+	tokenize $fileWithPath "/" $tokenBuffer;
+	int $prjPathTokens = `tokenize $projectPath "/" $tokenBuffer2`;
+	$file = $tokenBuffer[(size($tokenBuffer)-1)];
+	int $i = 0;
+	string $outputPath = ($projectPath+"frames/anm_frames/");
+	for ($i=($prjPathTokens+1);$i<size($tokenBuffer)-3;$i++){
+		$outputPath = ($outputPath+$tokenBuffer[$i]+"/");
+	}
+	//$outputPath = ($outputPath +"sgi/");
+
+	
+	string $filename = `file -q -shn -sn`;
+	string	$tokenBuffer3[];
+	tokenize $filename "." $tokenBuffer3;
+	$i = 0;
+	string $outputFile = $tokenBuffer3[0];
+	if (size($tokenBuffer)>1){
+		for ($i=1;$i<size($tokenBuffer3)-1;$i++){
+			$outputFile = ($outputFile+"_"+$tokenBuffer3[$i]);
+		}
+	}
+
+	if (`filetest -d $outputPath` == 0){
+		sysFile -makeDir $outputPath;
+	} 
+	$outputPath = ($outputPath + $outputFile +"/");
+
+	string $outfile = ($outputPath+$outputFile);
+	print ($outfile + "\n");
+
+	int $index = 1;
+	string $outfileOrig = $outfile;
+	while (`filetest -f ($outfile+".avi")` == 1){
+		$outfile = ($outfileOrig+"_"+$index);
+		$index++;
+	}
+
+	playblast  -format image -filename $outfile -clearCache 1 -viewer 1 -showOrnaments 0 -fp 4 -percent 100 -widthHeight 960 540;
+	//playblast  -format movie -filename $outfile -clearCache 1 -viewer 1 -showOrnaments 0 -fp 4 -compression none -percent 100 -widthHeight 960 540;
+
+
+	string $native = toNativePath($outfile); 
+	system ("start "+$native+".avi");
+
+}

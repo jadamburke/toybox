@@ -1,0 +1,9 @@
+global proc aiConnectAssetAOVs (){
+    $sel = `ls -type aiAOV`;
+    for ($each in $sel){
+        //connectAttr "defaultArnoldDriver.message" ($each+".outputs[0].driver");
+        //connectAttr "defaultArnoldFilter.message" ($each+".outputs[0].filter");
+        
+        catch(eval("connectAttr -na \""+$each+".message\" \"defaultArnoldRenderOptions.aovList\""));
+    }
+}

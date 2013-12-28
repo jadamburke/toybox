@@ -1,0 +1,31 @@
+// testDropCallback
+
+// this is used in a particular script of mine that mimics the shelf trashcan function but on my own controls. 
+// in 2011 this removing of the control during a drop callback causes a fatal error. Previous to 2011 this worked.
+
+global proc testDropCallback () {
+	
+	window;
+	columnLayout -dpc "testDropCB";
+	button -label "drag" -dgc "testDragCB";
+	button -label "drop" -dpc "testDropCB";
+	symbolButton -dpc "testDropCB";
+	iconTextButton -style "textOnly" -dpc "testDropCB" -label "drop";
+	showWindow;
+
+
+}
+global proc string[] testDragCB(string $dragControl, int $x, int $y, int $mods){
+
+	string $msg[] = {"move", $x, $y, $mods};
+	return $msg;
+}
+
+global proc testDropCB (string $dragControl, string $dropControl, string $msgs[], int $x, int $y, int $type){
+
+	print ("Removing "+$dragControl+"\n");
+	evalDeferred ("deleteUI -control "+$dragControl);
+
+	int $mods = $msgs[3];
+	print ("mods="+$mods+"\n");
+}

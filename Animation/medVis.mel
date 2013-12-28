@@ -1,0 +1,13 @@
+// medVis
+global proc medVis() {
+	string $selected2[] = `ls -sl`;
+	string $tokenBuffer[];
+	$numTokens = `tokenize $selected2[0] "_" $tokenBuffer`;
+	select ($tokenBuffer[0]+"_LORES");
+	select -add ($tokenBuffer[0]+"_HIRES");
+	hide `ls -sl`;
+	select ($tokenBuffer[0]+"_MEDRES");
+	
+	showHidden `ls -sl`;
+
+}

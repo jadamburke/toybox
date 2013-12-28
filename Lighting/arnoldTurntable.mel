@@ -1,0 +1,27 @@
+// turntable
+// Created by: raphe
+// Date: 2012/03/09 09:57:51
+
+global proc arnoldTurntable(){
+
+	if(! `pluginInfo -q -l "mtoa"`){
+		loadPlugin "mtoa";
+	}
+	evalDeferred("setCurrentRenderer arnold");
+	evalDeferred("unifiedRenderGlobalsWindow;");
+	file -import -type "mayaAscii" -ra true -namespace "Arnold_turntable_01" -options "v=0"  -pr -loadReferenceDepth "all" (`getenv MAYA_PPTOOLS`+"/sceneTemplates/import_Arnold_lightRig_01.ma");
+	if(! `pluginInfo -q -l "mtoa"`){
+		loadPlugin "mtoa";
+	}
+
+	$turntables = `ls "Arnold_turntable_*:aiRaySwitchShape"`;
+	string $i = "";
+	for($i in $turntables){
+	    $connected = `isConnected ($i + ".message") defaultArnoldRenderOptions.background`;
+	    if(! $connected){
+	   		eval("connectAttr -f " + $i + ".message defaultArnoldRenderOptions.background");
+			print("connectAttr -f " + $i + ".message defaultArnoldRenderOptions.background\n");
+	    }
+	}
+
+}

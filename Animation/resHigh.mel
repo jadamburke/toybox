@@ -1,0 +1,49 @@
+// resHigh
+
+
+global proc resHigh (){
+	string $setsToHide[] = `ls -type objectSet -r 1 "*MED"`;
+	string $setsToHide2[] = `ls -type objectSet -r 1 "*LOW"`;
+	string $setsToShow[] = `ls -type objectSet -r 1 "*HIGH"`;
+
+	
+	string $objectsToHide[] = `sets -q -no $setsToHide`;
+	string $objectsToHide2[] = `sets -q -no $setsToHide2`;
+	string $objectsToShow[] = `sets -q -no $setsToShow`;
+
+	string $each = "";
+
+	for ($each in $objectsToHide){
+		//if (!`isConnected ($each+".visibility")`){
+			evalEcho("setAttr "+$each+".visibility 0");
+		//}
+		//else{
+			//warning ($each+".visibility was not hidden because it is keyframed");
+		//}
+		
+
+	}
+
+	for ($each in $objectsToHide2){
+		//if (!`isConnected ($each+".visibility")`){
+			evalEcho("setAttr "+$each+".visibility 0");
+	//}
+		//else{
+			//warning ($each+".visibility was not hidden because it is keyframed");
+	//}
+		
+
+	}
+
+	for ($each in $objectsToShow){
+		//if (!`isConnected ($each+".visibility")`){
+			evalEcho("setAttr "+$each+".visibility 1");
+	//}
+		//else{
+			//warning ($each+".visibility was not shown because it is keyframed");
+	//}
+		
+
+	}
+
+}

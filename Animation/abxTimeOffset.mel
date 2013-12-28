@@ -1,0 +1,390 @@
+// timeOffset
+global proc abxTimeOffset() {
+if (`window -ex abxTimeOffsetWindow` != true)
+	{
+		window -w 150 -h 200 -t "abxTimeOffset" -in "abxTimeOffset" -s true -tb true abxTimeOffsetWindow;
+
+		columnLayout -rs 1 -w 400 -cal "center" -cat "both" 0 -adj true abxTimeOffsetColLyt;
+
+
+		button -label "Enable Selected" -h 20 -w 60 -c "timeOffsetAdd";
+		button -label "Enable As Group" -h 20 -w 60 -c "timeOffsetGroupAdd";
+		button -label "Disable Selected" -h 20 -w 60 -c "timeOffsetRemoveKeepAttr";
+		button -label "Remove Completely" -h 20 -w 60 -c "timeOffsetRemove";
+		button -label "Bake Offset" -h 20 -w 60 -c "timeOffsetBake";
+		button -label "UnBake Offset" -h 20 -w 60 -c "timeOffsetUnbake";
+		button -label "KeyWithOffset" -h 20 -w 60 -c "keyWithTimeOffset";
+
+		button -label "Sequence Offset Attr" -h 20 -w 60 -c "timeOffsetSequence";
+		button -label "Randomize Offset Attr" -h 20 -w 60 -c "timeOffsetRandom";
+
+		window -e -w 150 -h 200 abxTimeOffsetWindow;
+		showWindow abxTimeOffsetWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 150 -h 200 abxTimeOffsetWindow;
+		showWindow abxTimeOffsetWindow;
+    	}
+
+}
+
+
+
+global proc timeOffsetAdd() {
+
+string $sel[] = `ls -sl`;
+
+for ($each in $sel){
+
+
+	if (!`attributeExists "offset" $each`)
+		addAttr -sn "offset" -k 1 -at "float" $each;
+	if (!`objExists ($each+"_offsetAdd")`)
+		createNode plusMinusAverage -name ($each+"_offsetAdd");
+	if (!`objExists ($each+"_offsetAddUnit")`)
+		createNode unitToTimeConversion -name ($each+"_offsetAddUnit");
+
+	if (!`isConnected -ignoreUnitConversion time1.outTime ($each+"_offsetAdd.i1[0]")`)
+		connectAttr time1.outTime ($each+"_offsetAdd.i1[0]");
+
+	if (!`isConnected  ($each+".offset") ($each+"_offsetAdd.i1[1]")`)
+		connectAttr ($each+".offset") ($each+"_offsetAdd.i1[1]");
+
+	if (!`isConnected  ($each+"_offsetAdd.o1") ($each+"_offsetAddUnit.input")`)
+		connectAttr ($each+"_offsetAdd.o1") ($each+"_offsetAddUnit.input");
+
+	setAttr ($each+"_offsetAddUnit.conversionFactor") 200;
+
+		string $selectedChnl[];
+		string $keyable[];
+		$selectedChnl = `channelBox -q -sma mainChannelBox`;
+		$selSSAChnl = `channelBox -q -ssa mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSSAChnl);
+		$selSHAChnl = `channelBox -q -sha mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSHAChnl);
+		$selSOAChnl = `channelBox -q -soa mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSOAChnl);
+		if (size($selectedChnl)>0)
+			$keyable = $selectedChnl;
+		else
+			$keyable = `listAttr -k $each`;
+		
+		for ($every in $keyable){
+			if (`connectionInfo -isDestination ($each+"."+$every)`) {
+				string $sourceNode[] = `listConnections -source 1 ($each+"."+$every)`;
+				if (`objectType $sourceNode[0]` == "pairBlend"){
+					string $sourceConnections[] = `listConnections -p true -source 1 ($each+"."+$every)`;
+					string $tokenBuffer[];
+					tokenize $sourceConnections[0] "." $tokenBuffer;
+					string $attrName = $tokenBuffer[1];
+					$incomingAttr1 = (`substitute "out" $attrName "in"`+"1");
+					string $newSourceNode[] = `listConnections -source 1 ($sourceNode[0]+"."+$incomingAttr1)`;
+					if (attributeExists("input",$newSourceNode[0])){
+						$sourceNode[0] = $newSourceNode[0];
+					}
+					else{	
+						$incomingAttr2 = (`substitute "out" $attrName "in"`+"2");
+						$newSourceNode = `listConnections -source 1 ($sourceNode[0]+"."+$incomingAttr2)`;
+						if (attributeExists("input",$newSourceNode[0])){
+							$sourceNode[0] = $newSourceNode[0];
+						}
+					}
+					
+				}
+				if (attributeExists("input",$sourceNode[0])){
+					if (`connectionInfo -isDestination ($sourceNode[0]+".input")`)	
+						warning ($sourceNode[0]+".input already has connection, skipped");
+					else
+						connectAttr ($each+"_offsetAddUnit.output") ($sourceNode[0]+".input");
+						print ("connectAttr "+($each+"_offsetAddUnit.output")+" "+ ($sourceNode[0]+".input")+"\n");
+				}
+			}
+		}
+}	
+select $sel;
+
+}
+
+
+global proc timeOffsetGroupAdd() {
+
+string $sel[] = `ls -sl`;
+$groupOffsetNode = $sel[0];
+
+
+	if (!`attributeExists "offset" $groupOffsetNode`)
+		addAttr -sn "offset" -k 1 -at "float" $groupOffsetNode;
+	if (!`objExists ($groupOffsetNode+"_offsetAdd")`)
+		createNode plusMinusAverage -name ($groupOffsetNode+"_offsetAdd");
+	if (!`objExists ($groupOffsetNode+"_offsetAddUnit")`)
+		createNode unitToTimeConversion -name ($groupOffsetNode+"_offsetAddUnit");
+
+	if (!`isConnected -ignoreUnitConversion time1.outTime ($groupOffsetNode+"_offsetAdd.i1[0]")`)
+		connectAttr time1.outTime ($groupOffsetNode+"_offsetAdd.i1[0]");
+
+	if (!`isConnected ($groupOffsetNode+".offset") ($groupOffsetNode+"_offsetAdd.i1[1]")`)
+		connectAttr ($groupOffsetNode+".offset") ($groupOffsetNode+"_offsetAdd.i1[1]");
+
+	if (!`isConnected ($groupOffsetNode+"_offsetAdd.o1") ($groupOffsetNode+"_offsetAddUnit.input")`)
+		connectAttr ($groupOffsetNode+"_offsetAdd.o1") ($groupOffsetNode+"_offsetAddUnit.input");
+
+	setAttr ($groupOffsetNode+"_offsetAddUnit.conversionFactor") 200;
+
+		string $selectedChnl[];
+		string $keyable[];
+		$selectedChnl = `channelBox -q -sma mainChannelBox`;
+		$selSSAChnl = `channelBox -q -ssa mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSSAChnl);
+		$selSHAChnl = `channelBox -q -sha mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSHAChnl);
+		$selSOAChnl = `channelBox -q -soa mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSOAChnl);
+		if (size($selectedChnl)>0)
+			$keyable = $selectedChnl;
+		else
+			$keyable = `listAttr -k $groupOffsetNode`;
+		for ($each in $sel){
+			for ($every in $keyable){
+				if (`attributeExists $every $each`){
+				if (`connectionInfo -isDestination ($each+"."+$every)`) {
+					string $sourceNode[] = `listConnections -source 1 ($each+"."+$every)`;
+					if (attributeExists("input",$sourceNode[0])){
+						if (`connectionInfo -isDestination ($sourceNode[0]+".input")`)	
+							warning ($sourceNode[0]+".input already has connection, skipped");
+						else
+							connectAttr ($groupOffsetNode+"_offsetAddUnit.output") ($sourceNode[0]+".input");
+					}
+				}
+				}
+			}
+		}	
+select $sel;
+
+}
+
+global proc timeOffsetRemove() {
+
+string $sel[] = `ls -sl`;
+
+for ($each in $sel){
+	string $offsetNode[];
+	string $keyable[] = `listAttr -k $each`;
+	for ($every in $keyable){
+		if (`connectionInfo -isDestination ($each+"."+$every)`) {
+			string $sourceNode[] = `listConnections -source 1 ($each+"."+$every)`;
+			if (attributeExists("input",$sourceNode[0])){
+				$offsetNode = `listConnections -source 1 ($sourceNode[0]+".input")`;
+			}
+		}
+	}
+	deleteAttr -at "offset" $each;
+	delete $offsetNode[0];
+	//delete ($each+"_offsetAdd");
+	//delete ($each+"_offsetAddUnit");
+}	
+select $sel;
+
+}
+
+
+global proc timeOffsetRemoveKeepAttr() {
+
+string $sel[] = `ls -sl`;
+
+
+for ($each in $sel){
+	string $offsetNodes[];
+	string $unitNodes[];
+	string $keyable[] = `listAttr -k $each`;
+	for ($every in $keyable){
+		if (`connectionInfo -isDestination ($each+"."+$every)`) {
+			
+			string $animNode[] = `listConnections -source 1 ($each+"."+$every)`;
+
+			if (`objectType $animNode[0]` == "pairBlend"){
+
+				string $sourceConnections[] = `listConnections -p true -source 1 ($each+"."+$every)`;
+				string $tokenBuffer[];
+				tokenize $sourceConnections[0] "." $tokenBuffer;
+				string $attrName = $tokenBuffer[1];
+				$incomingAttr1 = (`substitute "out" $attrName "in"`+"1");
+				string $newSourceNode[] = `listConnections -source 1 ($animNode[0]+"."+$incomingAttr1)`;
+				if (attributeExists("input",$newSourceNode[0])){
+					$animNode[0] = $newSourceNode[0];
+				}
+				else{	
+					$incomingAttr2 = (`substitute "out" $attrName "in"`+"2");
+					$newSourceNode = `listConnections -source 1 ($animNode[0]+"."+$incomingAttr2)`;
+					if (attributeExists("input",$newSourceNode[0])){
+						$animNode[0] = $newSourceNode[0];
+					}
+				}	
+
+			}
+			//print ("Found Source Node "+$animNode[0]+"\n");
+			if (attributeExists("input",$animNode[0])){
+				
+				string $unitNode[] = `listConnections -source 1 ($animNode[0]+".input")`;
+				$unitNodes[size($unitNodes)] = $unitNode[0];
+
+				if (attributeExists("input",$unitNode[0])){
+					string $offsetNode[] = `listConnections -source 1 ($unitNode[0]+".input")`;
+					//print ("Found "+$offsetNode[0]+"\n");
+					$offsetNodes[size($offsetNodes)] = $offsetNode[0];
+				}
+			}
+		}
+
+	}
+
+	if (size($offsetNodes)>0){
+		for ($every in $offsetNodes){
+			if (`objExists $every`){
+				delete $every;
+			}
+		}
+	}
+
+	if (size($unitNodes)>0){
+		for ($every in $unitNodes){
+			if (`objExists $every`){
+				delete $every;
+			}
+		}
+	}
+
+	//string $tokenBuffer[];
+	//tokenize $each "|" $tokenBuffer;
+	//deleteAttr -at "offset" $each;
+	//delete ($tokenBuffer[size($tokenBuffer)-1]+"_offsetAdd");
+	//delete ($each+"_offsetAddUnit");
+}	
+select $sel;
+
+}
+
+global proc timeOffsetBake() {
+
+string $sel[] = `ls -sl `;
+
+for ($each in $sel){
+
+		string $selectedChnl[];
+		string $keyable[];
+		$selectedChnl = `channelBox -q -sma mainChannelBox`;
+		$selSSAChnl = `channelBox -q -ssa mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSSAChnl);
+		$selSHAChnl = `channelBox -q -sha mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSHAChnl);
+		$selSOAChnl = `channelBox -q -soa mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSOAChnl);
+		if (size($selectedChnl)>0)
+			$keyable = $selectedChnl;
+		else
+			$keyable = `listAttr -k $each`;
+	for ($every in $keyable){
+		$offset = `getAttr ($each+".offset")`;
+		keyframe -e -r -tc ($offset*-1) ($each+"."+$every);
+		//deleteAttr -at "offset" $each;
+		if (`objExists ($each+"_offsetAdd")`)
+			delete ($each+"_offsetAdd");
+		//delete ($each+"_offsetAddUnit");
+	}
+}	
+select $sel;
+
+}
+
+global proc timeOffsetUnbake() {
+
+string $sel[] = `ls -sl`;
+
+for ($each in $sel){
+	if (!`attributeExists "offset" $each`){
+		//addAttr -sn "offset" -k 1 -at "float" $each;
+		return;
+	}
+	$offset = `getAttr ($each+".offset")`;
+	keyframe -e -r -tc ($offset*1) $each;
+
+	if (!`exists ($each+"_offsetAdd")`)
+		createNode plusMinusAverage -name ($each+"_offsetAdd");
+	if (!`exists ($each+"_offsetAddUnit")`)
+		createNode unitToTimeConversion -name ($each+"_offsetAddUnit");
+	connectAttr time1.outTime ($each+"_offsetAdd.i1[0]");
+	connectAttr ($each+".offset") ($each+"_offsetAdd.i1[1]");
+	connectAttr ($each+"_offsetAdd.o1") ($each+"_offsetAddUnit.input");
+	setAttr ($each+"_offsetAddUnit.conversionFactor") 200;
+
+		string $keyable[] = `listAttr -k $each`;
+		for ($every in $keyable){
+			if (`connectionInfo -isDestination ($each+"."+$every)`) {
+				string $sourceNode[] = `listConnections -source 1 ($each+"."+$every)`;
+				if (attributeExists("input",$sourceNode[0])){
+					if (`connectionInfo -isDestination ($sourceNode[0]+".input")`)	
+						warning ($sourceNode[0]+".input already has connection, skipped");
+					else
+						connectAttr ($each+"_offsetAddUnit.output") ($sourceNode[0]+".input");
+				}
+			}
+		}
+}	
+select $sel;
+
+}
+
+global proc timeOffsetSequence() {
+	string $sel[] = `ls -sl`;
+	int $count = size($sel);
+	int $i = 0;
+	int $index = 0;
+	for ($i = 0;$i<$count;$i++){
+		
+		if (`attributeExists offset $sel[$i]`){
+			setAttr ($sel[$i]+".offset") $index;
+			$index++;
+		}
+			
+	}
+
+}
+
+global proc timeOffsetRandom() {
+	string $sel[] = `ls -sl`;
+	int $count = size($sel);
+	int $i = 0;
+	for ($i = 0;$i<$count;$i++){
+		
+		if (`attributeExists offset $sel[$i]`){
+			float $randNum = rand(0,$count);
+			setAttr ($sel[$i]+".offset") $randNum;
+		}
+			
+	}
+
+}
+
+global proc keyWithTimeOffset () {
+	$sel = `ls -sl`;
+	for ($each in $sel){
+
+		string $selectedChnl[];
+		string $keyable[];
+		$selectedChnl = `channelBox -q -sma mainChannelBox`;
+		$selSSAChnl = `channelBox -q -ssa mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSSAChnl);
+		$selSHAChnl = `channelBox -q -sha mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSHAChnl);
+		$selSOAChnl = `channelBox -q -soa mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSOAChnl);
+		if (size($selectedChnl)>0)
+			$keyable = $selectedChnl;
+		else
+			$keyable = `listAttr -k $each`;
+
+		for ($every in $keyable) {	
+			setKeyframe -time (`currentTime -q`+`getAttr ($each+".offset")`) -at $every $each;
+		}
+	}
+}

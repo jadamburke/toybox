@@ -1,0 +1,81 @@
+// timewarpHUD
+
+global proc timewarpHUD
+(){
+
+	if (!`headsUpDisplay -q -exists HUDAbxTimeWarp`){
+		initAbxTimeWarpHUD();
+		//headsUpDisplay -e -vis 1 HUDAbxTimeWarp;
+	}
+	if (`headsUpDisplay -q -vis HUDAbxTimeWarp`){
+		print ("turning off\n");
+		headsUpDisplay -e -vis 0 HUDAbxTimeWarp;
+
+	}
+	else {
+		print ("turning on\n");
+		headsUpDisplay -e -vis 1 HUDAbxTimeWarp;
+	}
+
+
+}
+
+global proc string getAbxTimeWarpFrame (){
+
+	string $twFrResult;
+		
+	if (`objExists "timeWarp1"`){
+		if (`getAttr timeWarp1.onOff` == 1){
+			int $twFr = (`getAttr timeWarp1.frame` * 1000);
+			if ($twFr == 0){
+				$twFrResult = "0.000";
+			}
+			else {
+				string $twFrStr = $twFr;
+				int $twFrSize = size($twFrStr);
+				$twFrResult = (`substring $twFrStr 1 ($twFrSize - 3)`+"."+`substring $twFrStr ($twFrSize - 2) ($twFrSize)`);
+			}
+			
+			string $result = ("TIMEWARP:ON FR: "+$twFrResult);
+			return $result;
+		}
+		else {
+			return "TIMEWARP:OFF";
+		}
+
+	}
+	else {
+		return "";
+	}
+}
+
+
+
+global proc initAbxTimeWarpHUD
+ () {
+
+	headsUpDisplay 
+		-vis		0
+               -section          4
+               -block `headsUpDisplay -nfb 4`
+               -blockSize        "medium"
+		-dataWidth 	150
+		-dataFontSize    "large"
+               -command          "getAbxTimeWarpFrame()"
+		-atr
+               HUDAbxTimeWarp;
+
+	// set hud inactive display color to white for better vis
+	displayColor -dormant headsUpDisplayLabels 16;
+}
+
+
+//  -event            "timeChanged"
+
+//  -event		"NameChanged" 
+
+// -event "ModelPanelSetFocus"
+
+//NO -event "postSceneCallbacks"
+
+// -event "SceneSegmentChanged"

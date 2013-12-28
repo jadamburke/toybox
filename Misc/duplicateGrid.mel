@@ -1,0 +1,37 @@
+// duplicateGrid
+
+global proc duplicateGrid () {
+
+	string $nodeToDuplicate[] = `ls -sl`;
+	float $widthUnits = 400;
+	float $heightUnits = 150;
+	int $duplicates = 100;
+	float $randomizeVal = .5;
+	float $unitMultiplyX = .33;
+	float $unitMultiplyY = .52;
+	int $i=0;
+	int $j=0;
+	int $x = 0;
+	int $y = 0;
+	global string $gMainProgressBar;
+	progressBar -edit -beginProgress -isInterruptable true -status "" -maxValue 100 $gMainProgressBar;
+	
+	for ($i=0;$i<size($nodeToDuplicate);$i++) {
+		for ($x=0; $x<$widthUnits;$x++){
+			if(`progressBar -query -isCancelled $gMainProgressBar`)break;		
+			for ($y=0; $y<$heightUnits;$y++){
+				if(`progressBar -query -isCancelled $gMainProgressBar`)break;
+				
+				vector $newPosition = <<($x*$unitMultiplyX-(.5*$widthUnits*$unitMultiplyX)),($y*$unitMultiplyY-(.5*$heightUnits*$unitMultiplyY)),0>>;
+				string $newObj[] = `instance $nodeToDuplicate[$i]`;
+				move -a ($newPosition.x) ($newPosition.y) ($newPosition.z) ($newObj[0]);
+				$j++;
+				int $percentComplete = ($y+($x*$widthUnits))/($widthUnits*$heightUnits)*100;
+				//print ($percentComplete+"--"+($y+($x*$widthUnits))+":");
+				progressBar -edit -pr $percentComplete $gMainProgressBar;
+				
+			}
+		}
+	}
+	progressBar -edit -endProgress $gMainProgressBar;
+}

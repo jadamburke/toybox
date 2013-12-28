@@ -1,0 +1,63 @@
+global proc clusterRibbon(){
+$sel = `ls -sl`;
+$shapeNode = `listRelatives -shapes $sel[0]`;
+$spans = `getAttr ($shapeNode[0]+".spans")`;
+$degree = `getAttr ($shapeNode[0]+".degree")`;
+$spans = $spans+$degree;
+string $curve1;
+string $curve2;
+
+if (size($sel) == 2){
+	$curve1 = $sel[0];
+	$curve2 = $sel[1];
+}
+else{
+	error ("Must select two nurbs curves");
+	return;
+}
+
+// create group node for ribbon rig
+group -name ($curve1+"_RIG");
+xform -os -piv 0 0 0;
+
+
+// create linked clusters for curves under group
+
+for ($i = 0;$i<$spans;$i++){
+	select ($curve1+".cv["+$i+"]");
+	select -add ($curve2+".cv["+$i+"]");
+	$newCluster = `cluster -name ($curve1+"_clstr"+$i)` ;
+	parent $newCluster ($curve1+"_RIG");
+}
+
+// loft curves under group
+
+loft -ch 1 -u 1 -c 0 -ar 1 -d 3 -ss 1 -rn 1 -po 0 -rsn true -name ($curve1+"_loft") $curve1 $curve2;
+parent ($curve1+"_loft") ($curve1+"_RIG");
+
+$loftShape = `listRelatives -shapes ($curve1+"_loft")`;
+$loftNode = `listConnections -d off -s on ($loftShape[0]+".create")`;
+
+$subCrv1 = `listConnections -d off -s on ($loftNode[0]+".inputCurve[0]")`;
+$subCrv2 = `listConnections -d off -s on ($loftNode[0]+".inputCurve[1]")`;
+
+rename $subCrv1[0] ($curve1+"_subCurve1");
+rename $subCrv2[0] ($curve1+"_subCurve2");
+
+addAttr -ln "start"  -at double  -min 0 -max 1 ($curve1+"_loft");
+addAttr -ln "end"  -at double  -min 0 -max 1 ($curve1+"_loft");
+
+setAttr -e-keyable true ($curve1+"_loft.start");
+setAttr -e-keyable true ($curve1+"_loft.end");
+setAttr ($curve1+"_loft.end") 1;
+
+connectAttr -f ($curve1+"_loft.start") ($curve1+"_subCurve1.minValue") ;
+connectAttr -f ($curve1+"_loft.end") ($curve1+"_subCurve1.maxValue") ;
+connectAttr -f ($curve1+"_loft.start") ($curve1+"_subCurve2.minValue") ;
+connectAttr -f ($curve1+"_loft.end") ($curve1+"_subCurve2.maxValue");
+
+
+
+
+
+}

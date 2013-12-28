@@ -1,0 +1,24 @@
+// AOVSetOverride.mel
+// Created by: raphe
+// Date: Feb 5, 2013
+
+global proc AOVSetOverride(){
+	string $AOVs[] = `ls -type aiAOV`;
+	for($AOV in $AOVs){
+		eval ("editRenderLayerAdjustment \"" + $AOV + ".enabled\"");
+	}
+}
+
+global proc AOVSetAllOn(){
+	string $AOVs[] = `ls -type aiAOV`;
+	for($AOV in $AOVs){
+		eval ("setAttr \"" + $AOV + ".enabled\" 1");
+	}
+}
+
+global proc AOVSetAllOff(){
+	string $AOVs[] = `ls -type aiAOV`;
+	for($AOV in $AOVs){
+		eval ("setAttr \"" + $AOV + ".enabled\" 0");
+	}
+}

@@ -1,0 +1,21 @@
+// insertRibbonKnot
+global proc insertRibbonKnot() {
+
+
+$selobj = `ls -o -sl`;
+$selcmpt = `ls -sl`;
+string $tokenBuffer[];
+string $cmpnt = "";
+
+tokenize $selcmpt[0] "." $tokenBuffer;
+
+for ($i=1;$i<size($tokenBuffer);$i++){
+	$cmpnt = $cmpnt + "." + $tokenBuffer[$i];
+}
+$base = `match "[a-zA-Z]*" $selobj[0]`;
+
+
+select -r ($base+"1"+$cmpnt);
+select -add ($base+"2"+$cmpnt);
+
+}

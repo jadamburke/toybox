@@ -1,0 +1,15 @@
+// makeXPM
+
+global proc makeXPM () {
+	fileBrowserDialog -m 0 -fc "jabBrowseXPMPath"  -an "Load Image Sequence" -ds 0;
+
+}
+
+global proc jabBrowseXPMPath (string $sampleImageName, string $fileType) {
+	string $tokenBuffer[];
+	tokenize $sampleImageName "." $tokenBuffer;
+	exec ("/Applications/Autodesk/maya8.5/Maya.app/Contents/bin/imconvert \""+(toNativePath($sampleImageName))+ "\" \""+(toNativePath($tokenBuffer[0]))+".xpm\"");
+	print ("/Applications/Autodesk/maya8.5/Maya.app/Contents/bin/imconvert \""+(toNativePath($sampleImageName))+ "\" \""+(toNativePath($tokenBuffer[0]))+".xpm\"");
+	//print ($tokenBuffer[0]+".xpm\n");
+
+}

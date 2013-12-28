@@ -1,0 +1,108 @@
+// ppNewScene
+
+
+
+// this method creates a new scene based on Maya's own new scene file option vars
+// by temporarily setting the new file scene option vars to hardcoded template file locations
+// it then restores the option vars to their original values before returning
+
+
+global proc ppNewScene () {
+
+}
+
+global proc ppDoNewScene (string $which) {
+
+
+	//get the old newFile name variable if it exists so it can be restored later.
+	//string $OldnewFileName = `optionVar -q "newFileName"`;
+
+	// get the option var flag value so it can be restored later
+	//int $OldnewFileEnabled = `optionVar -q "newFileEnabled"`;
+
+	string $newFile = "";
+	
+	switch ($which){
+		case "empty":
+			$newFile = "//MONKEY/Resources/maya/sceneTemplates/newEmpty.ma";
+		case "hd24fps":
+			$newFile = "//MONKEY/Resources/maya/sceneTemplates/newHD24fps.ma";
+			break;
+		case "sd24fps":
+			$newFile = "//MONKEY/Resources/maya/sceneTemplates/newSD24fps.ma";
+			break;
+		case "rig":
+			$newFile = "//MONKEY/Resources/maya/sceneTemplates/newRigEmpty.ma";
+			break;	
+		default: 
+			break;
+	}
+
+
+	print ("$newFile ="+$newFile+"\n");
+	if ($newFile != ""){
+		//optionVar -intValue "newFileEnabled" 1;
+		//optionVar -stringValue "newFileName" $newFile;
+	}
+	else {
+		//warning ("Could not resolve new scene type. Reverting to default new scene")
+		//optionVar -intValue "newFileEnabled" 0;
+	}
+
+
+	ppPerformNewScene $newFile;
+	//string $tmpCmd = "ppPerformNewScene 0 ";
+	//addToRecentCommandQueue $tmpCmd "New Panda Panther Scene";
+
+
+	// restore option var to their previous settings
+	//optionVar -intValue "newFileEnabled" $OldnewFileEnabled;
+	//optionVar -stringValue "newFileName" $OldnewFileName;
+}
+
+
+
+
+
+
+global proc ppPerformNewScene (string $fileToOpen) {
+
+	checkForUnknownNodes();
+	$result = saveChanges("file -f -new");
+	if ($result){
+		
+
+		$fileId= `fopen $fileToOpen "r"`;
+		string $nextLine = `fgetline $fileId`;
+
+		string $cmd = $nextLine;
+
+		if (`gmatch $cmd "*;\n"`){
+			catchQuiet(evalEcho($cmd));
+			$cmd = "";
+		}
+		
+		while ( size( $nextLine ) > 0 ) {
+			$nextLine = `fgetline $fileId`;
+			$cmd += $nextLine;
+			if (`gmatch $nextLine "*;\n"`){
+				catchQuiet(evalEcho($cmd));
+				$cmd = "";
+			}
+
+		}
+		fclose $fileId;
+		//if (catch(evalEcho($cmd)) == 0){
+		//	//evalEcho($cmd);
+		//}
+
+		select -cl;
+
+		// run scene config scripts to set frame ranges etc.
+		if (`objExists sceneConfigurationScriptNode`)
+			scriptNode -executeBefore sceneConfigurationScriptNode;
+		if (`objExists uiConfigurationScriptNode`)
+			scriptNode -executeBefore uiConfigurationScriptNode;
+
+	}
+}

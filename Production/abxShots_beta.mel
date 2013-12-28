@@ -1,0 +1,2768 @@
+
+// Shot Manager
+// abxShots.mel
+//
+// Version 0.8
+// Created by J. Adam Burke adam@adamburke.net
+// Modified : 2 Nov 2011
+
+// DESCRIPTION:
+// Shot Manager is a Scene File management system for shot-specific scene files such as animation scenes, layout, lighting, and fx.
+
+// USAGE:
+// Source script and call "abxShots;"
+// assign to shelf or hotkey as preferred
+
+
+// ©2011 J. Adam Burke 
+// http://www.adamburke.net
+
+// KNOWN ISSUES
+// 1. the scene lister assumes files are .ma and tries to open .ma. it should look for both and show the latest in either .ma or .mb
+
+
+// TODO
+// 1. fix the .ma scene file issue above
+// 2. add support for scenes
+
+
+
+
+global proc abxShots () {
+
+
+	if (!`window -exists abxShotsWindow`){
+		window -t "Shot Manager" -width 500 -height 300 -menuBar true abxShotsWindow;
+
+		menu -label "File" -tearOff 1;
+			menuItem -en 0 -label "New Scene";
+			menuItem -label "Incremental Save" -c "abxShotsIncrementalSave \"auto\" \"\" \"\"";
+			menuItem -label "Auto Master Scene" -c "abxShotsMaster \"auto\" \"\" \"\"";
+			menuItem -divider 1;
+			menuItem -label "Close" -c "window -e -vis 0 abxShotsWindow";
+
+		menu -label "Project" -tearOff 1;
+			menuItem -label "Set Project" -c "if (`exists abxProject`==0) source \"//MONKEY/Resources/Maya/scripts/Toolbox/Pipeline/abxProject.mel\";if (`exists abxProject`) abxProject"; 
+			menuItem -label "Asset Manager" -c "if (`exists abxAssets`==0) source \"//MONKEY/Resources/Maya/scripts/Toolbox/Pipeline/abxAssets.mel\";if (`exists abxAssets`) abxAssets";
+
+
+			setParent -menu ..;
+		menu -label "Create" -tearOff 1;
+			menuItem -en 1 -label "New Shot..." -c "abxShotsShowNewShotUI `tabLayout -q -st abxShotsListTabLyt`" ;
+			menuItem -en 0 -label "New Sequence...";
+
+		menu -label "View" -tearOff 1;
+			menuItem -en 1 -label "Refresh" -c "abxShotsPopulateList \"_ALL_SHOTS\" abxShotsList;abxShotsPopulateList \"_PREVIS\" abxPrevisList;abxShotsShowLatestShot `file -q -sn`";
+
+		menu -label "Help";
+			menuItem -l "PandaPanther Wiki" -c "system \"start \\\"C:/Program Files (x86)/Mozilla Firefox/firefox.exe\\\" \\\"http://wiki.pandapanther.com/groups/pandapantherproductionwiki/wiki/4c330/Shot_Manager.html\\\"\"";
+
+		formLayout abxShotsWindowMainForm;
+
+		
+		paneLayout -configuration "vertical2" abxShotsMainPane;
+		tabLayout -imw 0 -imh 0 -cc "abxShotsListTabChange"  abxShotsListTabLyt;
+		formLayout -p abxShotsListTabLyt abxPrevisLibForm;
+		formLayout -p abxShotsListTabLyt abxShotsLibForm;
+		
+		
+		formLayout -p abxShotsMainPane abxShotsDetailsForm;
+
+
+		setParent abxPrevisLibForm;
+
+		string $previsLister = `treeView -elc abxShotsEditShotLabelCB -numberOfButtons 1 -abr true -enk true -sc "abxShotsSetActiveShot " -cmc "abxShotsUpdateMenu" abxPrevisList`;
+		//string $pMenu = `popupMenu -parent $shotLister abxShotsPopupMenu`;
+
+		setParent abxShotsLibForm;
+
+		string $shotLister = `treeView -elc abxShotsEditShotLabelCB -numberOfButtons 3 -abr true -enk true -sc "abxShotsSetActiveShot " -cmc "abxShotsUpdateMenu" abxShotsList`;
+		string $pMenu = `popupMenu -parent $shotLister abxShotsPopupMenu`;		
+
+		abxShotsBuildMenu  $shotLister;
+
+		abxShotsPopulateList "_PREVIS" "abxPrevisList";
+		abxShotsPopulateList "_ALL_SHOTS" "abxShotsList";
+
+		formLayout -e
+        		-af abxShotsMainPane top 0
+        		-af abxShotsMainPane left 0
+        		-af abxShotsMainPane bottom 0
+        		-af abxShotsMainPane right 0
+        		abxShotsWindowMainForm;
+
+		formLayout -e 
+			-af $previsLister left 2
+			-af $previsLister top 2
+			-af $previsLister right 0
+			-af $previsLister bottom 2
+			abxPrevisLibForm;
+
+		formLayout -e 
+			-af $shotLister left 2
+			-af $shotLister top 2
+			-af $shotLister right 0
+			-af $shotLister bottom 2
+			abxShotsLibForm;
+
+
+		tabLayout -e 
+			-tabLabel abxPrevisLibForm "_PREVIS"
+			-tabLabel abxShotsLibForm "_ALL_SHOTS"
+			abxShotsListTabLyt;
+
+		tabLayout -e -sti 2 abxShotsListTabLyt;
+		
+		paneLayout -e -paneSize 1 35 100 abxShotsMainPane;
+
+		abxShotsCreateDetailUI;
+		
+		evalDeferred ("abxShotsShowLatestShot `file -q -sn`");
+		showWindow abxShotsWindow;
+	}
+
+	else {
+
+		showWindow abxShotsWindow;
+	}
+
+
+}
+
+// this procedure looks at the latest shot (either currently open shot or the last opened file)
+// and tries to automatically select the shot in the shot manager
+global proc abxShotsShowLatestShot (string $sceneFilePath) {
+	
+	string $currentScene = $sceneFilePath;
+	
+	string $shotNameGuess = "";
+	string $shotTakeGuess = "";
+	string $shotDeptGuess = "";
+	string $shotSubDeptGuess = "";
+	string $shotSequenceGuess = "";
+	string $shotFolderGuess = "";
+	string $extension = `fileExtension $currentScene`;
+	string $currentSceneName = `basenameEx $currentScene`;
+	
+	string $tokenBuffer[];
+	tokenize $currentScene "/" $tokenBuffer;
+	if (size($tokenBuffer) > 1){
+		$subDeptGuess = $tokenBuffer[size($tokenBuffer)-2];
+		if (size($tokenBuffer) > 2 ) {
+			$shotDeptGuess = tolower($tokenBuffer[size($tokenBuffer)-3]);
+			if (size($tokenBuffer) > 3 ) {
+				$shotNameGuess = $tokenBuffer[size($tokenBuffer)-4];
+				if (size($tokenBuffer) > 4){
+					if ($tokenBuffer[size($tokenBuffer)-5] != "_ALL_SHOTS" && $tokenBuffer[size($tokenBuffer)-5] != "_PREVIS"){
+						$shotSequenceGuess = $tokenBuffer[size($tokenBuffer)-5];
+						if ($tokenBuffer[size($tokenBuffer)-6] == "_ALL_SHOTS" || $tokenBuffer[size($tokenBuffer)-6] == "_PREVIS" ){
+							$shotFolderGuess = $tokenBuffer[size($tokenBuffer)-6];
+						}	
+					}
+					else{
+						$shotFolderGuess = $tokenBuffer[size($tokenBuffer)-5];
+					}
+				}
+			}
+		}
+	}
+	string $listViewName = "";
+	if ($shotFolderGuess == "_PREVIS"){
+		// set the shot list view tab to the _PREVIS tab
+		tabLayout -e -st "abxPrevisLibForm"  abxShotsListTabLyt;
+		$listViewName = "abxPrevisList";
+	}
+	else if ($shotFolderGuess == "_ALL_SHOTS"){
+		tabLayout -e -st "abxShotsLibForm"  abxShotsListTabLyt;
+		$listViewName = "abxShotsList";
+	}
+	else {
+		// try the last selected file instead
+		return;
+	}
+	
+	print ("shotSeq="+$shotSequenceGuess+" shotNameGuess="+$shotNameGuess+"\n");
+	print ("listViewName="+$listViewName+"\n");
+	if (`treeView -q -ex $listViewName`){
+		print ("listViewExists\n");
+		if ($shotSequenceGuess == ""){
+			// for the current selected view select the shotName guess
+			if (`treeView -q -itemExists $shotNameGuess $listViewName`){
+				treeView -e -selectItem $shotNameGuess 1 $listViewName;
+				abxShotsSetActiveShot $shotNameGuess 1; 
+			}
+		}
+		else{
+			// for the current shot folder list, expand the sequence and select the seqName/shotname item as selected
+			if (`treeView -q -itemExists ($shotSequenceGuess+"/"+$shotNameGuess) $listViewName`){
+				treeView -e -expandItem $shotSequenceGuess 1 $listViewName;
+				treeView -e -selectItem ($shotSequenceGuess+"/"+$shotNameGuess) 1 $listViewName;
+				abxShotsSetActiveShot ($shotSequenceGuess+"/"+$shotNameGuess) 1; 
+				evalDeferred ("abxShotsListTabChange ;");
+			}
+		}
+	}
+}
+
+// intelligently sorts an array alphabetically with numbers handled seperately
+global proc string[] abxShotsNumericalSort (string $inArray[]) {
+
+	//string $workArray[];
+	string $result[];
+	
+	//for ($i=0;$i<size($inArray);$i++){
+		// stringArrayInsertAtIndex(int $index, string[] $list, string $item)
+		// strcmp string string
+
+	//}
+	return $result;
+	
+}	
+
+global proc abxShotsListTabChange () {
+	if (`tabLayout -q -st abxShotsListTabLyt` == "abxPrevisLibForm"){
+		if (`formLayout -q -exists abxShotsPreFrmLyt`){
+			formLayout -e -en 1 abxShotsPreFrmLyt;
+			formLayout -e -en 0 abxShotsAnmFrmLyt;
+			formLayout -e -en 0 abxShotsFxFrmLyt;
+			formLayout -e -en 0 abxShotsLgtFrmLyt;
+			tabLayout -e -st abxShotsPreFrmLyt abxShotsDeptTabLyt;
+		}
+	}
+	else {
+		if (`formLayout -q -exists abxShotsPreFrmLyt`){
+			formLayout -e -en 0 abxShotsPreFrmLyt;
+			formLayout -e -en 1 abxShotsAnmFrmLyt;
+			formLayout -e -en 1 abxShotsFxFrmLyt;
+			formLayout -e -en 1 abxShotsLgtFrmLyt;
+			tabLayout -e -st abxShotsAnmFrmLyt abxShotsDeptTabLyt;
+		}
+	}
+}
+
+global proc abxShotsPopulateList (string $shotFolder, string $listControl) {
+
+	treeView -e -ra $listControl;
+
+	string $projectPath = `workspace -q -rd`;
+	string $shotsFolder[] = `getFileList -folder ($projectPath+"/scenes/"+$shotFolder+"/")`;
+
+	string $sorted[] = sort($shotsFolder);
+	//string $sorted[] = abxShotsSort($shotsFolder);
+
+	for ($each in $sorted){
+
+		if (`filetest -d ($projectPath+"/scenes/"+$shotFolder+"/"+$each+"/")`){
+		
+				
+				//textScrollList -e -append $each $listControl;
+			if ($each != ".DS_Store"){
+				
+				// determine if it is a scene subfolder
+				string $subFolders[] = `getFileList -folder ($projectPath+"/scenes/"+$shotFolder+"/"+$each+"/")`;
+				string $sortedSub[] = sort($subFolders);
+
+				int $isShotFolder = 0;
+				for ($every in $sortedSub){
+					if ($isShotFolder == 0){
+						if  ($every == "ANM" || $every == "LGT" || $every == "FX"){
+							$isShotFolder = 1;
+						}
+					}
+					else {
+						break;
+					}
+				}
+
+				if ($isShotFolder == 0){
+					treeView -e -hb -addItem $each "" $listControl;
+					treeView -e -ei $each 0 $listControl;
+
+
+					//treeView -e -bti $each 1 "A" -bti $each 2 "F" -bti $each 3 "L" $listControl;
+					for ($every in $sortedSub){
+						if (`filetest -d ($projectPath+"/scenes/"+$shotFolder+"/"+$each+"/"+$every)`){
+							$fullname = ($each+"/"+$every);
+							treeView -e -addItem $fullname $each $listControl;
+						
+						
+							if ($shotFolder == "_PREVIS"){
+								treeView -e -bti $fullname 1 "P" -textColor $fullname .3 .9 .4 $listControl;
+							}
+							else {
+								treeView -e -bti $fullname 1 "A" -bti $fullname 2 "F" -bti $fullname 3 "L" $listControl;
+							}
+							treeView -e -displayLabel $fullname $every $listControl;
+							//treeView -e -or $fullname 1 0 5 $listControl;
+							//treeView -e -bto $fullname 1 true -bto $fullname 2 true -bto $fullname 3 true $listControl;
+							//treeView -e -btc $fullname 1 .3 .7 .4 -btc $fullname 2 .7 .5 .3 -btc $fullname 3 .7 .3 .3 $listControl;
+						}
+					}
+				}
+				else {
+					treeView -e -addItem $each "" $listControl;
+					treeView -e -bti $each 1 "A" -bti $each 2 "F" -bti $each 3 "L" $listControl;
+					//treeView -e -or $each 1 0 5 $listControl;
+					//treeView -e -bto $each 1 true -bto $each 2 true -bto $each 3 true $listControl;
+					//treeView -e -btc $each 1 .3 .7 .4 -btc $each 2 .7 .5 .3 -btc $each 3 .7 .3 .3 $listControl;
+
+				}
+				if ($shotFolder == "_PREVIS"){
+					treeView -e -textColor $each .3 .9 .4 $listControl;
+				}
+			}
+		}	
+	}
+	if (size($sorted) > 0){
+		string $sceneName = basenameEx(`file -q -sn`);
+		string $sceneShotName = `abxShotsGetSceneShotName $sceneName` ;
+		if (stringArrayContains($sceneShotName,$sorted)){
+			evalDeferred("treeView -e -si \""+$sceneShotName+"\" 1 "+$listControl+";abxShotsSetActiveShot \""+$sceneShotName+"\" 1");
+		}
+		else {
+			//evalDeferred("treeView -e -si \""+$sorted[0]+"\" 1 "+$listControl+";abxShotsSetActiveShot \""+$sorted[0]+"\" 1");
+		}
+		
+	}
+
+}
+
+global proc int abxShotsUpdateMenu (string $itemName) {
+	treeView -e -cs abxShotsList;
+	treeView -e -si $itemName 1 abxShotsList;
+	menuItem -e -label $itemName abxShotsPopupMenuItemTitle;
+
+	return true;
+
+}
+
+global proc string abxShotsEditShotLabelCB (string $oldName, string $newName){
+		
+	print "Shame on you! So you were just gonna rename a whole shot? just like that?\n";
+	return "";
+}
+
+global proc abxShotsBuildMenu (string $shotLister) {
+
+	// delete the current popup menu items
+	string $popupMenus[] = `treeView -q -pma $shotLister`;
+	for ($each in $popupMenus){
+			menuItem -parent $each -label "Shot Label" abxShotsPopupMenuItemTitle;
+
+			//menuItem -parent $each -divider 1;
+			//menuItem -parent $each -label "====ANM====";
+			//menuItem -parent $each -divider 1;
+			//menuItem -parent $each -label "  Open Anm Work Scene" -c "abxShotsCtxMCmd(\"open anm work\");";
+			//menuItem -parent $each -label "  Open Anm Master Scene" -c "abxShotsCtxMCmd(\"open anm master\");";
+			//menuItem -parent $each -label "  Save Anm Work Scene" -c "abxShotsCtxMCmd(\"save anm work\")";
+			//menuItem -parent $each -label "  Commit Anm Master Scene" -c "abxShotsCtxMCmd(\"save anm master\")";
+			//menuItem -parent $each -divider 1;
+			//menuItem -parent $each -label "====Rig====";
+			//menuItem -parent $each -divider 1;
+			//menuItem -parent $each -label "  Ref Anm Master" -c "abxShotsCtxMCmd(\"refanm asset\")";
+			//menuItem -parent $each -label "  Open LGT Work Scene" -c "abxShotsCtxMCmd(\"open lgt work\");";;
+			//menuItem -parent $each -label "  Open LGT Master Scene" -c "abxShotsCtxMCmd(\"open lgt master\");";;
+			//menuItem -parent $each -label "  Save LGT Work Scene" -c "abxShotsCtxMCmd(\"save lgt work\")";
+			//menuItem -parent $each -label "  Commit LGT Master Scene" -c "abxShotsCtxMCmd(\"save lgt master\")";
+
+			menuItem -parent $each -divider 1;
+			menuItem -parent $each -label "Capture Thumbnail" -c "abxShotsCtxMCmd(\"captureThumb\")";
+			menuItem -parent $each -divider 1;
+			menuItem -parent $each -label "Browse Shot" -c "abxShotsCtxMCmd(\"browse\")";
+	}
+}
+
+// executes commands from the popup menu while making sure they are applied to the correct asset
+global proc abxShotsCtxMCmd(string $command){
+	
+	$assetPath = `menuItem -q -label abxShotsPopupMenuItemTitle`;
+
+	//$shotName = `treeListView`;
+	//$dept = ``;
+	
+
+	switch ($command){
+	case "open geo work":
+		//abxShotsOpenWorkScene(($assetPath+"/geo") , "latest");
+		break;
+	case "open geo master":
+		//abxShotsOpenMasterScene($assetPath+"/geo");
+		break;
+	case "open rig work":
+		//abxShotsOpenWorkScene(($assetPath+"/rig") , "latest");
+		break;
+	case "open rig master":
+		//abxShotsOpenMasterScene($assetPath+"/rig");
+		break;
+	case "save anm work":
+			// get the selected 
+			//abxShotsIncrementalSave($shotName, $dept, $takeName)
+		break;
+	case "save rig master":
+		//abxAssetsMaster(($assetPath+"/rig"));
+		break;
+	case "save geo work":
+		//abxAssetsIncrementalSave(($assetPath+"/geo"));
+		break;
+	case "save geo master":
+		//abxAssetsMaster(($assetPath+"/geo"));
+		break;
+	case "publish":
+		//abxAssetsPublish($assetPath);
+		break;
+	case "ref asset":
+		//abxAssetsRefAsset($assetPath);
+		break;
+	case "refanm":
+		//abxAssetsRefGeo($assetPath);
+		break;
+
+	case "captureThumb":
+		abxShotsCaptureThumbnail ($assetPath);
+		break;
+	case "browse":
+		abxShotsBrowseShot ($assetPath);
+		break;
+	}
+	
+	
+}
+
+
+
+global proc int abxShotsSetActiveShot (string $shotName, int $state) {
+
+	//treeView -e -cs abxShotsList;
+	//treeView -e -si $shotName 1  abxShotsList;
+	if ($state == 1){
+	abxShotsRefreshDetailsUI $shotName;
+	print ("set shot to "+$shotName+"\n");
+	}
+	return 1;
+
+}
+
+global proc abxShotsCreateDetailUI (){
+	
+	setParent abxShotsDetailsForm;
+
+	formLayout abxShotSpecLyt;
+		columnLayout -cat "both" 0 -adj 1 abxShotsDtlColLyt;
+		frameLayout -cll 1 -bs "etchedIn" -l "Shot Details";
+		
+		rowLayout -numberOfColumns 2 -rat 2 "top" 0;
+		frameLayout -lv 0 abxShotsDetailImgFrmLyt;
+			image -h 100 -w 177 -i "//MONKEY/resources/maya/scripts/production/resources/shotThumb.png" abxShotsDetailImg;
+			popupMenu;
+				menuItem -label "Capture Thumbnail" -c "abxShotsCaptureThumbnail \"\"";
+		setParent..;
+		columnLayout;
+			textFieldGrp -cw 1 80 -cw 2 122 -adj 2 -label "Shot Name:" -text  "" -editable false abxShotsDtlShotName;
+			textFieldGrp -cw 1 80 -cw 2 122 -adj 2 -label "Resolution:" -text  "" -editable false abxShotsDtlRes;
+			textFieldGrp -cw 1 80 -cw 2 122 -adj 2 -label "Frame Rate:" -text  "" -editable false abxShotsDtlFPS;
+			floatFieldGrp -en1 0 -en2 0 -cw 1 80 -cw 2 50 -cw 3 50 -nf 2 -label "Start/End:" -v1 0 -v2 0 abxShotsDtlRange;
+			setParent..;
+		setParent..;
+		setParent..;
+		separator -h 5 -style "none";
+		frameLayout -cll 1 -bs "etchedIn" -l "Camera Details";
+		columnLayout;
+			
+			rowLayout -numberOfColumns 2;
+
+				columnLayout;
+					textFieldGrp -cw 1 100 -cw 2 150 -label "Cam Version:" -editable false -text "" abxShotsDtlCamScene;
+					textFieldGrp -cw 1 100 -cw 2 150 -label "Date:" -editable false -text "" abxShotsDtlCamDate;
+					setParent..;
+				columnLayout -cat "both" 0 -adj 1;
+					button -w 140 -label "Reference Cam ->" -c "abxShotsCameraReference \"\"";
+					rowLayout -numberOfColumns 2;
+						button -w 70 -label "Edit Cam" -c "abxShotsCameraMakeEditable";
+						button -w 70 -label "Master Cam" -c "abxShotsCameraMaster `ls -type camera -r 1 \"*renderCamShape\"`";
+						setParent..;
+					setParent..;					
+
+			
+			
+
+	setParent abxShotsDetailsForm;
+
+	tabLayout -imw 0 -imh 0 -cc "abxShotsDeptTabChange;"  abxShotsDeptTabLyt;
+
+
+
+	formLayout -e 
+		-af abxShotSpecLyt "left" 0
+		-af abxShotSpecLyt "top" 0
+		-af abxShotSpecLyt "right" 0
+		-ac abxShotSpecLyt "bottom" 0 abxShotsDeptTabLyt 
+		-af abxShotsDeptTabLyt "left" 0 
+		-ap abxShotsDeptTabLyt "top" 0 50 
+		-af abxShotsDeptTabLyt "right" 0 
+		-af abxShotsDeptTabLyt "bottom" 0 
+		abxShotsDetailsForm;
+
+	formLayout -e
+		-af abxShotsDtlColLyt "left" 0
+		-af abxShotsDtlColLyt "top" 0
+		-af abxShotsDtlColLyt "right" 0
+		-af abxShotsDtlColLyt "bottom" 0
+		abxShotSpecLyt;
+
+		
+	// commands
+		formLayout abxShotsPreFrmLyt;
+			//rowLayout -numberOfColumns 2 -adj 2 -ct2 "both" "both" -rat 2 "both" 0;
+				columnLayout abxShotsPreListBtnCol;;
+					button -label "New" -ann "Create new take scene" -w 60 -c abxShotsCreateTakeProc;
+					button -label "Open" -w 60 -c "abxShotsOpenTake abxShotsPreScnList";
+					button -label "Save" -w 60 -c "abxShotsIncrementalSave \"auto\" \"\" \"\";abxShotsDeptTabChange;";
+					separator -h 20;
+					button -ann "Reference selected scene into current scene" -en 1 -label "Reference" -w 60 -c "abxShotsReferenceMaster abxShotsPreScnList";
+					separator -h 20;
+					button -en 1 -ann "Master latest work scene"-label "Master" -w 60 -c "abxShotsMasterTake abxShotsPreScnList";
+
+					setParent ..;					
+				
+					textScrollList -dcc "abxShotsOpenTake abxShotsPreScnList" abxShotsPreScnList;
+					popupMenu -pmc "abxShotsUpdateTakeMenu Pre" abxShotsPrePUMenu;
+					menuItem -label ("Dept:"+"TakeName") abxShotsPreMenuItemTitle;
+					menuItem -divider 1;
+					menuItem -en 0 -label "Open Work Scene" -c "abxShotsCtxMCmd(\"open pre work\");";
+					menuItem -en 0 -label "Incremental Save" -c "abxShotsCtxMCmd(\"save pre work\")";
+					menuItem -divider 1;
+					menuItem -en 0  -label "Commit Master Scene" -c "abxShotsCtxMCmd(\"save pre master\")";
+					menuItem -en 0 -label "Open Master Scene" -c "abxShotsCtxMCmd(\"open pre master\");";
+
+					setParent ..;
+		formLayout -e 
+			-af abxShotsPreScnList "left" 70
+			-af abxShotsPreScnList "top" 3
+			-af abxShotsPreScnList "bottom" 3
+			-af abxShotsPreScnList "right" 3
+
+			-af abxShotsPreListBtnCol "left" 3
+			-af abxShotsPreListBtnCol "top" 3
+ 
+			abxShotsPreFrmLyt;
+		setParent abxShotsDeptTabLyt;
+
+
+		formLayout  abxShotsAnmFrmLyt;
+			//rowLayout -numberOfColumns 2 -adj 2 -ct2 "both" "both" -rat 2 "both" 0;
+				columnLayout abxShotsAnmListBtnCol;
+					button -label "New" -ann "Create new take scene" -w 60 -c abxShotsCreateTakeProc;
+					button -label "Open" -w 60 -c "abxShotsOpenTake abxShotsAnmScnList";
+					button -label "Save" -w 60 -c "abxShotsIncrementalSave \"auto\" \"\" \"\";abxShotsDeptTabChange;";
+					separator -h 20;
+					button -ann "Reference selected scene into current scene" -en 1 -label "Reference" -w 60 -c "abxShotsReferenceMaster abxShotsAnmScnList";
+					separator -h 20;
+					button -en 1 -ann "Master latest work scene"-label "Master" -w 60 -c "abxShotsMasterTake abxShotsAnmScnList";
+
+					setParent ..;					
+				
+				textScrollList -dcc "abxShotsOpenTake abxShotsAnmScnList" abxShotsAnmScnList;
+				popupMenu -pmc "abxShotsUpdateTakeMenu Anm" abxShotsAnmPUMenu;
+				menuItem -label ("Dept:"+"TakeName") abxShotsAnmMenuItemTitle;
+				menuItem -divider 1;
+				menuItem -en 0 -label "Open Scene" -c "abxShotsCtxMCmd(\"open anm work\");";
+				menuItem -en 0 -label "Incremental Save" -c "abxShotsCtxMCmd(\"save anm work\")";
+				menuItem -divider 1;
+
+				menuItem -en 0 -label "Master Scene" -c "abxShotsCtxMCmd(\"save anm master\")";
+				menuItem -en 0 -label "Open Master" -c "abxShotsCtxMCmd(\"open anm master\");";
+				menuItem -divider 1;
+			
+				menuItem -en 0 -label "Reference Master" ;
+				menuItem -divider 1;
+				menuItem -en 0 -label "Archive and Remove" -c "abxShotsCtxMCmd(\"archive anm work\")";
+
+			setParent ..;
+		formLayout -e 
+			-af abxShotsAnmScnList "left" 70
+			-af abxShotsAnmScnList "top" 3
+			-af abxShotsAnmScnList "bottom" 3
+			-af abxShotsAnmScnList "right" 3
+
+			-af abxShotsAnmListBtnCol "left" 3
+			-af abxShotsAnmListBtnCol "top" 3
+ 
+			abxShotsAnmFrmLyt;
+		setParent abxShotsDeptTabLyt;
+
+		// FX
+		formLayout abxShotsFxFrmLyt;
+			//rowLayout -numberOfColumns 2 -adj 2 -ct2 "both" "both" -rat 2 "both" 0;
+				columnLayout abxShotsFxListBtnCol;
+					button -label "New" -ann "Create new take scene" -w 60 -c abxShotsCreateTakeProc;
+					button -label "Open" -w 60 -c "abxShotsOpenTake abxShotsFxScnList";
+					button -label "Save" -w 60 -c "abxShotsIncrementalSave \"auto\" \"\" \"\";abxShotsDeptTabChange;";
+					separator -h 20;
+					button -ann "Reference selected scene into current scene" -en 1 -label "Reference" -w 60 -c "abxShotsReferenceMaster abxShotsFXScnList";
+					separator -h 20;
+					button -en 1 -ann "Master latest work scene"-label "Master" -w 60 -c "abxShotsMasterTake abxShotsFxScnList";
+
+					setParent ..;	
+
+									
+				
+					textScrollList -dcc "abxShotsOpenTake abxShotsFxScnList" abxShotsFxScnList;
+					popupMenu -pmc "abxShotsUpdateTakeMenu Fx" abxShotsFxPUMenu;
+					menuItem -en 0 -label ("Dept:"+"TakeName") abxShotsFxMenuItemTitle;
+					menuItem -divider 1;
+					menuItem -en 0 -label "Open Work Scene" -c "abxShotsCtxMCmd(\"open fx work\");";
+					menuItem -en 0 -label "Incremental Save" -c "abxShotsCtxMCmd(\"save fx work\")";
+					menuItem -divider 1;
+					menuItem -en 0 -label "Commit Master Scene" -c "abxShotsCtxMCmd(\"save fx master\")";
+					menuItem -en 0 -label "Open Master Scene" -c "abxShotsCtxMCmd(\"open fx master\");";
+
+					setParent ..;
+		formLayout -e 
+			-af abxShotsFxScnList "left" 70
+			-af abxShotsFxScnList "top" 3
+			-af abxShotsFxScnList "bottom" 3
+			-af abxShotsFxScnList "right" 3
+
+			-af abxShotsFxListBtnCol "left" 3
+			-af abxShotsFxListBtnCol "top" 3
+ 
+			abxShotsFxFrmLyt;
+		setParent abxShotsDeptTabLyt;
+
+		// lgt
+		formLayout abxShotsLgtFrmLyt;
+			//rowLayout -numberOfColumns 2 -adj 2 -ct2 "both" "both" -rat 2 "both" 0;
+				columnLayout abxShotsLgtListBtnCol;;
+					button -label "New" -ann "Create new take scene" -w 60 -c abxShotsCreateTakeProc;
+					button -label "Open" -w 60 -c "abxShotsOpenTake abxShotsLgtScnList";
+					button -label "Save" -w 60 -c "abxShotsIncrementalSave \"auto\" \"\" \"\";abxShotsDeptTabChange;";
+					separator -h 20;
+					button -ann "Reference selected scene into current scene" -en 1 -label "Reference" -w 60 -c "abxShotsReferenceMaster abxShotsLgtScnList";
+					separator -h 20;
+					button -en 1 -ann "Master latest work scene"-label "Master" -w 60 -c "abxShotsMasterTake abxShotsLgtScnList";
+
+					setParent ..;					
+				
+					textScrollList -dcc "abxShotsOpenTake abxShotsLgtScnList" abxShotsLgtScnList;
+					popupMenu -pmc "abxShotsUpdateTakeMenu Lgt" abxShotsLgtPUMenu;
+					menuItem -label ("Dept:"+"TakeName") abxShotsLgtMenuItemTitle;
+					menuItem -divider 1;
+					menuItem -en 0 -label "Open Work Scene" -c "abxShotsCtxMCmd(\"open lgt work\");";
+					menuItem -en 0 -label "Incremental Save" -c "abxShotsCtxMCmd(\"save lgt work\")";
+					menuItem -divider 1;
+					menuItem -en 0  -label "Commit Master Scene" -c "abxShotsCtxMCmd(\"save lgt master\")";
+					menuItem -en 0 -label "Open Master Scene" -c "abxShotsCtxMCmd(\"open lgt master\");";
+
+					setParent ..;
+		formLayout -e 
+			-af abxShotsLgtScnList "left" 70
+			-af abxShotsLgtScnList "top" 3
+			-af abxShotsLgtScnList "bottom" 3
+			-af abxShotsLgtScnList "right" 3
+
+			-af abxShotsLgtListBtnCol "left" 3
+			-af abxShotsLgtListBtnCol "top" 3
+ 
+			abxShotsLgtFrmLyt;
+		setParent abxShotsDeptTabLyt;
+
+
+
+
+
+
+		tabLayout -e 
+			-tabLabel abxShotsAnmFrmLyt "ANM"
+			-tabLabel abxShotsFxFrmLyt "FX"
+			-tabLabel abxShotsLgtFrmLyt "LGT"
+			-tabLabel abxShotsPreFrmLyt "PRE"
+			 abxShotsDeptTabLyt;
+
+		// set the ANM department tab to current
+		tabLayout -e -st abxShotsAnmFrmLyt abxShotsDeptTabLyt;
+		// initially set the previs tab to disabled
+		formLayout -e -en 0 abxShotsPreFrmLyt;
+
+}
+
+global proc abxShotsDeptTabChange () {
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+	// get the selected shot
+	if (`treeView -exists abxShotsList`){
+		string $shotName[];
+		if ($shotFolder == "_PREVIS")
+			$shotName = `treeView -q -si abxPrevisList`;
+		else 
+			$shotName = `treeView -q -si abxShotsList`;
+
+		// refresh the details UI
+		abxShotsRefreshDetailsUI $shotName[0];
+	}
+
+}
+
+global proc string abxShotsGetShortName (string $shotName){
+	
+	string $tokenBuffer[];
+	tokenize $shotName "/" $tokenBuffer;
+	string $result = $shotName;
+	if (size($tokenBuffer) > 1)
+		$result = $tokenBuffer[1];
+
+	return $result;
+}
+
+global proc string abxShotsGetActiveShotFolder () {
+	string $tabName = `tabLayout -q -st abxShotsListTabLyt`;
+	string $result;
+	if ($tabName == "abxPrevisLibForm")
+		$result = "_PREVIS";
+	else if ($tabName == "abxShotsLibForm")
+		$result = "_ALL_SHOTS";
+	return $result;
+
+}
+
+global proc string abxShotsGetActiveDeptTab (){
+	string $dept = `tabLayout -q -st abxShotsDeptTabLyt`;
+	if ($dept == "abxShotsAnmFrmLyt")
+		$dept = "anm";
+	else if ($dept == "abxShotsFxFrmLyt")
+		$dept = "fx";
+	else if ($dept == "abxShotsLgtFrmLyt")
+		$dept = "lgt";
+	else if ($dept == "abxShotsPreFrmLyt")
+		$dept = "pre";
+	return $dept;
+}
+
+global proc abxShotsRefreshDetailsUI (string $shotName){
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+
+	
+	string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+	// load current details
+	string $shotDetails[] = abxShotsGetShotDetails($shotName);
+
+	$shotFileName = `abxShotsGetShortName $shotName`;
+	
+	
+	// get active tab to determine which dept to show
+	string $dept = `abxShotsGetActiveDeptTab`;
+	
+
+
+	//print ("department is "+$dept+"\n");
+
+	string $shotsFolder[] = `getFileList -folder ($shotsPath+$shotFileName+"/"+toupper($dept)+"/work/")`;
+
+	string $shotImg = ($shotsPath+$shotName+"/"+$shotFileName+".png");
+	if (`filetest -r $shotImg`){
+		image -e -image $shotImg abxShotsDetailImg;
+	}
+	else {
+		//\\MONKEY\resources\maya\scripts\production\resources
+		image -e -i "//MONKEY/resources/maya/scripts/production/resources/shotThumb.png" abxShotsDetailImg;
+	}
+
+	textFieldGrp -e -text $shotName abxShotsDtlShotName;
+	textFieldGrp -e -text  $shotDetails[1] -editable false abxShotsDtlFPS;
+	textFieldGrp -e -text  $shotDetails[0] abxShotsDtlRes;
+	int $start;
+	int $end;
+	if ($shotDetails[2] != "")
+		$start = $shotDetails[2];
+	if ($shotDetails[3] != "")
+		$end = $shotDetails[3];
+
+	floatFieldGrp -e -v1 $start -v2 $end abxShotsDtlRange;
+
+	textFieldGrp -e -text $shotDetails[4] abxShotsDtlCamScene;
+	textFieldGrp -e -text $shotDetails[5] abxShotsDtlCamDate;
+
+	// clear the text scroll lists before populating
+	textScrollList -e -ra abxShotsAnmScnList;
+	textScrollList -e -ra abxShotsFxScnList;
+	textScrollList -e -ra abxShotsLgtScnList;
+	textScrollList -e -ra abxShotsPreScnList;
+
+	string $sorted[] = sort(`abxShotsGetScenes $shotName $dept`);
+	//print $sorted;
+	string $each = "";
+	for ($each in $sorted){
+		if ($dept == "anm")
+			textScrollList -e -append $each abxShotsAnmScnList;
+		else if ($dept == "fx")
+			textScrollList -e -append $each abxShotsFxScnList;
+		else if ($dept == "lgt")
+			textScrollList -e -append $each abxShotsLgtScnList;
+		else if ($dept == "pre")
+			textScrollList -e -append $each abxShotsPreScnList;
+ 
+	}
+	
+	// load previous log file
+
+}
+
+global proc abxShotsUpdateTakeMenu (string $dept) {
+
+	string $selectedTake[] = `textScrollList -q -si ("abxShots"+$dept+"ScnList")`;
+	menuItem -e -label $selectedTake[0] ("abxShots"+$dept+"MenuItemTitle");
+}
+
+global proc abxShotsBuildTakeMenu (string $shotLister) {
+
+
+	// delete the current popup menu items
+	string $popupMenus[] = `treeView -q -pma $shotLister`;
+	for ($each in $popupMenus){
+			menuItem -label ("Dept:"+"TakeName") abxShotsTakeMenuItemTitle;
+
+			menuItem -divider 1;
+			menuItem -label "  Open Work Scene" -c "abxShotsCtxMCmd(\"open anm work\");";
+			menuItem -label "  Incremental Save" -c "abxShotsCtxMCmd(\"save anm work\")";
+			menuItem -divider 1;
+			menuItem -label "  Commit Master Scene" -c "abxShotsCtxMCmd(\"save anm master\")";
+			menuItem -label "  Open Master Scene" -c "abxShotsCtxMCmd(\"open anm master\");";
+			menuItem -divider 1;
+			menuItem -label "  Ref Master Anm" -c "abxShotsCtxMCmd(\"refanm master\")";
+			menuItem -label "  Ref Master Fx" -c "abxShotsCtxMCmd(\"reffx master\")";
+			
+	}
+}
+
+global proc abxShotsOpenTake (string $sourceList) {
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+
+	// get active tab to determine which dept to show
+	string $dept = `abxShotsGetActiveDeptTab`;
+
+	string $takeSceneName[] = `textScrollList -q -si $sourceList`;
+	if (size($takeSceneName)>0){
+	string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+	string $shotName[];
+	if ($shotFolder == "_PREVIS")
+		$shotName = `treeView -q -si abxPrevisList`;
+	else 
+		$shotName = `treeView -q -si abxShotsList`;
+	$shotFileName = `abxShotsGetShortName $shotName[0]`;
+	string $mayaFormat = `fileExtension $takeSceneName[0]`;
+	if ($mayaFormat == "ma")
+		$mayaFormat = "mayaAscii";
+	else if ($mayaFormat == "mb")
+		$mayaFormat = "mayaBinary";
+
+	string $cmd = ("saveChanges(\"file -f -o \\\""+$shotsPath+$shotName[0]+"/"+toupper($dept)+"/work/"+$takeSceneName[0]+"\\\"\");");
+	$cmd += ("addRecentFile(\""+$shotsPath+$shotName[0]+"/"+toupper($dept)+"/work/"+$takeSceneName[0]+"\", \""+$mayaFormat+"\");");
+	evalEcho $cmd;
+	}
+
+}
+/*
+global proc abxShotsSaveAsTake (string $sourceList){
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+	// get the scene name, if it doesn't match then confirm with the user that they want save into the shot
+	string $currentScenePath = `file -q -sn`;
+	string $sceneFileName = basenameEx($currentScenePath);
+
+	// get active tab to determine which dept to show
+	string $dept = `abxShotsGetActiveDeptTab`;
+
+	string $takeSceneName[] = `textScrollList -q -si $sourceList`;
+	if (size($takeSceneName)>0){
+
+		string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+		string $selectedItems[] = `treeView -q -si abxShotsList`;
+		string $shotName = `abxShotsGetSceneShotName $takeSceneName[0]`;
+		string $takeName = `abxShotsGetSceneTakeName $takeSceneName[0]`;
+
+		string $sceneShotName = `abxShotsGetSceneShotName $
+
+	}
+
+	// rename the scene
+
+	// incremental save the scene
+}
+*/
+
+/////////////////////////////////////////////////////////////////////////////////
+///////////////////TAKE MASTERING////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+
+global proc abxShotsMasterTake(string $sourceList){
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+
+	// get active tab to determine which dept to show
+	string $dept = `abxShotsGetActiveDeptTab`;
+
+	string $takeSceneName[] = `textScrollList -q -si $sourceList`;
+	if (size($takeSceneName)>0){
+	string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+	string $selectedItems[] = `treeView -q -si abxShotsList`;
+	string $shotName = `abxShotsGetSceneShotName $takeSceneName[0]`;
+	string $takeName = `abxShotsGetSceneTakeName $takeSceneName[0]`;
+
+	string $masterFile = "";
+
+	if ($takeName == "")
+		$masterFile = ($shotName+"_"+$dept+"_master.mb");
+	else
+		$masterFile = ($shotName+"_"+$dept+"_"+$takeName+"_master.mb");
+
+	abxShotsMaster $shotName $dept $takeName ;	
+	//string $cmd = ("saveChanges(\"file -f -o \\\""+$shotsPath+$shotName+"/"+toupper($dept)+"/master/"+$masterFile+"\\\"\")");
+	//evalEcho $cmd;
+	}
+
+}
+
+global proc abxShotsOpenMaster(string $sourceList){
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+
+	// get active tab to determine which dept to show
+	string $dept = `abxShotsGetActiveDeptTab`;
+
+	string $takeSceneName[] = `textScrollList -q -si $sourceList`;
+	if (size($takeSceneName)>0){
+	string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+	string $selectedItems[] = `treeView -q -si abxShotsList`;
+	string $shotName = `abxShotsGetSceneShotName $takeSceneName[0]`;
+	string $takeName = `abxShotsGetSceneTakeName $takeSceneName[0]`;
+
+	string $masterFile = "";
+
+	if ($takeName == "")
+		$masterFile = ($shotName+"_"+$dept+"_master.mb");
+	else
+		$masterFile = ($shotName+"_"+$dept+"_"+$takeName+"_master.mb");
+	
+	string $cmd = ("saveChanges(\"file -f -o \\\""+$shotsPath+$shotName+"/"+toupper($dept)+"/master/"+$masterFile+"\\\"\")");
+	evalEcho $cmd;
+	}
+
+}
+
+global proc abxShotsReferenceMaster (string $sourceList){
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+
+	// get active tab to determine which dept to show
+	string $dept = `abxShotsGetActiveDeptTab`;
+
+	string $takeSceneName[] = `textScrollList -q -si $sourceList`;
+	if (size($takeSceneName)>0){
+
+		string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+		string $selectedItems[] = `treeView -q -si abxShotsList`;
+		string $shotName = $selectedItems[0]; //`abxShotsGetSceneShotName $takeSceneName[0]`;
+		string $takeName = `abxShotsGetSceneTakeName $takeSceneName[0]`;
+
+		string $shotFileName = `abxShotsGetShortName $shotName`;
+	
+		string $masterFile = "";
+
+		if ($takeName == "")
+			$masterFile = ($shotFileName+"_"+$dept+"_master.mb");
+		else
+			$masterFile = ($shotFileName+"_"+$dept+"_"+$takeName+"_master.mb");
+		string $masterFilePath = ($shotsPath+$shotName+"/"+toupper($dept)+"/master/"+$masterFile);
+		print ($masterFilePath+"\n");
+
+		if (`filetest -r $masterFilePath`){
+			$takeNameUpper = toupper(`substring $takeName 1 1`);
+			int $takeNameLen = size($takeName);
+			$takeNameUpper = ($takeNameUpper + `substring $takeName 2 $takeNameLen`);
+			abxShotsCreateReference $masterFilePath ($dept+$takeNameUpper) "namespace";
+		}
+		else{
+			error ("Master File Not Found");
+		}
+	}
+}
+
+global proc abxShotsCreateReference (string $refFile, string $prefix, string $type){
+		
+
+	if ($type == "rename"){
+		namespace -set ":";
+		//evalEcho ("file -r -type \"mayaAscii\" -gl -loadReferenceDepth \"all\" -rpr \""+$prefix+"\" -options \"v=0\" \""+$refFile+"\"");
+		evalEcho ("file -r -gl -loadReferenceDepth \"all\" -rpr \""+$prefix+"\" -options \"v=0\" \""+$refFile+"\"");
+		namespace -set ":";
+	}
+	else if ($type == "namespace"){
+		namespace -set ":";
+		//evalEcho ("file -r -type \"mayaAscii\" -gl -loadReferenceDepth \"all\" -namespace \""+$prefix+"\" -options \"v=0\" \""+$refFile+"\"");
+		evalEcho ("file -r -gl -loadReferenceDepth \"all\" -namespace \""+$prefix+"\" -options \"v=0\" \""+$refFile+"\"");
+		namespace -set ":";
+	}
+}
+
+global proc string[] abxShotsGetScenes (string $shotName, string $dept) {
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+	string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+	
+	$shotFileName = `abxShotsGetShortName $shotName`;
+
+	string $shotPrefix = ($shotFileName+"_"+$dept+"_");
+	string $shotsFolder[] = `getFileList -fs ($shotPrefix+"*") -folder ($shotsPath+$shotName+"/"+toupper($dept)+"/work/")`;
+	//print ($shotsPath+$shotName+"/"+toupper($dept)+"/work/\n");
+	//print $shotsFolder;
+
+	string $sorted[] = sort($shotsFolder);
+
+	string $foundTakeName[];
+	string $foundExtension[];
+	int $highestVersionInt[];
+	string $highestVersion[];
+
+	string $foundTakes[];
+	string $foundVersions[];
+	
+	for ($each in $sorted){
+
+		if (`gmatch $each ($shotPrefix+"*")`){
+
+			string $nameOnly = `basenameEx $each`;
+			string $extension = `fileExtension $each`;
+			int $prefixSize = size($shotPrefix)+1;
+			int $nameOnlySize = size($nameOnly);
+			string $noShotName = `substring $nameOnly $prefixSize $nameOnlySize`;
+			int $noShotNameSize = size($noShotName);
+
+			string $tokenBuffer[];
+			tokenize $noShotName "_" $tokenBuffer;
+			string $version = $tokenBuffer[size($tokenBuffer)-1];
+
+			//int $vSize = size($version);
+			//int $versionInt = int(`substring $version 2 $vSize`);
+			
+			
+			int $takeNameSize = $noShotNameSize - size($version) - 1;
+			string $takeName = `substring $noShotName 1 $takeNameSize`;
+			if (size($tokenBuffer) == 1){
+				$takeName="";
+				$takeNameSize = 0;
+			}
+			//print ($takeName+":"+$version+"\n");
+
+
+
+			if (!`stringArrayContains $takeName $foundTakes`){
+				$foundTakes[size($foundTakes)] = $takeName;
+				$foundVersions[size($foundVersions)] = abxShotsGetLatestWorkVersion($shotName, $dept, $takeName);
+			}
+		}
+	}
+
+	string $results[];
+	//print ("sizeOfTakes"+size($foundTakes)+"\n");
+	for ($i=0;$i<size($foundTakes);$i++){
+		if ($foundTakes[$i] != ""){
+			$results[$i] = ($shotPrefix+$foundTakes[$i]+"_"+$foundVersions[$i]+".ma");
+			//print ("foundTakeName="+$foundTakes[$i]+" highestVersion="+$foundVersions[$i]+"\n");
+			//$results[$i] = ($shotPrefix+$foundTakeName[$i]+"_"+$highestVersion[$i]+".ma");
+			//print ("foundTakeName="+$foundTakeName[$i]+" highestVersion="+$highestVersion[$i]+"\n");
+		}
+		else {
+			$results[$i] = ($shotPrefix+$foundVersions[$i]+".ma");
+			//print ("foundTakeName="+$foundTakes[$i]+" highestVersion="+$foundVersions[$i]+"\n");
+			//$results[$i] = ($shotPrefix+$highestVersion[$i]+".ma");
+			//print ("noTake. foundTakeName="+$foundTakeName[$i]+" highestVersion="+$highestVersion[$i]+"\n");
+		}
+	}
+
+	return $results;
+
+}
+
+
+// create a prompt for the name of the new take
+// user can choose to either save the current scene file as the new take, or to create a new take, or cancel
+global proc abxShotsCreateTakeProc (){
+
+	string $result = `promptDialog -title "New Take" -message "Enter Take Name: (Optional)" -button "OK" -button "No Thanks" -button "Cancel"  -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancel"`;
+
+	if ($result == "OK" || $result == "No Thanks") {
+		string $text = `promptDialog -query -text`;
+		string $tokenBuffer[];
+	
+		//$text = tolower($text);
+
+		// vallidate the take name
+	
+		tokenize $text "_" $tokenBuffer;
+		if (size($tokenBuffer)> 1){
+			$text = $tokenBuffer[0];
+			int $i = 0;
+			for ($i=1;$i<size($tokenBuffer);$i++){
+				int $l = size($tokenBuffer[$i]);
+				string $capLetter = toupper(`substring $tokenBuffer[$i] 1 1`);
+				string $rest = `substring $tokenBuffer[$i] 2 $l`;
+				$text += ($capLetter+$rest);
+			}
+		}
+
+		// vallidate the take name
+		tokenize $text " " $tokenBuffer;
+		if (size($tokenBuffer)> 1){
+			$text = $tokenBuffer[0];
+			int $i = 0;
+			for ($i=1;$i<size($tokenBuffer);$i++){
+				int $l = size($tokenBuffer[$i]);
+				string $capLetter = toupper(`substring $tokenBuffer[$i] 1 1`);
+				string $rest = `substring $tokenBuffer[$i] 2 $l`;
+				$text += ($capLetter+$rest);
+			}
+		}
+		string $shotFolder = `abxShotsGetActiveShotFolder`;
+
+		// get active tab to determine which dept to show
+		string $dept = `abxShotsGetActiveDeptTab`;
+
+		// string $takeSceneNames[] = `textScrollList -q -ai $sourceList`;
+
+		// get a list of take names from this for checking for duplicate names
+		
+
+
+		string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+
+		string $foundShotName[];
+		if ($shotFolder == "_PREVIS") {
+			$foundShotName = `treeView -q -si abxPrevisList`;
+		}
+		else{
+			$foundShotName = `treeView -q -si abxShotsList`;
+		}
+		abxShotsCreateTake $foundShotName[0] $dept $text;
+	}
+
+}
+
+
+global proc abxShotsCreateTake (string $shotName, string $dept, string $takeName){
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+	string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+
+	$shotFileName = `abxShotsGetShortName $shotName`;
+
+	// prompt to save current scene as this new take, create a new scene and save it, or cancel
+
+	$result = `confirmDialog -title "Create Take" -message "Save this scene as new take?" -button "Save This As" -button "New Scene File" -button "Cancel" -defaultButton "Save This As" -cancelButton "Cancel" -dismissString "Cancel"`;
+	if ($result == "Save This As" || $result == "New Scene File"){
+		string $takeFilePath = "";
+		if ($takeName != "")
+			$takeFilePath = ($shotsPath+$shotName+"/"+toupper($dept)+"/work/"+$shotFileName+"_"+$dept+"_"+$takeName+"_v001.ma");
+		else 
+			$takeFilePath = ($shotsPath+$shotName+"/"+toupper($dept)+"/work/"+$shotFileName+"_"+$dept+"_v001.ma");
+		string $cmd = "";
+
+		if ($result == "New Scene File"){	
+			//$cmd = ("saveChanges(\"file -f -new\");");
+			if (`exists ppDoNewScene`)
+				$cmd = ("ppDoNewScene \"hd24fps\";");
+			else
+				$cmd = ("saveChanges(\"file -f -new\");");
+				
+		}
+		$cmd += ("file -rn \""+$takeFilePath+"\";");
+		$cmd += ("abxShotsIncrementalSave \"auto\" \"\" \"\";");
+		$cmd += ("abxShotsRefreshDetailsUI \""+$shotName+"\";");
+		//$cmd += ("string $shotName[] = `treeView -q -si abxShotsList`;abxShotsRefreshDetailsUI $shotName[0];");
+		evalEcho ($cmd);
+
+
+	
+
+	}
+	else {
+		print ("New Take Cancelled\n");
+	}
+
+	
+
+
+}
+
+global proc abxShotsNewSequence (string $shotFolder){
+	string $result = `promptDialog -title "New Sequence Name" -message "Enter Sequence Name (No Underscores)" -button "OK" -button "Cancel"  -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancel"`;
+	if ($result == "OK") {
+		string $text = `promptDialog -query -text`;
+		string $tokenBuffer[];
+		$text = toupper($text);
+		// vallidate the sequence name
+		tokenize $text " " $tokenBuffer;
+		if (size($tokenBuffer)> 1){
+			$text = $tokenBuffer[0];
+			int $i = 0;
+			for ($i=1;$i<size($tokenBuffer);$i++){
+				int $l = size($tokenBuffer[$i]);
+				string $capLetter = toupper(`substring $tokenBuffer[$i] 1 1`);
+				string $rest = `substring $tokenBuffer[$i] 2 $l`;
+				$text += ($capLetter+$rest);
+			}
+		}
+		string $renderFolder = (`workspace -q -rd`+"../../RENDER/"+$shotFolder+"/"+$text);
+		string $path = (`workspace -q -rd`+"scenes/"+$shotFolder+"/"+$text);
+		evalEcho("sysFile -makeDir \""+$path+"\"");
+
+		if (`window -exists abxShotsCreateWindow`){
+			abxShotsUpdateNewShotUI;
+		}
+
+			// add the shot to the list view
+		if ($shotFolder == "_PREVIS"){
+			treeView -e -addItem $text "" abxPrevisList;
+			treeView -e -textColor $text .3 .9 .4 abxPrevisList;
+		}
+		else {
+			treeView -e -addItem $text "" abxShotsList;
+		}
+	}
+
+}
+
+global proc abxShotsShowNewShotUI (string $shotFolderTab) {
+	if (!`window -exists abxShotsCreateWindow`){
+		window -t "New Shot" -width 500 -height 200 abxShotsCreateWindow;
+		formLayout abxShotsNewShotUIFrmLyt;
+		frameLayout -lv 0 -borderStyle "out" abxShotsNewShotFrmeLyt;
+		columnLayout;
+
+		
+		optionMenuGrp -label "Location:" -columnWidth 2 80 -cw 3 100 -cc abxShotsUpdateNewShotUI abxShotsCreateTypeOM;
+			menuItem -label "_PREVIS";
+			menuItem -label "_ALL_SHOTS";
+		optionMenuGrp -e -sl 2 abxShotsCreateTypeOM;
+		rowLayout -numberOfColumns 2 -columnWidth2 250 100 -columnAttach 1 "both" 0 -columnAttach 2 "both" 0 abxShotsNewSeqRL;
+			optionMenuGrp -label "Sequence:"  -columnWidth 2 80 -cw 3 100 -cc abxShotsUpdateNewShotUI abxShotsCreateOMTmpl;	
+				menuItem -label "none";
+				string $loc =  `optionMenuGrp -q -value abxShotsCreateTypeOM`;
+				string $foundSeq[] = `abxShotsGetSequences $loc`;
+				for ($each in $foundSeq){
+					menuItem -label $each;
+				}	
+			button -label "New Sequence..." -c "abxShotsNewSequence `optionMenuGrp -q -v abxShotsCreateTypeOM`";
+			setParent ..;
+		// asset name
+		textFieldGrp -label "Shot Name:" -text  "S1_010"  abxShotsCreateTFName;
+
+		// asset method
+
+		setParent abxShotsNewShotUIFrmLyt;
+
+		rowLayout -numberOfColumns 3 -columnWidth3 160 160 160 -columnAttach 1 "both" 0 -columnAttach 2 "both" 0 -columnAttach 3 "both" 0 abxShotsNewShotRL;
+		button -label "Create" -h 25 -c "abxShotsCreateShotUI `optionMenuGrp -q -v abxShotsCreateTypeOM` (`optionMenuGrp -q -v abxShotsCreateOMTmpl`+\"/\"+`textFieldGrp -q -text abxShotsCreateTFName`);window -e -vis 0 abxShotsCreateWindow;" ;
+		button -label "Apply" -h 25 -c "abxShotsCreateShotUI `optionMenuGrp -q -v abxShotsCreateTypeOM` (`optionMenuGrp -q -v abxShotsCreateOMTmpl`+\"/\"+`textFieldGrp -q -text abxShotsCreateTFName`);";
+		button -label "Cancel" -h 25 -c "window -e -vis 0 abxShotsCreateWindow";
+
+		//optionMenuGrp -e -value $lib abxShotsCreateOMLib;
+		//optionMenuGrp -e -value $type abxShotsCreateOMType;
+		//textFieldGrp -e -text $name abxShotsCreateTFName;
+		//optionMenuGrp -e -value $template abxShotsCreateOMTmpl;
+
+		formLayout -e 
+			-af abxShotsNewShotFrmeLyt "left" 3
+			-af abxShotsNewShotFrmeLyt "top" 3
+			-af abxShotsNewShotFrmeLyt "bottom" 34
+			-af abxShotsNewShotFrmeLyt "right" 3
+
+			-af abxShotsNewShotRL "left" 0
+			-ac abxShotsNewShotRL  "top" 0 abxShotsNewShotFrmeLyt
+			-af abxShotsNewShotRL "bottom" 3
+			-af abxShotsNewShotRL "right" 3
+			abxShotsNewShotUIFrmLyt;
+			
+		if ($shotFolderTab == "abxShotsLibForm"){
+			optionMenuGrp -e -value "_ALL_SHOTS" abxShotsCreateTypeOM;
+		}
+		else if ($shotFolderTab == "abxPrevisLibForm"){
+			optionMenuGrp -e -value "_PREVIS" abxShotsCreateTypeOM;
+		}
+		showWindow abxShotsCreateWindow;
+	}
+	else {
+		showWindow abxShotsCreateWindow;
+	}
+}
+
+global proc abxShotsUpdateNewShotUI () {
+	string $loc = `optionMenuGrp -q -value abxShotsCreateTypeOM`;
+	string $seq = `optionMenuGrp -q -value abxShotsCreateOMTmpl`;
+	string $oldSeqNames[] = `optionMenuGrp -q -ils abxShotsCreateOMTmpl`;
+	for ($each in $oldSeqNames){
+		string $label = `menuItem -q -l $each`;
+		if ($label != "none"){
+			deleteUI -menuItem $each;
+		}
+	}
+	string $foundSeq[] = `abxShotsGetSequences $loc`;
+	int $i = 1;
+	int $selIndex = 1;
+	for ($each in $foundSeq){
+		$i++;
+		if ($each == $seq)
+			$selIndex = $i;
+		setParent abxShotsCreateOMTmpl;
+		menuItem  -label $each;
+	}
+	
+	optionMenuGrp -e -sl $selIndex abxShotsCreateOMTmpl;
+	if (`optionMenuGrp -q -value abxShotsCreateOMTmpl` != "none")
+		textFieldGrp -e -text  (`optionMenuGrp -q -value abxShotsCreateOMTmpl`+"_")  abxShotsCreateTFName;
+	else
+		textFieldGrp -e -text "" abxShotsCreateTFName;
+	evalDeferred("setFocus abxShotsCreateTFName");
+	
+}
+
+global proc abxShotsCreateShotUI (string $shotFolder, string $shotName){
+
+	string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+	string $shotFileName = `abxShotsGetShortName $shotName`;
+	//string $result = `promptDialog -title "New Shot Name" -message "Enter Shot Name: (S#_###)" -button "OK" -button "Cancel"  -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancel"`;
+	//if ($result == "OK") {
+   	//string $text = `promptDialog -query -text`;
+	string $tokenBuffer[];
+	string $sequenceName = "";
+	tokenize $shotName "/" $tokenBuffer;
+	if (size ($tokenBuffer) > 1){
+		if ($tokenBuffer[0] == "none"){
+			$shotName = $tokenBuffer[1];
+		}
+		$sequenceName = $tokenBuffer[0];
+	}
+
+	$text = toupper($shotName);
+
+	// vallidate the take name
+	/*
+	tokenize $text "_" $tokenBuffer;
+	if (size($tokenBuffer)> 1){
+		$text = $tokenBuffer[0];
+		int $i = 0;
+		for ($i=1;$i<size($tokenBuffer);$i++){
+			int $l = size($tokenBuffer[$i]);
+			string $capLetter = toupper(`substring $tokenBuffer[$i] 1 1`);
+			string $rest = `substring $tokenBuffer[$i] 2 $l`;
+			$text += ($capLetter+$rest);
+		}
+	}
+	*/
+
+	// vallidate the take name
+	tokenize $text " " $tokenBuffer;
+	if (size($tokenBuffer)> 1){
+		$text = $tokenBuffer[0];
+		int $i = 0;
+		for ($i=1;$i<size($tokenBuffer);$i++){
+			int $l = size($tokenBuffer[$i]);
+			string $capLetter = toupper(`substring $tokenBuffer[$i] 1 1`);
+			string $rest = `substring $tokenBuffer[$i] 2 $l`;
+			$text += ($capLetter+$rest);
+		}
+	}
+
+	abxShotsCreateShot $shotFolder $text;
+
+	// add the shot to the list view
+	if ($shotFolder == "_PREVIS"){
+		treeView -e -addItem $shotName $sequenceName abxPrevisList;
+		treeView -e -displayLabel $shotName $shotFileName abxPrevisList;
+		treeView -e -bti $shotName 1 "P" abxPrevisList;
+		treeView -e -textColor $shotName .3 .9 .4 abxPrevisList;
+	}
+	else {
+		treeView -e -addItem $shotName $sequenceName abxShotsList;
+		treeView -e -displayLabel $shotName $shotFileName abxShotsList;
+		treeView -e -bti $shotName 1 "A" -bti $shotName 2 "F" -bti $shotName 3 "L" abxShotsList;
+	}
+	/////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////
+}
+
+global proc abxShotsCreateShot (string $shotFolder, string $shotName){
+
+	string $shotsFolder = "scenes/"+$shotFolder+"/";
+	string $renderFolder = "../../RENDER/"+$shotFolder+"/";
+
+	string $shotFileName = `abxShotsGetShortName $shotName`;
+
+	
+
+	string $path = (`workspace -q -rd`+$shotsFolder);
+	if (!`filetest -d $path`){
+		evalEcho("sysFile -makeDir \""+$path+"\"");
+	}
+	$path = ($path+$shotName+"/");
+	print $path;
+	if (!`filetest -d $path`){
+		evalEcho("sysFile -makeDir \""+$path+"\"");	
+	}
+	if ($shotFolder == "_PREVIS"){
+		string $subPath = ($path+"PRE/");
+		print $subPath;
+		if (!`filetest -d $subPath`){
+			evalEcho("sysFile -makeDir \""+$subPath+"\"");
+			sysFile -makeDir ($subPath+"/work");
+			sysFile -makeDir ($subPath+"/master");
+		}
+		$subPath = ($path+"CAM/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+			sysFile -makeDir ($subPath+"/master");
+		}
+	}
+	else {
+		string $subPath = ($path+"ANM/");
+		print $subPath;
+		if (!`filetest -d $subPath`){
+			evalEcho("sysFile -makeDir \""+$subPath+"\"");
+			sysFile -makeDir ($subPath+"/work");
+			sysFile -makeDir ($subPath+"/master");
+		}
+		$subPath = ($path+"FX/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+			sysFile -makeDir ($subPath+"/work");
+			sysFile -makeDir ($subPath+"/master");
+		}
+		$subPath = ($path+"LGT/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+			sysFile -makeDir ($subPath+"/work");
+			sysFile -makeDir ($subPath+"/master");
+		}
+		$subPath = ($path+"CAM/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+			sysFile -makeDir ($subPath+"/master");
+		}
+	}
+	
+
+	// render frames folders
+
+	string $path = (`workspace -q -rd`+$renderFolder);
+	if (!`filetest -d $path`){
+		sysFile -makeDir $path;
+	}
+	$path = ($path+$shotName+"/");
+	if (!`filetest -d $path`){
+		sysFile -makeDir $path;	
+	}
+
+	if ($shotFolder == "_PREVIS"){
+		$subPath = ($path+"PRE/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+		}
+		$subPath = ($path+"playblasts/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+		}
+	}
+	else {
+
+		$subPath = ($path+"ANM/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+		}
+		$subPath = ($path+"FX/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+		}
+		$subPath = ($path+"LGT/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+		}	
+		$subPath = ($path+"COMP_RENDERS/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+			sysFile -makeDir ($subPath+"COMP/");
+			sysFile -makeDir ($subPath+"PROXY/");
+		}
+		$subPath = ($path+"playblasts/");
+		if (!`filetest -d $subPath`){
+			sysFile -makeDir $subPath;
+		}
+	}
+
+
+}
+
+
+
+global proc abxShotsIncrementalSave(string $shotName, string $dept, string $takeName){
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+
+	string $shotSequence = "";
+	string $sceneFileName = "";
+	string $shotNameGuess = "";
+	string $shotTakeGuess = "";
+	string $subDeptGuess = "";
+	string $deptGuess = "";
+	string $shotsFolder = "scenes/"+$shotFolder+"/";
+
+	$shotFileName = `abxShotsGetShortName $shotName`;
+
+	// get the scene name
+	string $currentScene = `file -q -sn`;
+	string $extension = `fileExtension $currentScene`;
+	string $currentSceneName = `basenameEx $currentScene`;
+
+	// tokenize the scene name for automatic incremental save
+	string $tokenBuffer[];
+	tokenize $currentScene "/" $tokenBuffer;
+
+	$sceneFileName = $tokenBuffer[size($tokenBuffer)-1];
+
+	int $latestFoundVersion = -1;
+
+	// assume this path <workspace>/scenes/<shotFolder>/<shotName>/<dept>/<take><version>
+	// tokenize backwards through the current scene path to guess details about the file
+
+	if (size($tokenBuffer) > 1){
+		$subDeptGuess = $tokenBuffer[size($tokenBuffer)-2];
+		if (size($tokenBuffer) > 2 ) {
+			$deptGuess = tolower($tokenBuffer[size($tokenBuffer)-3]);
+			if (size($tokenBuffer) > 3 ) {
+				$shotNameGuess = $tokenBuffer[size($tokenBuffer)-4];
+				if (size($tokenBuffer) > 4){
+					if ($tokenBuffer[size($tokenBuffer)-5] != "_ALL_SHOTS" && $tokenBuffer[size($tokenBuffer)-5] != "_PREVIS"){
+						$shotSequence = $tokenBuffer[size($tokenBuffer)-5];
+					}
+				}
+			}
+		}
+	}
+
+	int $shotNameSize = size($shotNameGuess)+1+size($deptGuess)+1;
+	int $currentSceneNameSize = size($currentSceneName);
+	string $noShotName = `substring $currentSceneName $shotNameSize $currentSceneNameSize `;
+	
+	string $tokenBuffer[];
+	tokenize $noShotName "_" $tokenBuffer;
+	if (size($tokenBuffer) > 1){
+		$shotTakeGuess = $tokenBuffer[0];
+	}
+	print ($shotNameGuess+","+$shotTakeGuess+","+$deptGuess+"\n");
+
+	// automatic incremental save, guesses based on your current scene where to incrementally save it
+	if ($shotName != "auto"){
+		string $result;
+		if ($shotName != $shotNameGuess || $takeName != $shotTakeGuess || $dept != $deptGuess){
+			$result = `confirmDialog -title "Confirm" -message "This scene doesn't appear to belong here? Are you sure?" -button "Yes" -button "No" -defaultButton "Yes" -cancelButton "No" -dismissString "No"`;		
+		}
+		if ($result == "Yes"){
+			$shotNameGuess = $shotName;
+			$shotTakeGuess = $takeName;
+			$subDeptGuess = "work";
+			$deptGuess = $dept;
+		}		
+	}
+
+	string $pathGuess = "";
+	if ($shotSequence != ""){
+		$pathGuess = (`workspace -q -rd`+$shotsFolder+$shotSequence+"/"+$shotNameGuess+"/"+toupper($deptGuess)+"/"+$subDeptGuess+"/");
+	}
+	else {
+		$pathGuess = (`workspace -q -rd`+$shotsFolder+$shotNameGuess+"/"+toupper($deptGuess)+"/"+$subDeptGuess+"/");
+	}
+	print ("pathGuess="+$pathGuess+"\n");
+
+	// test to see if we guessed the correct shot path by comparing the found scene file path details with the details 
+	// sumbited by the user 
+
+	if (`filetest -d $pathGuess`){
+		string $workVersion ="";
+
+		if ($shotSequence == "")
+			$workVersion = abxShotsGetLatestWorkVersion($shotNameGuess,$deptGuess,$shotTakeGuess);
+		else 
+			$workVersion = abxShotsGetLatestWorkVersion(($shotSequence+"/"+$shotNameGuess),$deptGuess,$shotTakeGuess);
+
+
+		if($workVersion == ""){
+			$workVersion = "v000";
+		}
+
+		else if ($workVersion != ""){
+			string $numOnly = substring($workVersion,2,size($workVersion));
+			int $wVersionInt = int($numOnly);
+			$wVersionInt = $wVersionInt + 1;
+			string $newWorkVersion = "";
+			if ($wVersionInt > 99){
+				$newWorkVersion = ("v"+$wVersionInt);
+			}
+			else if ($wVersionInt > 9){
+				$newWorkVersion = ("v0"+$wVersionInt);
+			}
+			else {
+				$newWorkVersion = ("v00"+$wVersionInt);
+			}
+
+			string $filePath = "";
+			if ($shotTakeGuess == ""){
+				$filePath = ($pathGuess+$shotNameGuess+"_"+$deptGuess+"_"+$newWorkVersion+".ma");
+			}
+			else {
+				$filePath = ($pathGuess+$shotNameGuess+"_"+$deptGuess+"_"+$shotTakeGuess+"_"+$newWorkVersion+".ma");
+			}
+			
+			string $mayaFormat = `fileExtension $filePath`;
+			if ($mayaFormat == "ma")
+				$mayaFormat = "mayaAscii";
+			else if ($mayaFormat == "mb")
+				$mayaFormat = "mayaBinary";
+				
+			evalEcho("file -rn \""+$filePath+"\";");
+			evalEcho("file -f -save  -options \"v=0\" -type \""+$mayaFormat+"\"");
+			evalEcho("addRecentFile(\""+$filePath+"\", \""+$mayaFormat+"\");");
+
+		}
+		else {
+			warning ("Could not Guess where to save this. Please Save using Shots Manager");
+		}
+		abxShotsDeptTabChange;
+	}
+	else {
+		warning ("Could not Guess where to save this. Please Save using Shots Manager");
+	}
+}
+
+global proc abxShotsOpenLatestWorkScene (string $shotName, string $dept, string $takeName) {
+
+	string $shotsPath = (`workspace -q -rd`+"/scenes/_ALL_SHOTS/");
+	string $version = abxShotsGetLatestWorkVersion($shotName, $dept, $takeName);
+	string $takeSceneName = "";
+
+	$shotFileName = `abxShotsGetShortName $shotName`;
+
+	if ($takeName == ""){
+		$takeSceneName = ($shotFileName+"_"+$dept+"_"+$version+".ma");
+	}
+	else {
+		$takeSceneName = ($shotFileName+"_"+$dept+"_"+$takeName+"_"+$version+".ma");
+	}
+
+	string $cmd = ("saveChanges(\"file -f -o \\\""+$shotsPath+$shotName+"/"+toupper($dept)+"/work/"+$takeSceneName+"\\\"\")");
+	evalEcho $cmd;
+
+}
+
+// interdepartmental proc for saving the latest master file
+global proc abxShotsMaster(string $shotName, string $dept, string $takeName){
+
+	string $shotSequence = "";
+	string $sceneFileName = "";
+	string $shotNameGuess = "";
+	string $shotTakeGuess = "";
+	string $subDeptGuess = "";
+	string $deptGuess = "";
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+	string $shotsFolder = "scenes/"+$shotFolder+"/";
+
+	// get the scene name
+	string $currentScene = `file -q -sn`;
+	if ($currentScene == "" && $shotName == "auto"){
+		error ("Maya can't determine what scene file this is. Aborting Auto Master\n");
+	}
+	string $extension = `fileExtension $currentScene`;
+	string $currentSceneName = `basenameEx $currentScene`;
+
+	// tokenize the scene name for automatic incremental save
+	string $tokenBuffer[];
+	tokenize $currentScene "/" $tokenBuffer;
+
+	$sceneFileName = $tokenBuffer[size($tokenBuffer)-1];
+
+	int $latestFoundVersion = -1;
+
+	// assume this path <workspace>/scenes/<shotFolder>/<shotName>/<dept>/<take><version>
+
+
+
+	if (size($tokenBuffer) > 1){
+		$subDeptGuess = $tokenBuffer[size($tokenBuffer)-2];
+		if (size($tokenBuffer) > 2 ) {
+			$deptGuess = tolower($tokenBuffer[size($tokenBuffer)-3]);
+			if (size($tokenBuffer) > 3 ) {
+				$shotNameGuess = $tokenBuffer[size($tokenBuffer)-4];
+				if (size($tokenBuffer) > 4){
+					if ($tokenBuffer[size($tokenBuffer)-5] != "_ALL_SHOTS" && $tokenBuffer[size($tokenBuffer)-5] != "_PREVIS"){
+						$shotSequence = $tokenBuffer[size($tokenBuffer)-5];
+					}
+				}
+			}
+		}
+	}
+
+	print ("sceneFileName="+$sceneFileName+" shotNameGuess="+$shotNameGuess+" deptGuess ="+$deptGuess+"\n");
+
+	int $shotNameSize = size($shotNameGuess)+1+size($deptGuess)+1;
+	int $currentSceneNameSize = size($currentSceneName);
+	string $noShotName = `substring $currentSceneName $shotNameSize $currentSceneNameSize `;
+	
+	string $tokenBuffer[];
+	tokenize $noShotName "_" $tokenBuffer;
+	if (size($tokenBuffer) > 1){
+		$shotTakeGuess = $tokenBuffer[0];
+	}
+	
+
+	if ($shotName != "auto" && $shotName != "ghetto"){
+		$shotNameGuess = $shotName;
+		$shotTakeGuess = $takeName;
+		$deptGuess = $dept;
+
+	}
+	print ($shotNameGuess+","+$shotTakeGuess+","+$deptGuess+"\n");
+
+	string $workDirGuess = "";
+	string $masterDirGuess = "";
+	string $workVersion = "";
+
+	print ("shot sequence ="+$shotSequence+"\n");
+
+	if ($shotSequence == ""){
+		$workDirGuess = (`workspace -q -rd`+$shotsFolder+$shotNameGuess+"/"+toupper($deptGuess)+"/"+$subDeptGuess+"/");
+		$masterDirGuess = (`workspace -q -rd`+$shotsFolder+$shotNameGuess+"/"+toupper($deptGuess)+"/master/");
+		$workVersion= abxShotsGetLatestWorkVersion($shotNameGuess,$deptGuess,$shotTakeGuess);
+	}
+	else {
+		$workDirGuess = (`workspace -q -rd`+$shotsFolder+$shotSequence+"/"+$shotNameGuess+"/"+toupper($deptGuess)+"/"+$subDeptGuess+"/");
+		$masterDirGuess = (`workspace -q -rd`+$shotsFolder+$shotSequence+"/"+$shotNameGuess+"/"+toupper($deptGuess)+"/master/");
+		$workVersion= abxShotsGetLatestWorkVersion(($shotSequence+"/"+$shotNameGuess),$deptGuess,$shotTakeGuess);	
+	}
+	
+
+	string $filePath = "";
+	string $masterFilePath = "";
+	string $tempMasterFilePath = "";
+
+	if ($shotTakeGuess == ""){
+		string $result;
+		$result = `confirmDialog -title "Confirm" -message ("Mastering "+$shotNameGuess+"_"+$deptGuess+"_master.mb") -button "OK" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancle"`;
+		if ($result == "Cancel"){		
+			warning "User Cancelled Mastering Process";
+			return;
+		}
+
+		$filePath = ($workDirGuess+$shotNameGuess+"_"+$deptGuess+"_"+$workVersion+".ma");
+		$masterFilePath = ($masterDirGuess+$shotNameGuess+"_"+$deptGuess+"_master.mb");
+		$tempMasterFilePath = ($masterDirGuess+"TMP"+$shotNameGuess+"_"+$deptGuess+"_master.mb");
+	}
+	else {
+
+		string $result;
+		$result = `confirmDialog -title "Confirm" -message ("Mastering "+$shotNameGuess+"_"+$deptGuess+"_"+$takeName+"_master.mb") -button "OK" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancle"`;
+		if ($result == "Cancel"){		
+			warning "User Cancelled Mastering Process";
+			return;
+		}
+		// filepath should be new work version not work version
+		$filePath = ($workDirGuess+$shotNameGuess+"_"+$deptGuess+"_"+$shotTakeGuess+"_"+$workVersion+".ma");
+		$masterFilePath = ($masterDirGuess+$shotNameGuess+"_"+$deptGuess+"_"+$shotTakeGuess+"_master.mb");
+		$tempMasterFilePath = ($masterDirGuess+"TMP"+$shotNameGuess+"_"+$deptGuess+"_"+$shotTakeGuess+"_master.mb");
+	}
+
+	// if the shot is not automatic then it should see if the currently open scene is the latest work file for mastering, if it is not, then it should be opened.
+	if ($shotName != "auto" && $shotName != "ghetto"){
+
+		
+		
+		if ($shotName != $shotNameGuess || $takeName != $shotTakeGuess || $dept != $deptGuess){
+			string $result;
+			
+			$result = `confirmDialog -title "Shot Master" -message ("The latest work scene for this shot must be opened to continue mastering.") -button "OK" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancel"`;	
+
+			if ($result == "OK"){
+				// open the latest work file
+				print ("Trying to open latest workshop\n");
+				abxShotsOpenLatestWorkScene($shotNameGuess,$deptGuess,$shotTakeGuess);
+			}	
+			else {
+				warning "Mastering Cancelled";
+				return;
+			}
+		}
+		
+	}
+
+	// if the latest workshop is already open 
+	print ($currentScene+"\n");
+	print ($filePath+"\n");
+	if ($currentScene == $filePath){
+		// if the file needs saving
+		//if (`file -q -mf`){
+		//	// incrementally save the workshop
+		//	abxShotsIncrementalSave("auto", "", "");
+		//	$currentScene = `file -q -sn`;
+		//	$sceneFileName = `file -q -shn -sn`;
+		//	$filePath = `file -q -sn`;
+		//}
+	}
+
+	// else if the open file is not the latest workshop
+	else {
+		// prompt the user to open the latest workshop
+		$result = `confirmDialog -title "Confirm" -message "Must Open Latest Workshop to Continue" -button "OK" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancle"`;
+		if ($result == "OK"){
+			// open latest workshop file
+			//abxShotsOpenWorkScene(($assetLibGuess+"/"+$assetTypeGuess+"/"+$assetNameGuess+"/"+$deptGuess), "");
+			abxShotsOpenLatestWorkScene($shotNameGuess,$deptGuess,$shotTakeGuess);
+			$sceneFileName = $filePath;
+			
+		}
+		else {
+			warning "User Cancelled Mastering Process";
+			return;
+
+		}
+	}
+
+
+	//////////////////////////////////////////////////////////////////////////////
+	// perform mastering procedures///////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////
+
+
+		
+
+	// if dept is lgt
+	if ($deptGuess == "lgt"){
+
+		// delete any loaded or unloaded references
+		// abxAssetsRemoveAllReferences;
+
+		// remove items in the deleteSet
+		//if (`objExists deleteSet`){
+		//	select deleteSet;
+		//	lockNode -l 0;
+		//	delete `ls -sl`;
+		//	if (`objExists deleteSet`){
+		//		lockNode -l 0 deleteSet;
+		//		delete deleteSet;
+		//	}
+		//}
+		// delete history on geo
+		//select `ls -type "mesh" -type "nurbsSurface" -type "nurbsCurve"`;
+		//delete -ch;
+
+		
+
+		// flatten hierarchies		
+
+		// remove unused shaders
+		// remove all namespaces
+		//abxAssetsRemoveAllNamespaces;
+		
+		// optionally export shading networks along with a shader map file
+
+		// delete render layers
+		//abxAssetsDeleteAllRenderLayers;
+
+		// delete display layers
+		//abxAssetsDeleteAllDisplayLayers;
+		
+	}
+	// if dept is animation
+	else if ($deptGuess == "anm"){
+
+
+		// clear any failed reference edits before importing references
+		// this causes allot of crashing while importing references
+
+
+		// remove any references called tmp*
+		string $tempReferences[] = `ls -type reference "tmp*" "temp*"`;
+		for ($each in $tempReferences){
+			string $filePath = `referenceQuery -f $each`;
+			file -rr $filePath;
+
+		}
+
+
+		// 
+		if ($shotName != "ghetto"){
+			confirmDialog -title "Confirm" -message "Importing References";
+
+			abxShotsImportAllReferences;
+			confirmDialog -title "Confirm" -message "Removing RN nodes";
+
+			abxDeleteAllRN;
+		}
+		
+		confirmDialog -title "Confirm" -message "deleting other ref junk";
+
+		// remove unknown ref nodes
+		abxDeleteUnknownRefNodes;
+		abxDeleteSharedRefNodes;
+		
+
+		// remove items in deleteSet
+		if (`objExists deleteSet`){
+			select deleteSet;
+			if (size(`ls -sl`) > 0){
+				lockNode -l 0;
+				delete `ls -sl`;
+			}
+			if (`objExists deleteSet`){
+				lockNode -l 0 deleteSet;
+				delete deleteSet;
+			}
+		}
+
+
+		if ($shotName != "ghetto")
+			abxShotsDeleteAllRefNodes;
+		abxShotsDeleteAllRenderLayers;
+		abxShotsDeleteAllDisplayLayers ;
+
+		// make sure paths are set to MOON
+
+		// bake camera
+		if (`objExists stereoCamera`){
+			//source "//MONKEY/Resources/Maya/scripts/Toolbox/Pipeline/ppStereoCam.mel";
+			//ppStereoCamMaster();
+		}
+
+		// remove render cam and stereo camera
+		//if (`objExists stereoCamera`)
+		//	delete "stereoCamera";
+		//if (`objExists renderCam`)
+		//	delete "renderCam";
+		
+		delete `ls -r 1 -type transform "*fosterParent" "fosterParent*" "*fosterParent*"`;
+
+		
+		delete `ls -type unknown -type unknownDag -type unknownTransform`;
+
+
+		// 
+	}
+
+		
+
+	// archive the current master file
+
+	if (!`filetest -d $masterDirGuess`){
+		sysFile -makeDir $masterDirGuess;
+	}
+	
+
+	// save the file as a temp file first
+	evalEcho("file -rename \""+$tempMasterFilePath+"\"");
+	evalEcho("file -f -save  -options \"v=0\" -type \"mayaBinary\"");
+	//evalEcho("file -save");
+
+
+	// if the save was successful to the temp file
+	if (`filetest -r $tempMasterFilePath`){
+
+		if (`filetest -w $masterFilePath`){
+			// archive the older master file
+			
+			abxShotsArchiveFile ($masterFilePath, "master");
+
+		}
+			
+		// rename the current temp master file
+		sysFile -rename $masterFilePath $tempMasterFilePath ;
+		evalEcho("file -rename \""+$masterFilePath+"\"");
+	}
+	else {
+		error ("mastering failed: Unable to Save:"+$tempMasterFilePath);
+	}	
+
+	if ($shotSequence == ""){
+		print ("Updating Shot Details for "+$shotNameGuess+"\n");
+		abxShotsUpdateDetailsFromScene($shotNameGuess, "all"); 	
+	}
+	else {
+		print ("Updating Shot Details for "+$shotSequence+"/"+$shotNameGuess+"\n");
+		abxShotsUpdateDetailsFromScene(($shotSequence+"/"+$shotNameGuess), "all"); 
+	}
+
+
+	$result = `confirmDialog -title "Confirm" -message ($deptGuess+" Master Successful.") -button "Re-open Work" -button "New Scene" -button "Inspect Master" -defaultButton "Open Work" -cancelButton "New Scene" -dismissString "New Scene"`;
+	if ($result == "Open Work"){
+		//abxShotsOpenWorkScene($assetPath , "latest");
+	}
+	else if ($result == "New Scene"){
+		file -f -new;
+	}
+}
+
+global proc abxShotsCameraMaster (string $cameraName[]) {
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+	string $shotNames[] = `treeView -q -si abxShotsList`;
+	$shotName = $shotNames[0];
+
+	// check for sequence name
+	string $sequenceName = "";
+	string $tokenBuffer[];
+	tokenize $shotName "/" $tokenBuffer;
+	if (size($tokenBuffer)>1)
+		$sequenceName = $tokenBuffer[0];
+	
+	string $sceneName = basenameEx(`file -q -sn`);
+	
+	if ($sequenceName != ""){
+		$sceneName = ($sequenceName +"/"+ $sceneName);
+	}
+	string $sceneShotName = `abxShotsGetSceneShotName $sceneName`;
+	if (`abxShotsGetSceneShotName $sceneName` != $shotName){
+		string $buttonName = ("Master As "+$sceneShotName+" Camera");
+		string $result = `confirmDialog -title "Confirm" -message ("This scene file does not appear to be "+$shotName+".") -button $buttonName -button "Force" -button "Cancel"`;
+		if ($result == "Cancel"){
+			return;
+		}
+		else if ($result == $buttonName){
+			$shotName = $sceneShotName;
+		} 
+	}
+	
+	string $shotFileName = `abxShotsGetShortName $shotName`;
+
+	string $cameraMasterPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/"+$shotName+"/CAM/master/"+$shotFileName+"_cam_master.ma");
+
+	if ($cameraName[0] == "renderCamShape" || $cameraName[0] == "cam:renderCamShape"){
+
+		// remove the cam namespace from the scene
+		if (`namespace -exists "cam"`){
+			if (`objExists "cam:renderCamShape"`){
+				select "cam:renderCamShape";
+				select -add "cam:renderCam";
+
+				// if the node is NOT referenced
+				if (`referenceQuery -inr "cam:renderCamShape"` == 0){
+					$result = `confirmDialog -title "Confirm" -message ("Master "+$shotName+" Cam with cam:renderCamShape?") -button "Yes" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancel"`;
+					if ($result == "Cancel"){		
+						warning "User Cancelled Camera Master";
+						return;
+					}
+					abxShotsArchiveFile($cameraMasterPath, "master");
+				
+					// remove the cam namespace before exporting and re-referencing
+					namespace -f -mv "cam" ":";
+					namespace -rm "cam";
+					namespace -set ":";
+
+					file -type "mayaAscii" -options "v=0" -es $cameraMasterPath;
+
+					$result = `confirmDialog -title "Confirm" -message ("Camera Master Complete. Would You like to Reference the Master Now?") -button "Yes" -button "No" -defaultButton "Yes" -cancelButton "No" -dismissString "No"`;
+					if ($result == "Yes"){		
+						if (size(`ls -sl`) != 0){
+							delete `ls -sl`;
+						}
+						abxShotsCameraReference($shotName);					
+					}
+
+					
+				
+				}
+				// cam:renderCamShape is a referenced node
+				else {
+					confirmDialog -title "Confirm" -message "cam:renderCamShape is referenced and cannot be mastered. Import the cam reference, then remaster";
+					//string $refNode[] = `referenceQuery -f "cam:renderCamShape"`;
+					//file -rr $refNode;
+				}
+			}
+			else {
+				$result = `confirmDialog -title "Confirm" -message ("Master "+$shotName+" Cam with renderCamShape?") -button "Yes" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancel"`;
+				if ($result == "Cancel"){		
+					warning "User Cancelled Camera Master";
+					return;
+				}
+				select "renderCamShape";
+				select -add "renderCam";
+				abxShotsArchiveFile($cameraMasterPath, "master");
+				namespace -f -mv "cam" ":";
+				namespace -rm "cam";
+				namespace -set ":";
+
+				file -force -type "mayaAscii" -options "v=0" -es $cameraMasterPath;
+
+				$result = `confirmDialog -title "Confirm" -message ("Camera Master Complete. Would You like to Reference the Master Now?") -button "Yes" -button "No" -defaultButton "Yes" -cancelButton "No" -dismissString "No"`;
+				if ($result == "Yes"){		
+					if (size(`ls -sl`) != 0){
+						delete `ls -sl`;
+					}
+					abxShotsCameraReference($shotName);					
+				}
+				
+			}
+		}
+		else {
+			$result = `confirmDialog -title "Confirm" -message ("Master "+$shotName+" Cam with renderCamShape?") -button "Yes" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancel"`;
+			if ($result == "Cancel"){		
+				warning "User Cancelled Camera Master";
+				return;
+			}
+			select "renderCamShape";
+			select -add "renderCam";
+			abxShotsArchiveFile($cameraMasterPath, "master");
+			file -force -type "mayaAscii" -options "v=0" -es $cameraMasterPath;
+
+			$result = `confirmDialog -title "Confirm" -message ("Camera Master Complete. Would You like to Reference the Master Now?") -button "Yes" -button "No" -defaultButton "Yes" -cancelButton "No" -dismissString "No"`;
+			if ($result == "Yes"){		
+				if (size(`ls -sl`) != 0){
+					delete `ls -sl`;
+				}
+				abxShotsCameraReference($shotName);					
+			}
+		}	
+		abxShotsUpdateDetailsFromScene($shotName, "camDetails");
+	}
+	else {
+		confirmDialog -title "Confirm" -message "No renderCam or cam:renderCam found in scene. Please rename your primary camera to renderCam and retry";
+
+	}
+
+	
+
+}
+
+// Masters the camera into the shot's CAM folder. 
+global proc abxShotsCheckCamera () {
+
+	
+
+
+
+}
+
+
+global proc abxShotsCameraMakeEditable () {
+
+	string $shotNames[] = `treeView -q -si abxShotsList`;
+	string $shotName = $shotNames[0];
+
+	// check for sequence name
+	string $sequenceName = "";
+	string $tokenBuffer[];
+	tokenize $shotName "/" $tokenBuffer;
+	if (size($tokenBuffer)>1)
+		$sequenceName = $tokenBuffer[0];
+	
+	string $sceneName = basenameEx(`file -q -sn`);
+	
+	if ($sequenceName != ""){
+		$sceneName = ($sequenceName +"/"+ $sceneName);
+	}
+	
+	string $sceneShotName = `abxShotsGetSceneShotName $sceneName`;
+	if (`abxShotsGetSceneShotName $sceneName` != $shotName){
+		string $buttonName = ("Edit "+$sceneShotName+" Camera");
+		string $result = `confirmDialog -title "Confirm" -message ("This scene file does not appear to be "+$shotName+".") -button $buttonName -button "Cancel"`;
+		if ($result == "Cancel"){
+			return;
+		}
+		else if ($result == $buttonName){
+			$shotName = $sceneShotName;
+		} 
+	}
+	
+	string $shotFileName = `abxShotsGetShortName $shotName`;
+	
+	// if reference exists 
+	if (`objExists "cam:renderCamShape"`){
+		if (`referenceQuery -inr "cam:renderCamShape"` == 1){
+
+			$result = `confirmDialog -title "Confirm" -message ("This will Import the Referenced Camera so you can edit it. You will have to reset your viewport to look through the camera.") -button "OK" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancle"`;
+			if ($result == "Cancel"){		
+				warning "User Cancelled Camera Edit";
+				return;
+			}
+
+			// unload the reference
+			$refNode = `referenceQuery -rfn "cam:renderCamShape"`;
+			// file -unloadReference $refNode;
+			// set the lock state to 0
+			// setAttr ($refNode+".locked") 0;
+
+			// load the reference
+			// file -loadReference $refNode;
+			// import the reference
+			string $refFile = `referenceQuery -f $refNode`;
+			file -ir $refFile;
+		}
+		else {
+			confirmDialog -title "Confirm" -message "The Camera (cam:renderCam) is already imported into this scene and editable.";
+		}
+	}
+	else {
+		confirmDialog -title "Confirm" -message "This Scene does not reference the master camera. (cam:renderCamShape). Please reference the camera master in your scene and try again";
+	}
+
+}
+
+global proc abxShotsCameraReference (string $shotName){
+
+
+
+	if ($shotName == ""){
+		string $shotNames[] = `treeView -q -si abxShotsList`;
+		$shotName = $shotNames[0];
+	}
+
+	// check for sequence name
+	string $sequenceName = "";
+	string $tokenBuffer[];
+	tokenize $shotName "/" $tokenBuffer;
+	if (size($tokenBuffer)>1)
+		$sequenceName = $tokenBuffer[0];
+	
+	string $sceneName = basenameEx(`file -q -sn`);
+	
+	if ($sequenceName != ""){
+		$sceneName = ($sequenceName +"/"+ $sceneName);
+	}
+
+	string $sceneShotName = `abxShotsGetSceneShotName $sceneName`;
+	if (`abxShotsGetSceneShotName $sceneName` != $shotName){
+		string $buttonName = ("Use "+$sceneShotName+" Camera");
+		string $result = `confirmDialog -title "Confirm" -message ("This scene file does not appear to be "+$shotName+".") -button $buttonName -button "Force" -button "Cancel"`;
+		if ($result == "Cancel"){
+			return;
+		}
+		else if ($result == $buttonName){
+			$shotName = $sceneShotName;
+			$shotFileName = $shotName;
+		} 
+	}
+
+	string $shotFileName = `abxShotsGetShortName $shotName`;
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+
+	string $cameraMasterPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/"+$shotName+"/CAM/master/"+$shotFileName+"_cam_master.ma");
+
+	if (`filetest -r $cameraMasterPath`){
+	if (`namespace -exists "cam"`){
+		if (`referenceQuery -inr "cam:renderCamShape"` == 1){
+			string $refNode = `referenceQuery -f "cam:renderCamShape"`;
+			//file -rr $refNode;
+			file -loadReference "camRN" -type "mayaAscii" -options "v=0" $cameraMasterPath;
+
+
+		}
+		else {
+			if (`namespace -exists "cam"`){
+				namespace -f -mv "cam" ":";
+				namespace -rm "cam";
+			}
+		
+			namespace -set ":";
+			file -r -type "mayaAscii" -gl -loadReferenceDepth "all" -namespace "cam" -options "v=0" $cameraMasterPath;
+		}
+		
+	}
+	else {
+		file -r -type "mayaAscii" -gl -loadReferenceDepth "all" -namespace "cam" -options "v=0" $cameraMasterPath;
+	}
+	}
+	else {
+		confirmDialog -title "Confirm" -message ("There is no camera master for this shot: "+$shotName+".");
+	}
+}
+
+
+global proc string abxShotsGetSceneShotName (string $sceneFile){
+
+	
+	string $tokenBuffer[];
+	tokenize $sceneFile "_" $tokenBuffer;
+	if (size($tokenBuffer) > 2)
+		return ($tokenBuffer[0]+"_"+$tokenBuffer[1]);
+	else 
+		return "";
+	
+}
+
+global proc string abxShotsGetSceneTakeName (string $sceneFile) {
+
+	string $tokenBuffer[];
+	tokenize $sceneFile "_" $tokenBuffer;
+
+	string $takeName = "";
+	int $takeIndex = (size($tokenBuffer)-2);
+	if ($tokenBuffer[$takeIndex] != "anm" && $tokenBuffer[$takeIndex] != "fx" && $tokenBuffer[$takeIndex] != "lgt" && $tokenBuffer[$takeIndex] != "pre"){
+		$takeName = $tokenBuffer[$takeIndex];
+	}
+	if (size($tokenBuffer) > 2)
+		return $takeName;
+	else 
+		return "";
+
+}
+
+
+global proc string abxShotsGetLatestWorkVersion (string $shotName, string $dept, string $takeName) {
+
+		print ("abxGetVesion ShotName Param="+$shotName+"\n");
+		string $shotFileName = `abxShotsGetShortName $shotName`;
+		string $shotFolder = `abxShotsGetActiveShotFolder`;
+		print ("abxGetVesion $takeName="+$takeName+"\n");
+		
+
+		string $workPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/"+$shotName+"/"+toupper($dept)+"/work/");
+		// get the contents of the work directory
+		print ("latest version workPath="+$workPath+"\n");
+
+		string $filePrefix = ($shotFileName+"_"+$dept+"_");
+		if($takeName != "")
+			$filePrefix += ($takeName+"_");
+		string $workFolderFiles[] = `getFileList -fs ($filePrefix+"*") -folder $workPath`;
+		string $workScenes[];
+		string $latestFoundVersion = "v000";
+		int $highestVersion = 0;
+
+		print ("filePrefix="+$filePrefix+"\n");
+			
+		// iterate through the files to find the latest version number
+		for ($each in $workFolderFiles){
+			// match to the file naming structure
+			if (`gmatch $each ($filePrefix+"*")`){
+				$workScenes[size($workScenes)] = $each;
+				string $wholeFileName = basenameEx($each);
+				// added a plus 1
+				int $prefixSize = size($filePrefix)+1;
+				int $filenameSize = size($wholeFileName);
+				string $fileName = `substring $wholeFileName $prefixSize $filenameSize`;
+				//print ("FoundFilename="+$fileName+"\n");
+				string $tokenBuffer2[];
+				tokenize $fileName "_" $tokenBuffer2;
+				string $workVersion = "";
+				$workVersion = $tokenBuffer2[0];
+				
+				// cut off the 'v' from the string for conversion to integer
+				string $numOnly = substring($workVersion,2,size($workVersion));
+				int $wVersionInt = int($numOnly);
+				if ($wVersionInt > $highestVersion){
+					$highestVersion = $wVersionInt;
+					$latestFoundVersion = $workVersion;
+				}
+			}
+		}
+
+		if ($latestFoundVersion != ""){
+			print ($latestFoundVersion+"\n");
+			return $latestFoundVersion;
+		}
+		else {
+			return "";
+		}
+	
+}
+
+global proc abxShotsArchiveFile (string $filePath, string $type) {
+
+	string $pathOnly = dirname($filePath);
+	
+	string $extension = fileExtension($filePath);
+	string $sceneName= basename($filePath,("."+$extension));
+	
+
+
+	// create an archive of the current file
+
+	// if there is a log file, record its workshop version and append it to the file name
+
+	// 
+
+	if ($type == "publish"){
+		
+
+	}
+	else if ($type == "master") {
+		// check to see if there is an archive folder
+		string $archFolder = ($pathOnly+"/archive/");
+		if (!`filetest -d $archFolder`)
+			sysFile -md $archFolder;
+		if (`filetest -d $archFolder`){			
+			$archiveFiles = `getFileList -folder $archFolder`;
+			int $latestVersion = 0;
+			string $each;
+			for ($each in $archiveFiles){
+				string $tokenBuffer[];
+				tokenize $each "." $tokenBuffer;
+				if (size($tokenBuffer) == 2){
+					string $tokenBuffer2[];
+					tokenize $tokenBuffer[0] "_" $tokenBuffer2;
+					//if (size($tokenBuffer2) == 4){
+						string $foundVersionStr =  $tokenBuffer2[size($tokenBuffer2)-1];
+						int $strSize = size($foundVersionStr);
+						int $foundVersion = int(`substring $foundVersionStr 2 $strSize`);
+						if ($latestVersion < $foundVersion){
+							$latestVersion = $foundVersion;
+							print ("foundVersion = "+$foundVersion+"\n");
+						}
+					//}
+				}
+			}
+			$latestVersion++;
+			string $latestVersionStr = "";
+			if ($latestVersion < 10)
+				$latestVesionStr = ("v00"+$latestVersion);
+			else if ($latestVersion < 100)
+				$latestVesionStr = ("v0"+$latestVersion);
+			else 
+				$latestVesionStr = ("v"+$latestVersion);
+
+			
+			string $archivePath = ($pathOnly+"/archive/"+$sceneName+"_"+$latestVesionStr+"."+$extension);
+			print ("Archiving to :"+$archivePath+"\n");
+			sysFile -move $archivePath $filePath ;
+		}
+	}
+	
+
+}
+
+global proc abxShotsCaptureThumbnail (string $shotName) {
+
+
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+	string $shotsPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/");
+	if ($shotName == ""){
+	
+		string $shotNames[];
+		if ($shotFolder == "_PREVIS")
+			$shotNames = `treeView -q -si abxPrevisList`;
+		else 
+			$shotNames = `treeView -q -si abxShotsList`;
+		$shotName = $shotNames[0];
+	}
+
+	string $shotFileName = `abxShotsGetShortName $shotName`;
+
+	$result = `confirmDialog -title "Confirm" -message ("Overwrite Existing Thumbnail?") -button "Yes" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancle"`;
+	if ($result == "Cancel"){		
+		warning "User Cancelled Thumbnail Capture";
+		return;
+	}
+
+	string $pbPath = ($shotsPath+$shotName+"/"+$shotFileName+".png");
+	print ("thumbnailPath="+$pbPath+"\n");
+
+	// set render globals
+	//setAttr "defaultRenderGlobals.animation" 1;
+	//setAttr defaultRenderGlobals.outFormatControl 0;
+	//setAttr "defaultRenderGlobals.extensionPadding" 4;
+
+	int $imgFormat = `getAttr defaultRenderGlobals.imageFormat`;
+
+	// PNG image format
+	setAttr defaultRenderGlobals.imageFormat 32;
+	float $curFrame = `currentTime -q`;
+	int $imgWidth = 177;
+	int $imgHeight = 100;
+	
+	print (`playblast -ae`+"\n");
+
+	// setup the playblast as a command string for deferred evaluation
+	
+	string $cmd = ("playblast  -format iff -completeFilename \""+$pbPath+"\" -frame "+$curFrame+" -forceOverwrite -sequenceTime 0 -clearCache 1 -viewer 0 -showOrnaments 0 -percent 100 -widthHeight "+$imgWidth+" "+$imgHeight+";\n");
+	
+	if (`about -version` == "2012 x64" || `about -version` == "2012"){
+		$cmd = ("playblast  -format iff -filename \""+$pbPath+"\" -frame "+$curFrame+" -fp 0 -forceOverwrite -sequenceTime 0 -clearCache 1 -viewer 0 -showOrnaments 0 -percent 100 -compression \"png\" -widthHeight "+$imgWidth+" "+$imgHeight+";\n");
+		$cmd += ("sysFile -rename \""+$pbPath+"\" \""+$pbPath+".0.png\";");
+	}
+ 
+	// add to the deferred command to return the render global image format to sgi
+	$cmd += ("setAttr defaultRenderGlobals.imageFormat "+$imgFormat+";\n");
+	$cmd += ("abxShotsRefreshDetailsUI \""+$shotName+"\";\n") ;
+	// run the playblast command as deferred evaluation
+	//print ($cmd);
+	evalDeferred ($cmd);
+
+	
+}
+
+global proc abxShotsWriteShotDetails (string $shotName, string $shotDetails[]){
+
+	string $shotFileName = `abxShotsGetShortName $shotName`;
+	string $shotFolder = `abxShotsGetActiveShotFolder`;
+
+	string $detailsFile = (`workspace -q -rd`+"scenes/"+$shotFolder+"/"+$shotName+"/"+$shotFileName+"_details.txt");
+	
+	if (size($shotDetails) == 10){
+
+		$fileId=`fopen $detailsFile "w"`;
+
+		fprint $fileId ("abxShotsVersion=1.0\n");
+		fprint $fileId ("shotName="+$shotName+"\n");
+		fprint $fileId ("resolution="+$shotDetails[0]+"\n");
+		fprint $fileId ("frameRate="+$shotDetails[1]+"\n");
+		fprint $fileId ("startFrame="+$shotDetails[2]+"\n");
+		fprint $fileId ("endFrame="+$shotDetails[3]+"\n");
+		fprint $fileId ("camVersion="+$shotDetails[4]+"\n");
+		fprint $fileId ("camDate="+$shotDetails[5]+"\n");
+		fprint $fileId ("anmStatus="+$shotDetails[6]+"\n");
+		fprint $fileId ("fxStatus="+$shotDetails[7]+"\n");
+		fprint $fileId ("lgtStatus="+$shotDetails[8]+"\n");
+		fprint $fileId ("notes="+$shotDetails[9]+"\n");
+
+		fclose $fileId;
+
+	}
+	else {
+		Print ("Shot details not written, incorrect number of elements in shotDetail array\n");
+	}
+
+}
+
+global proc string[] abxShotsGetShotDetails (string $shotName) {
+	
+	string $shotFileName = `abxShotsGetShortName $shotName`;
+	string $shotFolder = `abxShotsGetActiveShotFolder`;	
+
+	string $detailsFile = (`workspace -q -rd`+"scenes/"+$shotFolder+"/"+$shotName+"/"+$shotFileName+"_details.txt");
+	string $shotDetails[];
+	string $headerData="";
+	string $nextLine="";
+	string $tokenBuffer[];
+	
+
+	if (`filetest -f ($detailsFile)`){
+		 $fileId=`fopen $detailsFile "r"`;
+			
+			$nextLine = `fgetline $fileId`;
+			tokenize $nextLine "=" $tokenBuffer;
+			string $abxShotsVersion = strip($tokenBuffer[1]);
+			//print ("ver is "+$abxShotsVersion+"\n");
+	
+			
+			$nextLine = `fgetline $fileId`;
+			tokenize $nextLine "=" $tokenBuffer;
+			string $abxShotsName = strip($tokenBuffer[1]);
+			//print ("shotName is "+$abxShotsName+"\n");
+
+			int $index = 0;
+			while (size($nextLine) > 0){
+				
+ 				$nextLine = `fgetline $fileId`;
+				tokenize $nextLine "=" $tokenBuffer;
+				$shotDetails[$index] = strip($tokenBuffer[1]);
+				$index++;
+			}
+ 		fclose $fileId;
+		return $shotDetails;
+	}
+	else{
+		print ($detailsFile+" File not Found. Ignoring.\n");
+		return {""};
+	}
+	
+	
+
+}
+
+global proc abxShotsBrowseShot (string $shotName){
+
+	string $shotsPath = (`workspace -q -rd`+"scenes/_ALL_SHOTS/");
+	$projPath = toNativePath($shotsPath+$shotName); 
+	if (`about -os ` == "mac")
+		exec ("open -a finder \""+$projPath+"\"");
+	else 
+		system(("start explorer "+$projPath));
+}
+
+global proc abxShotsImportAllReferences () {
+	string $refNodes[] = `file -q -r`;
+	for ($each in $refNodes){
+		
+		referenceEdit -failedEdits true -successfulEdits false -removeEdits $each;
+		// not sure why but some references crash while importing and quering the edit strings seems to fix it
+		referenceQuery -editStrings $each;
+		file -ir $each;
+	}
+}
+
+global proc abxShotsDeleteAllRefNodes (){
+	select -clear;
+	string $refNodes[] = `ls -type reference`;
+	for ($each in $refNodes){
+		lockNode -lock 0 $each;
+		delete $each;
+	}
+	
+
+}
+
+global proc abxShotsDeleteAllRenderLayers (){
+	select -clear;
+	string $renderLayers[] = `ls -type renderLayer`;
+
+	for ($each in $renderLayers){
+		if (!`gmatch $each "*defaultRenderLayer*"`){
+			renderLayerEditorDeleteLayer RenderLayerTab $each;
+			//delete $each;
+			updateEditorRenderLayer RenderLayerTab;
+			print ("Deleting Render Layer "+$each+"\n");
+		}
+	}
+
+
+	$renderLayers = `ls -type renderLayer`;
+	
+	for ($each in $renderLayers){
+		if (!`gmatch $each "defaultRenderLayer"`)
+			delete $each;
+	}
+
+}
+
+global proc abxShotsDeleteAllDisplayLayers (){
+	select -clear;
+	string $renderLayers[] = `ls -type displayLayer`;
+	for ($each in $renderLayers){
+		if (!`gmatch $each "defaultLayer"`)
+			delete $each;
+	}
+
+}
+
+global proc string[] abxShotsSort (string $listArray[]){
+	// do a sort that is based on underscore seperations
+
+	string $result[];
+
+	for ($i=0;$i<size($listArray);$i++){
+		string $tokenBuffer[];
+		tokenize $listArray[$i] "_" $tokenBuffer;
+		
+
+	}
+	return $result;
+}
+
+global proc abxDeleteAllRN() {
+	// clear out old reference nodes
+	$oldRN = `ls -type reference`;
+	for ($each in $oldRN){
+		lockNode -l 0 $each;
+		delete $each;
+	}
+
+}
+
+global proc abxDeleteUnknownRefNodes (){
+	select `ls -r 1 -type reference "*UNKNOWN*"`;
+	if (size(`ls -sl`) > 0)
+		lockNode -l 0;
+	delete `ls -r 1 -type reference "*UNKNOWN*"`;
+}
+
+global proc abxDeleteSharedRefNodes (){
+	select `ls -r 1 -type reference "*shared*"`;
+	if (size(`ls -sl`) > 0)
+		lockNode -l 0;
+	delete `ls -r 1 -type reference "*shared*"`;
+}
+
+
+global proc abxShotsUpdateDetailsFromScene(string $shotName, string $updateWhat) {
+
+	string $shotDetails[];
+	string $shotFileName = `abxShotsGetShortName $shotName`;
+
+	string $oldDetails[] = abxShotsGetShotDetails($shotName);
+
+	// res
+	$shotDetails[0]=$oldDetails[0];
+	//framerate
+	$shotDetails[1]=$oldDetails[1];
+	//anim start frame
+	$shotDetails[2]=$oldDetails[2];
+	//anim end frame
+	$shotDetails[3]=$oldDetails[3];
+	// cam version
+	$shotDetails[4]=$oldDetails[4];
+	//camDate
+	$shotDetails[5]=$oldDetails[5];
+	//anmStatus
+	$shotDetails[6]=$oldDetails[6];
+	//fxStatus
+	$shotDetails[7]=$oldDetails[7];
+	//lgtStatus
+	$shotDetails[8]=$oldDetails[8];
+	//notes
+	$shotDetails[9]=$oldDetails[9];
+
+	if ($updateWhat == "shotDetails" || $updateWhat == "all"){
+		// resolution
+		getAttr "defaultResolution.width";
+
+		$shotDetails[0] = (`getAttr "defaultResolution.width"`+" X "+`getAttr "defaultResolution.height"`);
+
+		// frame rate
+		$shotDetails[1]= `currentUnit -q -time`;
+
+		$shotDetails[2] = `playbackOptions -q -min`;
+		$shotDetails[3] = `playbackOptions -q -max`;
+	}
+
+	if ($updateWhat == "camDetails"){
+		// cam version
+		$shotDetails[4]=$oldDetails[4];
+		//camDate
+		$shotDetails[5]=`date`;
+	}
+
+	if ($updateWhat == "notes" || $updateWhat == "all"){
+		
+	}
+	
+	abxShotsWriteShotDetails ($shotName, $shotDetails);
+
+}
+
+global proc string[] abxShotsGetSequences (string $shotFolder) {
+
+	string $results[];
+	string $projectPath = `workspace -q -rd`;
+	string $shotsFolder[] = `getFileList -folder ($projectPath+"/scenes/"+$shotFolder+"/")`;
+
+	string $sorted[] = sort($shotsFolder);
+
+	for ($each in $sorted){
+		if (`filetest -d ($projectPath+"/scenes/"+$shotFolder+"/"+$each+"/")`){
+			if ($each != ".DS_Store"){
+
+				// determine if it is a scene subfolder
+				string $subFolders[] = `getFileList -folder ($projectPath+"/scenes/"+$shotFolder+"/"+$each+"/")`;
+
+				int $isShotFolder = 0;
+				for ($every in $subFolders){
+					if ($isShotFolder == 0){
+						if  ($every == "ANM" || $every == "LGT" || $every == "FX" || $every == "PRE"){
+							$isShotFolder = 1;
+						}
+					}
+					else {
+						break;
+					}
+				}
+
+				if ($isShotFolder == 0){
+					$results[(size($results))] = $each;
+				}
+			}
+		}
+	}
+	return $results;
+}

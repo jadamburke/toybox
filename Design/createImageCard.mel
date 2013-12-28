@@ -1,0 +1,17 @@
+// createImageCard
+
+global proc createImageCard () {
+
+	// browse for image
+
+	// create polygon
+
+	// get file dimensions
+
+	// resize polyPlane to match
+
+	// create surface shader
+
+	// connect poly to shader
+
+}

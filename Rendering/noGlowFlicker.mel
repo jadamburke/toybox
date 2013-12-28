@@ -1,0 +1,29 @@
+// noFlickerPlanets
+
+setAttr "shaderGlow1.autoExposure" 0;
+setAttr "shaderGlow1.quality" 0.5;
+setAttr "shaderGlow1.threshold" 0;
+setAttr "shaderGlow1.radialFrequency" 0.5;
+setAttr "shaderGlow1.starPoints" 4;
+setAttr "shaderGlow1.rotation" 0;
+setAttr "shaderGlow1.glowColor" -type double3 1 1 1 ;
+setAttr "shaderGlow1.glowIntensity" 0.15;
+setAttr "shaderGlow1.glowSpread" 0.05;
+setAttr "shaderGlow1.glowEccentricity" 0.1;
+setAttr "shaderGlow1.glowRadialNoise" 0;
+setAttr "shaderGlow1.glowStarLevel" 0;
+setAttr "shaderGlow1.glowOpacity" 0;
+setAttr "shaderGlow1.glowRingIntensity" 0;
+setAttr "shaderGlow1.glowRingFrequency" 0.5;
+setAttr "shaderGlow1.glowFilterWidth" 23;
+setAttr "shaderGlow1.haloColor" -type double3 1 1 1 ;
+setAttr "shaderGlow1.haloColor" -type double3 1 1 1 ;
+setAttr "shaderGlow1.haloIntensity" 0.15;
+setAttr "shaderGlow1.haloSpread" 0.3;
+setAttr "shaderGlow1.haloEccentricity" 0.1;
+setAttr "shaderGlow1.haloRadialNoise" 0;
+setAttr "shaderGlow1.haloStarLevel" 0;
+setAttr "shaderGlow1.haloOpacity" 0;
+setAttr "shaderGlow1.haloRingIntensity" 0;
+setAttr "shaderGlow1.haloRingFrequency" 0.5;
+setAttr "shaderGlow1.haloFilterWidth" 25;

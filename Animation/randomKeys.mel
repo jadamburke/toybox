@@ -1,0 +1,146 @@
+// randomKeys
+global proc randomKeys () {
+
+    if (`window -ex abxPendulateWindow` != true)
+        {
+	window -w 210 -h 134 -ret -menuBar true -t "randomKeys" -in "randomKeys" -s true -tb true randomKeysWindow;
+				
+		menu -hm true -label "Help";
+		menuItem -label "How To Use..." -c "abxPendulateHelp";
+		menuItem -label "About" -c "abxPendulateAbout";
+		menuItem -d true;
+		menuItem -label "Close" -c "window -e -vis 0 abxPendulateWindow";
+
+	
+	formLayout mainForm;
+
+
+
+	//separator -style "in" -h 3 sep0 ;
+	columnLayout;
+	floatFieldGrp -label "Min" fltMinValue;
+	floatFieldGrp -label "Max" fltMaxValue; 
+	floatFieldGrp -label "Interval" fltIntervalValue;
+	floatFieldGrp -label "Interval Rand" fltIntervalRandValue;
+
+	/*
+	floatSliderGrp 
+		-label "Decay"
+		-field true
+		-minValue 0.001
+		-maxValue 0.990
+		-fieldMinValue 0.001
+		-fieldMaxValue 0.990
+		-value 0.75
+		-pre 2
+		-cw 1 60
+		-cw 2 40
+		-cw 3 20
+		-adj 3
+		sldrDecay;
+	floatSliderGrp
+		-label "Tolerance"
+		-field true
+		-minValue 0.001
+		-maxValue 1
+		-fieldMinValue 0.001
+		-fieldMaxValue 10
+		-value 0.05
+		-pre 2
+		-cw 1 60
+		-cw 2 40
+		-cw 3 20
+		-adj 3
+		sldrTol;
+	*/
+	setParent..;
+	button -l "Randomize Keys" 
+		-c "randomKeysProc(`floatFieldGrp -q -v1 fltMinValue`, `floatFieldGrp -q -v1 fltMaxValue`, `floatFieldGrp -q -v1 fltIntervalValue`, `floatFieldGrp -q -v1 fltIntervalRandValue`);window -e -vis 0 randomKeysWindow" 
+		-al "center" 
+		-h 26 
+		btnRandKeys ;
+	button 
+		-l "Apply" 
+		-c "randomKeysProc(`floatFieldGrp -q -v1 fltMinValue`, `floatFieldGrp -q -v1 fltMaxValue`, `floatFieldGrp -q -v1 fltIntervalValue`, `floatFieldGrp -q -v1 fltIntervalRandValue`);" 
+		-al "center" 
+		-h 26 btnApply;
+	button -l "Close" 
+		-c "window -e -vis 0 randomKeysWindow" 
+		-al "center" 
+		-h 26 btnClose ;
+
+		/*
+		-attachForm fltMinValue "left" 5
+		-attachNone fltMinValue "right" 
+		-attachForm fltMinValue "top" 5
+		-attachNone fltMinValue "bottom"
+
+		-attachForm fltMaxValue "left" 25
+		-attachNone fltMaxValue "right"
+		-attachForm fltMaxValue "top" 5
+		-attachNone fltMaxValue "bottom"
+
+		-attachForm fltIntervalValue "left" 5
+		-attachNone fltIntervalValue "right"
+		-attachForm fltIntervalValue "top" 25
+		-attachNone fltIntervalValue "bottom"
+
+		-attachForm fltIntervalRandValue "left" 5
+		-attachNone fltIntervalRandValue "right"
+		-attachForm fltIntervalRandValue "top" 45
+		-attachNone fltIntervalRandValue "bottom"
+		*/
+	
+	formLayout -e
+
+	
+	    -attachForm btnRandKeys "left" 5 
+	    -attachPosition btnRandKeys "right" 3 33
+	    -attachNone btnRandKeys "top"
+	    -attachForm btnRandKeys "bottom" 5
+
+	    -attachPosition btnApply "left" 3 33 
+	    -attachPosition btnApply "right" 3 66
+	    -attachNone btnApply "top"
+	    -attachForm btnApply "bottom" 5
+	    
+	    -attachPosition btnClose "left" 3 66
+	    -attachForm btnClose "right" 5
+	    -attachNone btnClose "top"
+	    -attachForm btnClose "bottom" 5
+	
+	    mainForm ;
+
+	window -e -w 210 -h 134 randomKeysWindow;
+	showWindow randomKeysWindow;
+	}
+    	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 210 -h 134 arandomKeysWindow;
+		showWindow randomKeysWindow;
+	}
+
+}
+
+global proc randomKeysProc (float $minVal, float $maxVal, float $interval, float $intervalRand) {
+
+	// selected channels
+	$selNodes = `ls -sl`;
+	$selChannels = `channelBox -q -sma mainChannelBox`;
+	$startTime  = `playbackOptions -q -min`;
+	$endTime = `playbackOptions -q -max`;
+
+	for ($each in $selNodes) {
+		for ($every in $selChannels){
+			$randInterval = $interval + rand(-$intervalRand,$intervalRand);
+			for ($i=$startTime;$i<$endTime;$i=$i+$randInterval){
+				$randValue = rand($minVal,$maxVal);
+				setKeyframe -v $randValue -t $i ($each+"."+$every);
+				$randInterval = $interval + rand(-$intervalRand,$intervalRand);
+			}
+
+		}
+
+	}
+
+}

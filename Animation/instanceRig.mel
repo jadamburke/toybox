@@ -1,0 +1,50 @@
+// instanceRig
+// Created by: adam
+// Date: 2013/03/22 14:40:25
+
+global proc instanceRig()
+{
+    $sel = `ls -sl -type transform`;
+    string $each = "";
+    for ($each in $sel){
+        if (`gmatch $each "*:ROOT"`){
+        string $tokenBuffer[];
+        tokenize $each ":" $tokenBuffer;
+        $instAssetNamespace = $tokenBuffer[0];
+        $instLocName = ($instAssetNamespace+"_INST");
+        $newLoc = `spaceLocator -name $instLocName`;
+        $instLocName = $newLoc[0];
+        
+        $trans = `xform -q -a -ws -t $each`;
+        $rot = `xform -q -a -ws -ro $each`;
+        $scl = `xform -q -r -s $each`;
+        xform -a -ws -t $trans[0] $trans[1] $trans[2] $instLocName;
+        xform -a -ws -ro $rot[0] $rot[1] $rot[2] $instLocName;
+        xform -s $scl[0] $scl[1] $scl[2] $instLocName;  
+
+        $instRenamePrefix = ($instLocName+"_");//`substitute "_PROP_" $each ""`;
+        $dupeROOT = `duplicate -po -name ($instRenamePrefix+"ROOT") ($instAssetNamespace+":ROOT")`;
+        $dupeMOVER = `duplicate -po -name ($instRenamePrefix+"MOVER") ($instAssetNamespace+":MOVER")`;
+        $newInst = `duplicate -po -name ($instRenamePrefix+"BODY") ($instAssetNamespace+":BODY")`;
+        //$newInstGeo = `instance -name ($instRenamePrefix+"GEO") ($instAssetNamespace+":GEO")`;
+
+        // manual instance which avoids the excessive set connections that the instance command creates
+        $newInstGeo = `duplicate -po -name ($instRenamePrefix+"GEO") ($instAssetNamespace+":GEO")`;
+        string $child[] = `listRelatives -children ($instAssetNamespace+":GEO")`;
+        for ($every in $child)
+            parent -s -r -add $every $newInstGeo;
+        setAttr ($newInstGeo[0]+".inheritsTransform") 1;
+        evalEcho("parent -r "+$dupeMOVER[0]+" "+$dupeROOT[0]);
+        evalEcho("parent -r "+$newInst[0]+" "+$dupeMOVER[0]);
+        evalEcho("parent -r "+$newInstGeo[0]+" "+$dupeROOT[0]);
+        evalEcho("parent -r "+$dupeROOT[0]+" "+$instLocName);
+        setAttr ($dupeROOT[0]+".translate") 0 0 0;
+        setAttr ($dupeROOT[0]+".rotate") 0 0 0;         
+        setAttr ($dupeROOT[0]+".overrideEnabled") 1;
+        setAttr ($dupeROOT[0]+".overrideColor") 3;
+        }
+        else{
+          warning($each+" skipped because it does not appear to be a Asset Rig");
+        }
+    }
+}

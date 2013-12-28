@@ -1,0 +1,38 @@
+// selectStaticAnimCurves
+global proc selectStaticAnimCurves () {
+
+	string $animCurvesToSelect[];
+
+	string $animationCurves[] = `ls -sl -type "animCurveTU"  -type "animCurveTA" -type "animCurveTL" -type "animCurveTT"`;
+	for ($each in $animationCurves){
+		
+		int $keyCount = `keyframe -q -kc $each`;
+		//print ($each+" keycount="+$keyCount+"\n");
+		if ($keyCount < 2){
+			$animCurvesToSelect[size($animCurvesToSelect)] = $each;
+		}
+		
+		else {
+			float $foundValue[] = `keyframe -index 0 -q -vc $each`;
+			int $isDifferent = 0;
+			for ($i=1;$i<$keyCount;$i++){
+				float $testValue[] = `keyframe -index $i -q -vc $each`;
+				if ($testValue[0] != $foundValue[0]){
+					$isDifferent = 1;
+					$i = $keyCount;
+				}
+
+			}
+			if ($isDifferent == 0){
+				$animCurvesToSelect[size($animCurvesToSelect)] = $each;
+			}
+
+		}
+		
+
+	}
+	
+	select $animCurvesToSelect;
+	print ("Selected "+size($animCurvesToSelect)+" Curves\n");
+
+}

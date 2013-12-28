@@ -1,0 +1,145 @@
+// kaleidaTwelve
+global proc kaleidaTwelve(){
+
+	$selectedNodes = `ls -sl -type transform`;
+	for ($each in $selectedNodes){
+		duplicate -name ($each+"_copy") $each;
+		
+		cluster -name ($each+"Cluster") $each;
+		cluster -name ($each+"_copyCluster") ($each+"_copy");
+
+		// make locator to constrain it to cluster1's position
+		$locName = `createNode locator`;
+		rename `listRelatives -p $locName` ($each+"_MirrorLoc");
+		float $pivot[] = `xform -q -ws -piv ($each+"ClusterHandle")`;
+		setAttr ($each+"_MirrorLocShape.localPositionX") $pivot[0];
+		setAttr ($each+"_MirrorLocShape.localPositionY") $pivot[1];
+		setAttr ($each+"_MirrorLocShape.localPositionZ") $pivot[2];
+		setAttr ($each+"_MirrorLoc.spx") $pivot[3];
+		setAttr ($each+"_MirrorLoc.spy") $pivot[4];
+		setAttr ($each+"_MirrorLoc.spz") $pivot[5];
+		setAttr ($each+"_MirrorLoc.rpx") $pivot[0];
+		setAttr ($each+"_MirrorLoc.rpy") $pivot[1];
+		setAttr ($each+"_MirrorLoc.rpz") $pivot[2];	
+		setAttr ($each+"_MirrorLoc.visibility") 0;	
+
+		pointConstraint -offset 0 0 0 -weight 1 ($each+"ClusterHandle") ($each+"_MirrorLoc");
+		orientConstraint -offset 0 0 0 -weight 1 ($each+"ClusterHandle") ($each+"_MirrorLoc");
+		scaleConstraint -offset 1 1 1 -weight 1 ($each+"ClusterHandle") ($each+"_MirrorLoc");
+
+		group -name ($each+"_MirrorClstr") ($each+"_copyClusterHandle");
+		setAttr ($each+"_MirrorClstr.spx") 0;
+		setAttr ($each+"_MirrorClstr.spy") 0;
+		setAttr ($each+"_MirrorClstr.spz") 0;
+		setAttr ($each+"_MirrorClstr.rpx") 0;
+		setAttr ($each+"_MirrorClstr.rpy") 0;
+		setAttr ($each+"_MirrorClstr.rpz") 0;
+		setAttr ($each+"_MirrorClstr.sy") -1;
+		
+		select $each;
+		MirrorCutPolygonGeometry;
+		rename "mirrorCutPlane1" ($each+"_mcp1");
+		//rename "mirroredCutMesh1" ($each+"_mcm1");
+		delete "mirroredCutMesh1";
+		setAttr ($each+"_mcp1.translateX") 0;
+		setAttr ($each+"_mcp1.translateY") 0;
+		setAttr ($each+"_mcp1.translateZ") 0;
+		setAttr ($each+"_mcp1.rotateX") -90;
+		setAttr ($each+"_mcp1.rotateY") 0;
+		setAttr ($each+"_mcp1.rotateZ") 0;
+		setAttr ($each+"_mcp1.visibility") 0;
+
+		select $each;
+		MirrorCutPolygonGeometry;
+		rename "mirrorCutPlane1" ($each+"_mcp2");
+		//rename "mirroredCutMesh1" ($each+"_mcm2");
+		delete "mirroredCutMesh1";
+		setAttr ($each+"_mcp2.translateX") 0;
+		setAttr ($each+"_mcp2.translateY") 0;
+		setAttr ($each+"_mcp2.translateZ") 0;
+		setAttr ($each+"_mcp2.rotateX") -90;
+		setAttr ($each+"_mcp2.rotateY") 0;
+		setAttr ($each+"_mcp2.rotateZ") 150;
+		setAttr ($each+"_mcp2.visibility") 0;
+
+		select ($each+"_copy");
+		MirrorCutPolygonGeometry;
+		rename "mirrorCutPlane1" ($each+"_mcp3");
+		//rename "mirroredCutMesh1" ($each+"_mcm3");
+		delete "mirroredCutMesh1";
+		setAttr ($each+"_mcp3.translateX") 0;
+		setAttr ($each+"_mcp3.translateY") 0;
+		setAttr ($each+"_mcp3.translateZ") 0;
+		setAttr ($each+"_mcp3.rotateX") -90;
+		setAttr ($each+"_mcp3.rotateY") 0;
+		setAttr ($each+"_mcp3.rotateZ") 30;
+		setAttr ($each+"_mcp3.visibility") 0;
+
+		select ($each+"_copy");
+		MirrorCutPolygonGeometry;
+		rename "mirrorCutPlane1" ($each+"_mcp4");
+		//rename "mirroredCutMesh1" ($each+"_mcm4");
+		delete "mirroredCutMesh1";
+		setAttr ($each+"_mcp4.translateX") 0;
+		setAttr ($each+"_mcp4.translateY") 0;
+		setAttr ($each+"_mcp4.translateZ") 0;
+		setAttr ($each+"_mcp4.rotateX") -90;
+		setAttr ($each+"_mcp4.rotateY") 0;
+		setAttr ($each+"_mcp4.rotateZ") 180;
+		setAttr ($each+"_mcp4.visibility") 0;
+
+		//group -name ($each+"_MirrorCut_Source") $each ($each+"_copy");
+		//setAttr ($each+"_MirrorCut_Source.rpx") 0;
+		//setAttr ($each+"_MirrorCut_Source.rpy") 0;
+		//setAttr ($each+"_MirrorCut_Source.rpz") 0;
+		//setAttr ($each+"_MirrorCut_Source.spx") 0;
+		//setAttr ($each+"_MirrorCut_Source.spy") 0;
+		//setAttr ($each+"_MirrorCut_Source.spz") 0;
+
+		//instance -n ($each+"_MirrorCut_Instance1") ($each+"_MirrorCut_Source");
+		//setAttr ($each+"_MirrorCut_Instance1.rz") 0;
+		//setAttr ($each+"_MirrorCut_Instance1.sy") -1;
+
+		group -name ($each+"_OneSixth1") $each ($each+"_copy");
+		setAttr ($each+"_OneSixth1.spx") 0;
+		setAttr ($each+"_OneSixth1.spy") 0;
+		setAttr ($each+"_OneSixth1.spz") 0;
+		setAttr ($each+"_OneSixth1.rpx") 0;
+		setAttr ($each+"_OneSixth1.rpy") 0;
+		setAttr ($each+"_OneSixth1.rpz") 0;
+
+		instance -n ($each+"_OneSixth2") ($each+"_OneSixth1");
+		setAttr ($each+"_OneSixth2.rz") -60;
+
+		instance -n ($each+"_OneSixth3") ($each+"_OneSixth1");
+		setAttr ($each+"_OneSixth3.rz") -120;
+
+		instance -n ($each+"_OneSixth4") ($each+"_OneSixth1");
+		setAttr ($each+"_OneSixth4.rz") -180;
+
+		instance -n ($each+"_OneSixth5") ($each+"_OneSixth1");
+		setAttr ($each+"_OneSixth5.rz") -240;
+
+		instance -n ($each+"_OneSixth6") ($each+"_OneSixth1");	
+		setAttr ($each+"_OneSixth6.rz") -300;	
+
+		group -name ($each+"_Kaleido_GEO") ($each+"_OneSixth1") ($each+"_OneSixth2") ($each+"_OneSixth3") ($each+"_OneSixth4") ($each+"_OneSixth5") ($each+"_OneSixth6");
+		setAttr ($each+"_Kaleido_GEO.spx") 0;
+		setAttr ($each+"_Kaleido_GEO.spy") 0;
+		setAttr ($each+"_Kaleido_GEO.spz") 0;
+		setAttr ($each+"_Kaleido_GEO.rpx") 0;
+		setAttr ($each+"_Kaleido_GEO.rpy") 0;
+		setAttr ($each+"_Kaleido_GEO.rpz") 0;
+
+		//instance -n ($each+"_OneHalfInstance") ($each+"_OneHalfSource");
+		//setAttr ($each+"_OneHalfInstance.sx") -1;
+
+
+		group -name ($each+"_MirrorCut_RIG") ($each+"ClusterHandle") ($each+"_MirrorLoc") ($each+"_MirrorClstr") ($each+"_Kaleido_GEO") ($each+"_mcp1") ($each+"_mcp2") ($each+"_mcp3") ($each+"_mcp4");
+
+		connectAttr -f ($each+"_MirrorLoc.translate") ($each+"_copyClusterHandle.translate");
+		connectAttr -f ($each+"_MirrorLoc.rotate") ($each+"_copyClusterHandle.rotate");
+		connectAttr -f ($each+"_MirrorLoc.scale") ($each+"_copyClusterHandle.scale");
+	}
+
+}

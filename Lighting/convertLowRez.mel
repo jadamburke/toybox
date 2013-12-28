@@ -1,0 +1,75 @@
+global proc convertLowRez()
+{
+
+string $fileNodes[] = `ls -type file`;
+for($tmp in $fileNodes)
+{
+    string $cons[] = `listHistory -f true $tmp`;
+    string $SGroup[] = `ls -type shadingEngine $cons`;
+    string $allCons[] = `listConnections -d 1 $SGroup[0]`;
+    string $geos[] = `ls -type transform $allCons`;
+    //print $geos;
+    float $distance[];
+    int $d = 0;
+    string $theOne;
+    float $lo = 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999;
+    for($node in $geos)
+    {
+
+           //print $node; 
+           float $geoPoint[] = `exactWorldBoundingBox $node`;
+           
+
+           
+            float $minTime = `playbackOptions -q -minTime`;
+            float $maxTime = `playbackOptions -q -maxTime`;
+            float $range = $maxTime -$minTime;
+            float $middle = ($range/2)+$minTime;      
+           float $times[] = {$minTime, $middle, $maxTime};
+           for($theTime in $times)       
+           {
+              string $distNode = `createNode distanceBetween -n "geo_texture_DIST"`;
+              connectAttr "renderCam.translate" ($distNode+".point1");
+              setAttr ($distNode+".point2") $geoPoint[0] $geoPoint[1] $geoPoint[2];
+              $theDistance = `getAttr ($distNode+".distance")`;
+               
+               currentTime -edit $theTime;
+               print ("the_time = "+$theTime+"\n");
+               print ("the_geo = "+$node+"\n");
+               print ("the_distance = "+$theDistance+"\n");
+               if ($theDistance < $lo)
+                {
+                    $lo = $theDistance;
+                    $theOne = $node;   
+                }
+                $d = $d+1;
+               delete $distNode; 
+            }
+            
+      }    
+       
+       //print ($theOne+"\n");
+      
+        //go thru the timeslider and find the closest point the object is at
+        
+        
+
+      
+      
+      
+      
+       if($lo > 300)
+       {
+           string $filePath = `getAttr ($tmp+".fileTextureName")`;
+           string $baseFileName = `basenameEx($filePath)`;
+           string $pathParts[];
+           tokenize($filePath,"/",$pathParts);
+           int $pp = `size $pathParts`-1;
+           string $outputPath = substitute($pathParts[$pp],$filePath,($baseFileName+"_LOW.tga"));
+           setAttr -type "string" ($tmp+".fileTextureName") $outputPath;
+           print ($outputPath+"\n");
+       }
+
+
+                  
+}}

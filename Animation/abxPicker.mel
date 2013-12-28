@@ -1,0 +1,2060 @@
+// Picker Maya Script
+// abxPicker.mel
+//
+// Version 2.5 
+// Created by J. Adam Burke adam@adamburke.net
+// Modified : 22 Jul 2012
+
+
+// DESCRIPTION:
+// abxPicker provides artists, animators, and character TDs with an intuitive interface 
+// for creating and using custom character control interfaces. Using drag and drop, you 
+// can create, position, resize, and edit buttons to select character controls. 
+
+// USAGE:
+// Source script and call "abxPicker;"
+// assign to shelf or hotkey as preferred
+
+
+// ©2012 J. Adam Burke 
+// http://www.adamburke.net
+
+// modding for zoom bugs its fixed but hardcoded for namespaces so i need to address this at some point
+
+// added auto selection script job that auto switches characters based on current selection
+// added button hilighting to show what buttons have been pressed since last selection
+// color flashes when dropping a new command on a button
+
+
+// NOTES: things that suck
+// iconTextButtons are always underneat image, iconTextStaticLabel, picture controls on the same layout
+// formLayouts are not transparent EVER although they can inherit the parent bg color, other controls will be obscured
+// these two things make it suck to do background images
+
+global proc abxPicker(){
+	if (`window -q -ex abxPickerWindow`){
+		showWindow abxPickerWindow;
+	}
+	else{
+	string $parent = `window -t abxPicker abxPickerWindow`;
+	$panelName = "abxPickerLyt";
+	setParent $parent;
+	formLayout abxPickerWindowLyt;
+	$panelName = `formLayout $panelName`;
+	formLayout -e -af $panelName "left" 0 -af  $panelName "right"0 -af $panelName "top" 0 -af $panelName "bottom" 0 abxPickerWindowLyt;
+	//tabLayout -e -tabLabel $panelName "Picker" $parent;
+	
+	//--------------Toolbar Layout-----------------------
+	rowLayout -nc 6 -adj 3 -co6 0 0 2 0 0 0 -cw6 23 23 67 23 23 23 -ct6 "both" "both" "both" "both" "both" "both" -cl6 "center" "center" "right" "center" "center" "center" abxPickerToolbar;
+		iconTextButton -ann "New Picker Sheet" -image "fileNew.xpm" -w 23 -h 23 -command "layout -e -visible false abxPickerCharTabs;layout -e -visible true abxPickerNewForm";
+		iconTextButton -ann "Save Picker Sheet" -image "fileSave.xpm" -w 23 -h 23 -command "abxPickerWriteNode `tabLayout -q -st (eval(\"tabLayout -q -st abxPickerCharTabs\"))`;iconTextButton -e -ebg 0 -bgc .23 .23 .23 abxPickerSaveBtn;iconTextButton -e -en false abxPickerSaveBtn" abxPickerSaveBtn;
+		textField -ann "Character Menu" -editable false -text "None" abxPickerCharText;
+			popupMenu -b 1 abxPickerCharMenu;
+		iconTextButton -ann "Reload Picker Sheets" -image "autoload.xpm" -w 23 -h 23 -command "abxPickerRefresh 0";
+		iconTextButton -ann "Dock to Channel Editor" -image "channelLayers.png" -w 23 -h 23 -command "abxPickerDockToggle";
+		iconTextButton -ann "abxPicker Menu" -style "iconOnly" -w 23 -h 23 -image "downArrow.xpm" -label "abxPickerMenu" -command "";
+			popupMenu -button 1;
+				menuItem -label "New Picker..." -c "layout -e -visible false abxPickerCharTabs;layout -e -visible true abxPickerNewForm";;
+				menuItem -label "Save Edits to Current Picker" -command "abxPickerWriteNode `tabLayout -q -st (eval(\"tabLayout -q -st abxPickerCharTabs\"))`;iconTextButton -e -ebg 0 -bgc .23 .23 .23 abxPickerSaveBtn;iconTextButton -e -en false abxPickerSaveBtn";
+				//menuItem -label "Rename Current Picker";
+				//menuItem -label "Select Current Picker Node";
+				menuItem -d 1;
+				menuItem -label "Toggle Channel Box Docking" -command "abxPickerDockToggle";
+				//menuItem -label "Reload All Picker Sheets";				
+				menuItem -d 1;
+				//menuItem -label "Original Buttons";
+				//menuItem -label "Raised Buttons";
+				menuItem -label "Auto Char Switching" -cb 0 -command "menuItem -e -cb `abxPickerToggleAutoFocusSJ` abxPickerSwitchMnu;" abxPickerSwitchMnu;
+				menuItem -d 1;
+				menuItem -label "Help" -c "abxPickerHelp";
+
+		//iconTextButton -ann "Help" -style "iconOnly" -w 23 -h 23 -image "pickOtherComp.xpm" -label "?" -command "abxPickerHelp";
+		
+		
+		setParent..;
+
+	//--------------Picker Tab Layout--------------------
+	tabLayout -tabsVisible false -imw 0 -imh 0 abxPickerCharTabs;
+		abxPickerRefresh 1;
+	setParent..;
+	
+	//--------------Bottom Toolbar Layout-----------------
+	columnLayout -parent $panelName -rs 0 -cal "center" -cat "both" 0 -adj true  abxPickerColLyt;
+	rowLayout 
+		-cw 1 17 -cw 2 17 -cw 3 17 -cw 4 17 -cw 5 20 -cw 6 20 -cw 7 20 -cw 8 20 -cw 9 40 
+		-nc 9 -adj 8
+		-rat 1 "top" 0 -rat 2 "top" 0 -rat 3 "top" 0 -rat 4 "top" 0 -rat 5 "top" 0 -rat 6 "top" 0 -rat 7 "top" 0 -rat 8 "top" 0 -rat 9 "top" 0 
+		;
+
+
+
+	//nodeIconButton -style "textOnly" -l "+" -ann "Zoom In" -w 16 -h 16 -c "abxPickerZoom \"in\";abxPickerRefresh;";
+	//nodeIconButton -style "textOnly" -l "-" -ann "Zoom In" -w 16 -h 16 -c "abxPickerZoom \"out\";abxPickerRefresh;";
+	abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.7:.4:.4" "abxPickerCtrlNew" .7 .4 .4 "" "" "Drag and Drop: Red Button";
+	abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.7:.4:.4" "abxPickerCtrlNew" .4 .7 .4 "" "" "Drag and Drop: Green Button";
+	abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.7:.4:.4" "abxPickerCtrlNew" .4 .5 .7 "" "" "Drag and Drop: Blue";
+	abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.7:.4:.4" "abxPickerCtrlNew" .7 .7 .4 "" "" "Drag and Drop: Yellow";
+	abxPickerNewControl "default" 19 16 "textOnly" "Sl" "" "0:0:.7:.4:.4" "abxPickerCtrlCommand" .5 .5 .5 "/*select*/" "" "Drag this onto an existing button to reassign it to the current selection";
+	abxPickerNewControl "default" 19 16 "textOnly" "T" "" "0:0:.7:.4:.4" "abxPickerCtrlCommand" .5 .5 .5 "/*selectT*/" "" "Reassign Command: Select Current and Activate Translate Tool";
+	abxPickerNewControl "default" 19 16 "textOnly" "R" "" "0:0:.7:.4:.4" "abxPickerCtrlCommand" .5 .5 .5 "/*selectR*/" "" "Reassign Command: Select Current and Activate Rotate Tool";
+	//abxPickerNewControl "default" 16 16 "textOnly" "" "" "0:0:.7:.4:.4" "abxPickerCtrlNew" -1 -1 -1 "" "" "Opens an expanded set of UI controls and commands";
+	//nodeIconButton -style "iconOnly" -ann "Drag and Drop: Red" -dtg "0:0:.7:.4:.4" -w 16 -h 16 -bgc .7 .4 .4 -dgc "abxPickerCtrlNew";
+	//nodeIconButton -ebg 0 -style "iconOnly" -ann "Drag and Drop: Green" -dtg "0:0:.4:.7:.4" -w 16 -h 16 -bgc .4 .7 .4 -dgc "abxPickerCtrlNew";
+	//nodeIconButton -ebg 0 -style "iconOnly" -ann "Drag and Drop: Blue" -dtg "0:0:.4:.5:.7" -w 16 -h 16 -bgc .4 .5 .7 -dgc "abxPickerCtrlNew";
+	//nodeIconButton -ebg 0 -style "iconOnly" -ann "Drag and Drop: Yellow" -dtg "0:0:.7:.7:.4" -w 16 -h 16 -bgc .7 .7 .4 -dgc "abxPickerCtrlNew";
+	//nodeIconButton -ebg 0 -style "textOnly" -ann "Command: Select Current" -label "Sl" -w 19 -h 16 -bgc .5 .5 .5 -dgc "abxPickerCtrlCommand" -c "/*select*/";
+	//nodeIconButton -ebg 0 -style "textOnly" -ann "Command: Select Current and Translate" -label "T" -w 19 -h 16 -bgc .5 .5 .5 -dgc "abxPickerCtrlCommand" -c "/*selectT*/";
+	//nodeIconButton -ebg 0 -style "textOnly" -ann "Command: Select Current and Rotate" -label "R" -w 19 -h 16 -bgc .5 .5 .5 -dgc "abxPickerCtrlCommand" -c "/*selectR*/";
+	nodeIconButton -ebg 0 -style "textOnly" -l "More..." -w 16 -h 16 -c "abxPickerBuildToolbox" ;
+	columnLayout -w 40 -dpc "abxPickerCtrlTrash";
+		iconTextButton -ebg 0 -mw 0 -mh 0 -ann "Trash: Drag ctrls here to Delete" -style "iconOnly" -image "smallTrash.xpm" -w 40 -h 17 -dpc "abxPickerCtrlTrash" abxPickerTrashBtn;
+		setParent..;
+	setParent..;
+	
+	//--------------New Picker Layout -------------------
+	columnLayout -visible false -rs 2 -cat "both" 3 -adj true -parent $panelName abxPickerNewForm;
+		radioCollection;
+		rowLayout -adj 1 -nc 1 -cw 1 50 -cat 1 "both" 1 -cal 1 "center";
+		radioButton -l "Use Reference Prefix or Namespace" -onc "textField -e -en 0 -text \"\" abxPickerCharNameTxt;" abxPickerUsePrefixRB;
+		setParent..;
+		rowLayout -adj 2 -nc 2 -cw2 50 50 -ct2 "both" "both" -cl2 "center" "center" -co2 1 1;
+		radioButton -sl -l "Name" -onc "textField -e -en 1 abxPickerCharNameTxt;"  abxPickerUseNameRB;
+		textField -w 10 -text "Character" abxPickerCharNameTxt;
+		setParent..;
+		//textFieldGrp -adj 2 -cw 1 50 -cw 2 10 -label "Name" -text "Character" abxPickerCharNameTxt;
+		textFieldGrp -adj 2 -cw 1 50 -cw 2 10 -label "Tab" -text  "Main" abxPickerSubNameTxt;
+		textFieldButtonGrp -adj 2 -cw 1 50 -cw 2 10 -cw 3 60 -label "Image" -text "" -buttonLabel "B.." -bc "abxPickerBrowsePath `fileDialog2 -ds 2 -cap \"Choose Background Image\" -fm 1` \"\";" abxPickerImagePath;
+		colorSliderGrp -adj 3 -cw 1 50 -cw 2 30 -cw 3 30 -label "Color" -rgb .4 .4 .4 abxPickerBGColor;
+		
+
+		rowLayout -adj 1 -nc 3 -cw3 10 50 50 -ct3 "both" "both" "both" -cl3 "center" "center" "center" -co3 5 5 5;
+			button -visible false;
+			button -label "OK" -c "abxPickerNewSheet;layout -e -visible true abxPickerCharTabs;layout -e -visible false abxPickerNewForm" ;
+			button -label "Cancel" -c "layout -e -visible true abxPickerCharTabs;layout -e -visible false abxPickerNewForm";
+		setParent..;
+		//text -al "center" -label "Tip: Leave \"Name\" field blank\n when using referencing with\n rename prefixes or namespaces"; 
+
+
+	formLayout -e 
+		-af abxPickerToolbar "top" 0
+		-af abxPickerToolbar "left" 0
+		-af abxPickerToolbar "right" 0
+		-aof abxPickerToolbar "bottom" -24
+
+		-af abxPickerCharTabs "top" 24
+		-af abxPickerCharTabs "left" 0
+		-af abxPickerCharTabs "right" 0
+		-ap abxPickerCharTabs "bottom" 19 100
+
+		-af abxPickerNewForm "top" 24
+		-af abxPickerNewForm "left" 0
+		-af abxPickerNewForm "right" 0
+		-ap abxPickerNewForm "bottom" 20 100
+
+		-aof abxPickerColLyt "top" -20
+		-af abxPickerColLyt "left" 1
+		-af abxPickerColLyt "right" 1
+		-ap abxPickerColLyt "bottom" 1 100
+
+		$panelName;
+		
+	// create script job to refresh picker window on scene loads
+	string $listArray[] = `scriptJob -lj`;
+	string $tokenBuffer[];
+	int $foundJob = 0;
+	int $jobNum =0;
+	
+	for ($i=0;$i<size($listArray);$i++){
+		// if the script jobs are found Kill them
+		if (`gmatch $listArray[$i] "*abxPickerScriptJob*"`){
+			tokenize $listArray[$i] ":" $tokenBuffer;
+			$JobNum = $tokenBuffer[0];
+			//scriptJob -k (int($JobNum));
+			$foundJob = 1;
+		}
+	}
+	// if no script jobs were found then start new ones
+	if ($foundJob == 0) {
+		int $jobNum = `scriptJob -e "SceneOpened" "abxPickerScriptJob"`;
+	}
+	
+	abxPickerToggleAutoFocusSJ;
+
+	//return $panelName;
+	//dockControl -label "abxToybox" -fl 1 -area "left" -epo true
+	//        -content $parent
+	//        -allowedArea "left"
+	//        -allowedArea "right" abxToyboxDock;
+	showWindow $parent;
+	// mac loses the drag-drop events if the buttons aren't
+	if (`about -os` == "mac")
+		abxPickerRefresh 1;
+	}
+
+}
+
+global proc abxPickerDockToggle () {
+	// check if parent picker window exists
+	if (`layout -ex abxPickerLyt`){
+		$parentLayout = `layout -q -parent abxPickerLyt`;
+		if ($parentLayout == "abxPickerWindow|abxPickerWindowLyt"){
+			formLayout -parent DisplayLayerUITabLayout abxPickerTabLyt;
+			layout -e -parent abxPickerTabLyt abxPickerLyt;
+			formLayout -e 
+				-af abxPickerLyt "left" 0 
+				-af  abxPickerLyt "right"0 
+				-af abxPickerLyt "top" 0 
+				-af abxPickerLyt "bottom" 0 
+				abxPickerTabLyt;
+			tabLayout -e -st abxPickerTabLyt DisplayLayerUITabLayout;
+			tabLayout -e -tl abxPickerTabLyt "Picker" DisplayLayerUITabLayout;
+			deleteUI abxPickerWindow;
+		}
+		else if ($parentLayout == "MayaWindow|MainChannelsLayersLayout|ChannelsLayersPaneLayout|LayerEditorForm|DisplayLayerUITabLayout|abxPickerTabLyt"){
+			if (!`layout -q -ex abxPickerWindowLyt`){
+				window -t abxPicker -tlb true abxPickerWindow;
+				formLayout abxPickerWindowLyt;
+			}
+			layout -e -parent abxPickerWindowLyt abxPickerLyt;
+			formLayout -e 
+				-af abxPickerLyt "left" 0 
+				-af  abxPickerLyt "right"0 
+				-af abxPickerLyt "top" 0 
+				-af abxPickerLyt "bottom" 0 
+				abxPickerWindowLyt;
+			deleteUI abxPickerTabLyt;
+			showWindow abxPickerWindow;
+			if (`about -os` == "mac")
+				abxPickerRefresh 1;
+		}
+	}
+	// get window children layouts
+	// parent children window layout to the DisplayLayerUITabLayout
+	
+
+
+}
+
+global proc abxPickerZoom (string $mode){
+	// get visible picker node
+	$currentChar = `tabLayout -q -st abxPickerCharTabs`;
+	string $currentSubTabLayout = `tabLayout -q -st $currentChar`;
+	//if namespace is in use we need to substitute
+
+	string $currentNodeLyt = substituteAllString($currentSubTabLayout,"_",":");
+	int $subStrEnd = (size($currentNodeLyt)-6);
+	string $currentNode = (substring($currentNodeLyt, 1,$subStrEnd)+"_PIKR");
+	print ("CurrentNode="+$currentNode+"\n");
+	if (`attributeExists "pickerScale" $currentNode`){
+
+	
+		float $scaleFactor = `getAttr ($currentNode + ".pickerScale")`;
+	
+
+		if ($mode == "in"){
+			$scaleFactor = $scaleFactor + 0.25;
+			setAttr ($currentNode + ".pickerScale") $scaleFactor;
+		}
+		else if ($mode == "out"){
+			$scaleFactor = $scaleFactor - 0.25;
+			if ($scaleFactor > 0){
+				setAttr ($currentNode + ".pickerScale") $scaleFactor;
+			}
+		}
+
+		// get the current layout and resize the controls
+		//string $buttons[] = `tabLayout -q -ca $currentSubTabLayout`;
+		//int $i = 0;
+		//for ($i=0;$i<size($buttons);$i++){
+		//	formLayout -e
+
+		//}
+	}
+	else {
+		warning ("abxPicker Version 1.0 Node detected. Please update or re-save PIKR layout\n");
+	}
+
+}
+
+global proc string[] abxPickerCtrlDrag(string $dragControl, int $x, int $y, int $mods){
+
+	string $msg[] = {"move", $x, $y, $mods};
+	return $msg;
+}
+
+global proc string[] abxPickerCtrlNew(string $dragControl, int $x, int $y, int $mods){
+
+	string $msg[] = {"new", $x, $y, $mods};
+	return $msg;
+}
+
+global proc string[] abxPickerCtrlColor(string $dragControl, int $x, int $y, int $mods){
+	string $msg[] = {"color", $x, $y, $mods};
+	return $msg;
+
+}
+global proc string[] abxPickerCtrlImage(string $dragControl, int $x, int $y, int $mods){
+
+	string $msg[] = {"image", $x, $y, $mods};
+	return $msg;
+}
+global proc string[] abxPickerCtrlCommand(string $dragControl, int $x, int $y, int $mods){
+
+	string $msg[] = {"command", $x, $y, $mods};
+	return $msg;
+}
+global proc string[] abxPickerCtrlScript(string $dragControl, int $x, int $y, int $mods){
+	
+	$textControl = `control -q -dtg $dragControl`;
+	iconTextButton -e -c `scrollField -q -text $textControl` $dragControl;
+	string $msg[] = {"command", $x, $y, $mods};
+	return $msg;
+}
+global proc string[] abxPickerCtrlLabel(string $dragControl, int $x, int $y, int $mods){
+
+	string $msg[] = {"label", $x, $y, $mods};
+	return $msg;
+}
+global proc int abxPickerCtrlTrash(string $dragControl, string $dropControl, string $msgs[], int $x, int $y, int $type){
+	print ("drag="+$dragControl+" drop="+$dropControl+" xy="+$x+":"+$y+" type="+$type+"\n");
+	if ($msgs[0] == "move")
+		print ("Removing "+$dragControl+"\n");
+		// probably have to wait for this callback to end before deleting the control in 2011 otherwise it crashes
+		//eval("deleteUI -control "+$dragControl);
+		iconTextButton -e -en true abxPickerSaveBtn;
+		iconTextButton -e -ebg 1 -bgc 1 0 0 abxPickerSaveBtn;
+		string $formName = `control -q -p $dragControl`;
+		print ($formName);
+		//formLayout -e -ap $dragControl "top" 0 0 -ap $dragControl "left" 0 0 -ap $dragControl "bottom" 1 0 -ap$dragControl "right" 1 0 $formName;
+		//iconTextButton -e -dtg ("0:0:1:1:0") -w 1 -h 1 $dragControl;
+		control -e -enable 0 -visible 0 $dragControl;
+		return 2;
+}
+
+//-----------------------------------------------------------------------
+// form layout drop callback: handles various objects drop events
+
+global proc abxPickerCtrlDrop(string $dragControl, string $dropControl, string $msgs[], int $x, int $y, int $type){
+
+	global string $pickrHiliteList[];
+	iconTextButton -e -en true abxPickerSaveBtn;
+	iconTextButton -e -ebg 1 -bgc 1 0 0 abxPickerSaveBtn;
+
+	string $op = $msgs[0];
+	int $mods = $msgs[3];
+	int $startX = $msgs[1];
+	int $startY = $msgs[2];
+	int $inherit = 1;
+
+	int $modifiers = `getModifiers`;
+    if ($modifiers % 2) 
+    	$mods = 1;
+    if ($modifiers / 4 % 2)
+        $mods = 2;
+    if ($modifiers / 8 % 2)
+    	$mods = 3;
+    if ($modifiers / 16 % 2)
+    	$mods = 4;
+    
+
+	string $ctrlData = `control -q -dtg $dragControl`;
+	string $tokenBuffer[];
+	tokenize $ctrlData ":" $tokenBuffer;
+
+	//if (`about -os` == "mac"){
+	//	if ($mods == 1) $mods = 2;
+	//}
+	
+	if ($op == "move"){
+
+		switch ($mods){
+		case 0:
+			//print ("XPos="+$x+" YPos="+$y+"\n");
+			int $ctrlWidth = `control -q -w $dragControl`;
+			int $ctrlHeight = `control -q -h $dragControl`;
+
+			int $ctrlLeftPos = ($x-$startX);
+			int $ctrlTopPos = ($y-$startY);
+			int $ctrlRightPos = (-1*(($x-$startX)+$ctrlWidth));
+			int $ctrlBottomPos = (-1*(($y-$startY)+$ctrlHeight));
+			control -e -dtg ($ctrlLeftPos+":"+$ctrlTopPos+":"+$tokenBuffer[2]+":"+$tokenBuffer[3]+":"+$tokenBuffer[4]) $dragControl;
+			
+			//print ("Button "+$dragControl+" Pos:"+$ctrlLeftPos+":"+$ctrlTopPos+":"+$ctrlRightPos+":"+$ctrlBottomPos+"\n");
+
+			formLayout -e 
+				-ap $dragControl "left" $ctrlLeftPos 0
+				-ap $dragControl "top" $ctrlTopPos 0
+				-ap $dragControl "right" $ctrlRightPos 0
+				-ap $dragControl "bottom" $ctrlBottomPos 0
+				$dropControl;
+
+			// if the button being moved is in the hilite list then move the other hilighted buttons too
+			if (stringArrayContains($dragControl,$pickrHiliteList)){
+				for ($each in $pickrHiliteList){
+					if ($each != $dragControl){
+					int $ctrlWidth2 = `control -q -w $each`;
+					int $ctrlHeight2 = `control -q -h $each`;
+
+					string $ctrlData = `control -q -dtg $each`;
+					string $tokenBuffer2[];
+					tokenize $ctrlData ":" $tokenBuffer2;
+
+					int $ctrlLeftPos2 = int($tokenBuffer2[0]) + ($x - (int($tokenBuffer[0])+$startX));
+					int $ctrlTopPos2 = int($tokenBuffer2[1]) + ($y - (int($tokenBuffer[1])+$startY));
+					int $ctrlRightPos2 = (-1*($ctrlLeftPos2 +$ctrlWidth2));
+					int $ctrlBottomPos2 = (-1*($ctrlTopPos2 +$ctrlHeight2));
+					control -e -dtg ($ctrlLeftPos2+":"+$ctrlTopPos2+":"+$tokenBuffer2[2]+":"+$tokenBuffer2[3]+":"+$tokenBuffer2[4]) $each;
+					
+					//print ("Button "+$dragControl+" Pos:"+$ctrlLeftPos+":"+$ctrlTopPos+":"+$ctrlRightPos+":"+$ctrlBottomPos+"\n");
+
+					formLayout -e 
+						-ap $each "left" $ctrlLeftPos2 0
+						-ap $each "top" $ctrlTopPos2 0
+						-ap $each "right" $ctrlRightPos2 0
+						-ap $each "bottom" $ctrlBottomPos2 0
+						$dropControl;						
+					}
+				}
+			}
+			break;
+		// duplicate button
+		case 1:
+			$op = "new";
+			break;
+		
+		//resize bottom right corner
+		case 2:
+			//print ("XPos="+$x+" YPos="+$y+"\n");
+			int $ctrlLeftPos = $tokenBuffer[0];
+			int $ctrlTopPos = $tokenBuffer[1];
+			int $ctrlRightPos = (-1*$x);
+			int $ctrlBottomPos = (-1*$y);
+			//print ($x+" "+$ctrlLeftPos+" "+$y+" "+$ctrlTopPos+"\n");
+			if ($x < $ctrlLeftPos+8)
+				$ctrlRightPos = (-1*($ctrlLeftPos+8));
+			if ($y < $ctrlTopPos+8)
+				$ctrlBottomPos = (-1*($ctrlTopPos+8));
+
+			//print ("Button "+$dragControl+"Pos:"+$ctrlLeftPos+":"+$ctrlTopPos+":"+$ctrlRightPos+":"+$ctrlBottomPos+"\n");
+
+			control -e -w (($ctrlRightPos*-1)-$ctrlLeftPos) -h (($ctrlBottomPos*-1)-$ctrlTopPos) $dragControl;
+					
+			formLayout -e 
+				-ap $dragControl "right" $ctrlRightPos 0
+				-ap $dragControl "bottom" $ctrlBottomPos 0
+				$dropControl;
+			break;
+		}
+	}
+	if ($op == "color"){
+		string $colorControl = abxDropOnButton($dropControl,$x,$y);
+		if ($colorControl != ""){
+			if (float($tokenBuffer[2]) < 0) eval("control -e -ebg 0 "+$colorControl);
+			else eval("control -e -ebg 0 -bgc "+$tokenBuffer[2]+" "+$tokenBuffer[3]+" "+$tokenBuffer[4]+" "+$colorControl);
+			string $colorControlLabel = `control -q -dtg $colorControl`;
+			string $colorTBuffer[];
+			tokenize $colorControlLabel ":" $colorTBuffer;
+			control -e -dtg ($colorTBuffer[0]+":"+$colorTBuffer[1]+":"+$tokenBuffer[2]+":"+$tokenBuffer[3]+":"+$tokenBuffer[4]) $colorControl;
+		}	
+		else {	
+			$inherit = 0;
+			$op = "new";
+		}
+	}
+	if ($op == "command"){
+		string $colorControl = abxDropOnButton($dropControl,$x,$y);
+		if ($colorControl != ""){
+			string $command = `nodeIconButton -q -c $dragControl`;
+			
+			if ($command == "/*select*/"){
+				$slNodes = `ls -sl`;
+				$cmd = "\"";
+				for ($each in $slNodes)
+					$cmd = $cmd + " " + $each;
+				nodeIconButton -e -c ("global string $pickrPrefix=\"\";abxPickerSelect "+$cmd+"\"") $colorControl;
+				print ("Command Changed\n"); 
+			}
+			else if ($command == "/*selectT*/"){
+				$slNodes = `ls -sl`;
+				$cmd = "\"";
+				for ($each in $slNodes)
+					$cmd = $cmd + " " + $each;
+				nodeIconButton -e -c ("global string $pickrPrefix=\"\";abxPickerSelect "+$cmd+"\";setToolTo moveSuperContext") $colorControl;
+				print ("Command Changed\n"); 
+			}
+			else if ($command == "/*selectR*/"){
+				$slNodes = `ls -sl`;
+				$cmd = "\"";
+				for ($each in $slNodes)
+					$cmd = $cmd + " " + $each;
+				nodeIconButton -e -c ("global string $pickrPrefix=\"\";abxPickerSelect "+$cmd+"\";setToolTo RotateSuperContext") $colorControl;
+				print ("Command Changed\n"); 
+			}
+			else if ($command == "/*key*/"){
+				$slNodes = `ls -sl`;
+				$cmd = "\"";
+				for ($each in $slNodes)
+					$cmd = $cmd + " " + $each;
+				nodeIconButton -e -c ("global string $pickrPrefix=\"\";abxPickerKey "+$cmd+"\"") $colorControl;
+				print ("Command Changed\n"); 
+			}
+			else if ($command == "/*selectS*/"){
+				$slNodes = `ls -sl`;
+				$cmd = "\"";
+				for ($each in $slNodes)
+					$cmd = $cmd + " " + $each;
+				nodeIconButton -e -c ("global string $pickrPrefix=\"\";abxPickerSelect "+$cmd+"\";setToolTo scaleSuperContext") $colorControl;
+				print ("Command Changed\n"); 
+			}
+			else if ($command == "/*selectM*/"){
+				$slNodes = `ls -sl`;
+				$cmd = "\"";
+				for ($each in $slNodes)
+					$cmd = $cmd + " " + $each;
+				nodeIconButton -e -c ("global string $pickrPrefix=\"\";abxPickerSelect "+$cmd+"\";setToolTo ShowManips") $colorControl;
+				print ("Command Changed\n"); 
+			}
+			else if ($command == "/*toggle*/"){
+				string $slNodes[] = `ls -sl`;
+				string $selectedChnl[] = `channelBox -q -sma mainChannelBox`;
+				
+				if(size($selectedChnl) != 0 && size($slNodes) != 0){
+					$cmd = "\"";
+					for ($each in $slNodes){
+						$cmd = $cmd + " " + $each;
+					}
+					$attrs = "\"";
+					for ($each in $selectedChnl){
+						$attrs = $attrs + " " + $each;
+					}
+					nodeIconButton -e -c ("global string $pickrPrefix=\"\";abxPickerToggle "+$cmd+"\" "+$attrs+"\"") $colorControl;
+				}
+			}
+			else if ($command == "/*pose*/"){
+				string $slNodes[] = `ls -sl`;
+				$cmd = "";
+				for ($each in $slNodes){
+					string $keyableAttrs[] = `listAnimatable $each`;
+					for ($every in $keyableAttrs){
+						$val = `getAttr ($every)`;
+						$cmd = ($cmd+"setAttr "+$every+" "+$val+";");
+					}
+					nodeIconButton -e -c ("global string $pickrPrefix=\"\";"+$cmd) $colorControl;
+				}
+			}
+			else if ($command == "/*isolate*/"){
+				$slNodes = `ls -sl`;
+				$cmd = "";
+				for ($each in $slNodes)
+					$cmd = $cmd + " " + $each;
+				nodeIconButton -e -c ("global string $pickrPrefix=\"\";abxPickerIsolate \""+$cmd+"\";") $colorControl;
+				print ("Command Changed\n"); 
+			}
+			else {
+				nodeIconButton -e -c ("global string $pickrPrefix=\"\";"+$command) $colorControl;
+			}
+
+			// flashes the button to give edited feedback
+			string $colorControl = abxDropOnButton($dropControl,$x,$y);
+			$oldColor  = `nodeIconButton -q -bgc $colorControl`;
+			nodeIconButton -e -bgc 1 1 1 $colorControl;
+			//print ("iconTextButton -e -bgc "+$oldColor[0]+" "+$oldColor[1]+" "+$oldColor[1]+" "+$colorControl);
+			evalDeferred("nodeIconButton -e -bgc "+$oldColor[0]+" "+$oldColor[1]+" "+$oldColor[2]+" "+$colorControl);
+		}
+	}
+	if ($op == "label"){
+		string $colorControl = abxDropOnButton($dropControl,$x,$y);
+		if ($colorControl != ""){
+			string $label = `nodeIconButton -q -l $dragControl`;
+			nodeIconButton -e -l $label $colorControl;
+			nodeIconButton -e -style "textOnly" $colorControl;
+		}
+	}
+	if ($op == "image"){
+		string $colorControl = abxDropOnButton($dropControl,$x,$y);
+		if ($colorControl != ""){
+			string $image = `nodeIconButton -q -image $dragControl`;
+			nodeIconButton -e -image $image -style "iconOnly" $colorControl;
+		}
+		else {
+			$op = "new";
+		}
+	}
+	if ($op == "new"){
+		setParent $dropControl;
+		int $ctrlWidth = 16; 
+		int $ctrlHeight = 16;
+		string $image = `nodeIconButton -q -image $dragControl`;
+		string $data = `control -q -dtg $dragControl`;
+		string $label = "";
+		if ($inherit == 1){
+			$ctrlWidth = `control -q -w $dragControl`;
+			$ctrlHeight = `control -q -h $dragControl`;
+			$label = `nodeIconButton -q -l $dragControl`;
+		}
+
+		string $tokenBuffer[];
+		tokenize $data ":" $tokenBuffer;
+		$slNodes = `ls -sl`;
+		$cmd = "\"";
+
+		for ($each in $slNodes)
+			$cmd = $cmd + " " + $each;
+		$newCtrl = abxPickerNewButton(($x-($ctrlWidth/2)),($y-($ctrlHeight/2)),$ctrlWidth,$ctrlHeight,$tokenBuffer[2],$tokenBuffer[3],$tokenBuffer[4],$image,("global string $pickrPrefix=\"\";abxPickerSelect "+$cmd+"\""),$label);
+
+		control -e -h $ctrlHeight -w $ctrlWidth $newCtrl;		
+
+		int $newCtrlWidth = `control -q -w $newCtrl`;
+		int $newCtrlHeight = `control -q -h $newCtrl`;
+
+		//print ("Button "+$newCtrl+"Pos:"+$ctrlHeight+":"+$ctrlWidth+" From:"+$dragControl+"\n");
+
+		formLayout -e 
+			-ap $newCtrl "left" ($x-($ctrlWidth/2)) 0
+			-ap $newCtrl "top" ($y-($ctrlHeight/2)) 0
+			-ap $newCtrl "right" (-1*(($x-($ctrlWidth/2))+$ctrlWidth)) 0
+			-ap $newCtrl "bottom" (-1*(($y-($ctrlHeight/2))+$ctrlHeight)) 0
+			$dropControl;
+	}
+
+
+}
+//------------------------------------------------------------------------
+// returns the name of the button if any the drop was over
+global proc string abxDropOnButton(string $picker, int $x, int $y) {
+	int $buttonCount = `layout -q -nch $picker`;
+	string $uiName[] = `layout -q -ca $picker`;
+	string $pickerData = `layout -q -dtg $picker`;
+
+	for ($i=1;$i<$buttonCount;$i++){
+		string $data = `control -q -dtg $uiName[$i]`;
+		int $width = `control -q -width $uiName[$i]`;
+		int $height = `control -q -height $uiName[$i]`;
+
+		string $dataBuffer[];
+		tokenize $data ":" $dataBuffer;
+		
+		int $leftPos = $dataBuffer[0];
+		int $topPos = $dataBuffer[1];
+		float $red = $dataBuffer[2];
+		float $blue = $dataBuffer[3];
+		float $green = $dataBuffer[4];
+	
+		if ($x>=$leftPos && $y>=$topPos && $x<=($leftPos+$width) && $y<=($topPos+$height)){
+			//print ($x+":"+$y+":::"+$leftPos+","+$topPos+","+($leftPos+$width)+","+($topPos+$height)+"\n");
+			//print ($uiName[$i]+"\n");
+			// flashes UI Color;
+			//iconTextButton -e -bgc 1 1 1 $uiName[$i];
+			//iconTextButton -e -bgc $red $green $blue $uiName[$i];
+			return $uiName[$i];
+		}
+	}
+	return "";
+
+}
+//------------------------------------------------------------------------
+//sets the position of the button using attach position commands to the form layout
+
+global proc abxPickerSetPos(string $parent, string $control, int $x, int $y,int $width, int $height){
+
+	int $rightPos = ($x + $width)*-1;
+	int $bottomPos = ($y + $height)*-1;
+	int $parentWidth = `layout -q -w $parent`;
+	int $parentHeight = `layout -q -h $parent`;
+	//print ("Button Pos:"+$rightPos+":"+$bottomPos+":"+$parentWidth+":"+$parentHeight+"\n");
+
+	formLayout -e 
+		-ap $control "left" $x 0
+		-ap $control "top" $y 0
+		-ap $control "right" $rightPos 0
+		-ap $control "bottom" $bottomPos 0
+	$parent;
+}
+
+//--------------------------------------------------------------------------
+// creates a new button and encodes the position/color data into the label
+
+global proc string abxPickerNewButton(int $ctrlX, int $ctrlY, int $ctrlWidth, int $ctrlHeight, float $bgr, float $bgg, float $bgb, string $image,string $command, string $label){
+	// stores position and color data so it can be queried
+	$data = ($ctrlX+":"+$ctrlY+":"+$bgr+":"+$bgg+":"+$bgb);	
+	string $newCtrl;
+	//string $newCtrl = `iconTextButton -mh 0 -mw 0 -style "iconOnly" -l $label -dtg $data -w $ctrlWidth -h $ctrlHeight -bgc $bgr $bgg $bgb -dgc "abxPickerCtrlDrag" -image $image -c $command`;
+	if ($image== ""){
+		if ($bgr>=0){
+			//$newCtrl = `iconTextButton -mh 0 -mw 0 -style "textOnly" -l $label -dtg $data -w $ctrlWidth -h $ctrlHeight -bgc $bgr $bgg $bgb -dgc "abxPickerCtrlDrag" -c $command`;
+			//$newCtrl = `nodeIconButton -style "textOnly" -l $label -dtg $data -w $ctrlWidth -h $ctrlHeight -bgc $bgr $bgg $bgb -dgc "abxPickerCtrlDrag" -c $command`;
+			$newCtrl = `abxPickerNewControl "default" $ctrlWidth $ctrlHeight "textOnly" $label "" $data "abxPickerCtrlDrag" $bgr $bgg $bgb $command "" ""`;
+
+
+		}
+		else {
+			//$newCtrl = `iconTextButton -mh 0 -mw 0 -style "textOnly" -l $label -dtg $data -w $ctrlWidth -h $ctrlHeight -dgc "abxPickerCtrlDrag" -c $command`;
+			//$newCtrl = `nodeIconButton -style "textOnly" -l $label -dtg $data -w $ctrlWidth -h $ctrlHeight -dgc "abxPickerCtrlDrag" -c $command`;
+			$newCtrl = `abxPickerNewControl "default" $ctrlWidth $ctrlHeight "textOnly" $label "" $data "abxPickerCtrlDrag" -1 0 0 $command "" ""`;
+		}
+	}
+	else {
+		if ($bgr>=0){
+			//$newCtrl = `nodeIconButton -style "iconOnly" -image $image -dtg $data -w $ctrlWidth -h $ctrlHeight -bgc $bgr $bgg $bgb -dgc "abxPickerCtrlDrag" -c $command`;
+			$newCtrl = `abxPickerNewControl "default" $ctrlWidth $ctrlHeight "iconOnly" "" $image $data "abxPickerCtrlDrag" $bgr $bgg $bgb  $command "" ""`;
+
+		}
+		else {
+			//$newCtrl = `nodeIconButton -style "iconOnly" -image $image -dtg $data -w $ctrlWidth -h $ctrlHeight -dgc "abxPickerCtrlDrag" -c $command`;
+			$newCtrl = `abxPickerNewControl "default" $ctrlWidth $ctrlHeight "iconOnly" "" $image $data "abxPickerCtrlDrag" -1 0 0 $command "" ""`;
+
+		}
+	}
+	//nodeIconButton -e -ebg 0 -c ("global string $pickrControl = \""+$newCtrl+"\";"+$command) $newCtrl;
+	abxPickerCtrlEditCmd($newCtrl,("global string $pickrControl = \""+$newCtrl+"\";"+$command));
+	//popupMenu -button 3 -parent $newCtrl;
+	//menuItem -label "Label...";
+	//menuItem -label "Color...";
+	//menuItem -label "Image...";
+	//menuItem -label "Command...";
+	//menuItem -label "Dimensions...";
+	//menuItem -d true;
+	//menuItem -label "Delete";
+
+	return $newCtrl;
+}
+// generic control maker function
+global proc string abxPickerNewControl (string $controlType, int $w, int $h, string $s, string $l, string $i, string $dtg, string $dgc, float $bgr, float $bgg, float $bgb, string $c, string $parent, string $ann){
+	string $newCtrl;
+	if ($bgr>=0)
+		$newCtrl = `nodeIconButton -style "textOnly" -mw 0 -mh 0 -l $l -dtg $dtg -w $w -h $h -ebg 0 -bgc $bgr $bgg $bgb -dgc $dgc -c $c`;
+	else 
+		$newCtrl = `nodeIconButton -style "textOnly" -mw 0 -mh 0 -l $l -dtg $dtg -w $w -h $h -ebg 0 -dgc $dgc -c $c`;
+	return $newCtrl;
+}
+
+global proc abxPickerCtrlEditCmd (string $name, string $c){
+	if (`control -exists $name`){
+		string $type = "";
+		string $cmd = "";
+		string $ec = encodeString ($c);
+		// if its a known UI control type the use the command that created it
+		if (!catchQuiet(eval("objectTypeUI \""+$name+"\""))){
+			$type = `objectTypeUI $name`;
+			$cmd = ($type+" -e -c \""+$ec+"\" \""+$name+"\"");
+		}
+		// else assume its a nodeIconButton which doesn't work with the objectTypeUI command
+		else{
+			$cmd = ("nodeIconButton -e -c \""+$ec+"\" \""+$name+"\"");
+		}
+		eval($cmd);
+	}
+}
+
+global proc abxPickerCtrlHilite (string $name){
+	string $type = "";
+	if (!catchQuiet(eval("objectTypeUI \""+$name+"\""))){
+		$type = `objectTypeUI $name`;
+	}
+	// set the original color on the control
+	$cmd = "control -e -bgc 1 1 .7";
+	if ($type != "iconTextButton")
+		$cmd += " -ebg 0";
+
+	eval($cmd+" \""+$name+"\"");
+}
+
+global proc abxPickerCtrlClearHilite (string $name){
+	
+	if (`control -exists $name`){
+		string $type = "";
+		string $cmd = "";
+		// get the original color
+		string $data = `control -q -dtg $name`;
+		string $tokenBuffer[];
+		tokenize $data ":" $tokenBuffer;
+		if (size($tokenBuffer)==5){
+			if (!catchQuiet(eval("objectTypeUI \""+$name+"\""))){
+				$type = `objectTypeUI $name`;
+			}
+			// set the original color on the control
+			$cmd = ("control -e -bgc "+$tokenBuffer[2]+" "+$tokenBuffer[3]+" "+$tokenBuffer[4]);
+			if ($type != "iconTextButton")
+				$cmd += " -ebg 0";
+
+			eval($cmd+" \""+$name+"\"");
+		}
+	}
+}
+
+global proc abxPickerLabelEdit (){
+
+	print ("label edited\n");
+}
+
+
+// because image controls don't auto detect their dimensions in 2011 this will get the image size by creating a symbol button
+
+global proc int[] abxPickerGetImageSize (string $imagePath){
+	window abxImageTempWindow;
+	
+	columnLayout;
+	symbolButton  -vis 1 -image $imagePath tempSB;
+	showWindow abxImageTempWindow;
+	window -e -tlc -2000 -2000 abxImageTempWindow;
+	int $ih = `symbolButton -q -height tempSB`;
+	int $iw = `symbolButton -q -width tempSB`;
+	deleteUI -window abxImageTempWindow;
+	//print ("Height:"+$ih+" Width:"+$iw+"\n");
+	return {$iw,$ih};
+
+}
+
+//########################////
+
+//-------------------------------------------------------------------------
+// shows the new form and creates a blank layout and node
+
+global proc abxPickerNewSheet () {
+
+	global string $pickrPrefix;
+	string $characterName = `textField -q -text abxPickerCharNameTxt`;
+	string $characterName2 = "";
+	if ($characterName != "")
+		$characterName2 = ($characterName + "_");
+	string $subCharName = `textFieldGrp -q -text abxPickerSubNameTxt`;
+	string $bgImage = `textFieldButtonGrp -q -text abxPickerImagePath`;
+	$bgImage = `workspace -en $bgImage`;
+	float  $bgColor[] = `colorSliderGrp -q -rgb abxPickerBGColor`;	
+	string $bgPic;
+
+	if (!`tabLayout -q -ex ($characterName+"PkrLyt")`){
+		tabLayout -parent abxPickerCharTabs ($characterName+"PkrLyt");
+		//menuItem -parent "abxPickerCharMenu" -label $characterName -c ("tabLayout -e -st "+$characterName+"PkrLyt abxPickerCharTabs;textField -e -text "+$characterName+" abxPickerCharText");
+	}
+	if ($characterName == "")
+		formLayout -parent ($characterName+"PkrLyt") -dtg (" |"+$subCharName+"|"+$bgColor[0]+"|"+$bgColor[1]+"|"+$bgColor[1]) -bgc $bgColor[0] $bgColor[1] $bgColor[2] -dpc "abxPickerCtrlDrop" ($characterName2+$subCharName+"PkrLyt");
+	else
+		formLayout -parent ($characterName+"PkrLyt") -dtg ($characterName2+"|"+$subCharName+"|"+$bgColor[0]+"|"+$bgColor[1]+"|"+$bgColor[1]) -bgc $bgColor[0] $bgColor[1] $bgColor[2] -dpc "abxPickerCtrlDrop" ($characterName2+$subCharName+"PkrLyt");
+		if (`filetest -f $bgImage`){
+			int $imageDim[] = `abxPickerGetImageSize $bgImage`;
+			setParent ($characterName2+$subCharName+"PkrLyt");
+			if (`about -os` == "mac")
+				$bgPic = `iconTextButton -en 0 -parent ($characterName2+$subCharName+"PkrLyt") -dgc "abxPickerCtrlDrag" -image $bgImage -w $imageDim[0] -h $imageDim[1]`;
+			else
+				$bgPic = `image -parent ($characterName2+$subCharName+"PkrLyt") -image $bgImage -w $imageDim[0] -h $imageDim[1]`;
+		}
+		else {
+			if (`about -os` == "mac")
+				$bgPic = `iconTextButton -visible false -bgc $bgColor[0] $bgColor[1] $bgColor[2]`;
+			else
+				$bgPic = `image -visible false -bgc $bgColor[0] $bgColor[1] $bgColor[2]`;
+		}
+		popupMenu -button 3 -parent ($characterName2+$subCharName+"PkrLyt");
+		menuItem -label "BG Image..." -c abxPickerSetBGImage;
+		menuItem -label "Zoom In" -c "abxPickerZoom \"in\";abxPickerRefresh 0;" ;
+		menuItem -label "Zoom Out" -c "abxPickerZoom \"out\";abxPickerRefresh 0;";
+
+
+		tabLayout -e -tabLabel ($characterName2+$subCharName+"PkrLyt") $subCharName ($characterName+"PkrLyt");
+		formLayout -e 
+			-af $bgPic "top" 0 
+			-af $bgPic "left" 0
+			-an $bgPic "right" 
+			-an $bgPic "bottom" 
+			($characterName2+$subCharName+"PkrLyt");
+
+		setParent ..;
+	$pickrPrefix = "";
+	if ($characterName == ""){
+		abxPickerNewNode ($characterName2+$subCharName+"_PIKR") $bgImage ($bgColor[0]+":"+$bgColor[1]+":"+$bgColor[1]) 1 0 1;
+		}
+	else{
+		abxPickerNewNode ($characterName2+$subCharName+"_PIKR") $bgImage ($bgColor[0]+":"+$bgColor[1]+":"+$bgColor[1]) 0 0 1;
+		}
+	if ($characterName != "")
+			menuItem -parent "abxPickerCharMenu" -label $characterName -c ("abxPickerMenuCmd \""+$characterName+"\"");
+	else
+			menuItem -parent "abxPickerCharMenu" -label "*Prefix*" -c ("abxPickerMenuCmd \""+$characterName+"\"");
+	abxPickerMenuCmd $characterName;
+	//textField -e -text $characterName abxPickerCharText;
+	//tabLayout -e -st ($characterName2+$subCharName+"PkrLyt") ($characterName+"PkrLyt");
+	//tabLayout -e -st ($characterName+"PkrLyt") abxPickerCharTabs;
+	
+
+}
+
+//-------------------------------------------------------------------------
+// deletes all current picker layouts and redraws them from the saved nodes
+
+global proc abxPickerRefresh (int $force) {
+
+	string $pickerNodes[] = `ls "*_PIKR"`;
+	string $loadedSheets[]; 
+	string $lastChar; 
+	string $lastTab = "";
+	string $charName;
+	string $charName2;
+	string $subName;
+	string $tokenBuffer[];
+
+
+	$pickerNodes = stringArrayCatenate($pickerNodes,`ls "*:*_PIKR"`);
+
+	string $loseUnsaved = "Refresh without Save";
+	if (`iconTextButton -q -en abxPickerSaveBtn` == 1 && $force == 0){
+		$loseUnsaved = `confirmDialog -title "abxPicker: Unsaved Layout Edits" -message "You unsaved changes to the current abxPicker UI. Refresh without saving will lose these changes.\n Continue Refresh?" -button "Refresh without Save" -button "Save and Refresh" -button "Cancel Refresh" -dismissString "Cancel Refresh" -cancelButton "Cancel Refresh"`;
+	}
+
+	if ($loseUnsaved == "Save and Refresh"){
+		abxPickerWriteNode `tabLayout -q -st (eval("tabLayout -q -st abxPickerCharTabs"))`;
+		iconTextButton -e -en false abxPickerSaveBtn;
+	}
+	if ($loseUnsaved != "Cancel Refresh"){
+	
+
+	if (size($pickerNodes) > 0){	
+		if (`tabLayout -q -ex abxPickerCharTabs`){
+			$loadedSheets = `tabLayout -q -ca abxPickerCharTabs`;
+			$lastChar = `textField -q -text abxPickerCharText`;
+			if ($lastChar != "None" && $lastChar != "*Prefix*"){
+				$lastTab = `tabLayout -q -st ($lastChar+"PkrLyt")`;
+			}
+		}
+	}
+	
+	// hides all pickersheets, deletes picker sheets and character menu items.
+	tabLayout -e -visible false abxPickerCharTabs;
+	textField -e -text "None" abxPickerCharText;
+	for ($each in $loadedSheets)
+		deleteUI -layout $each;
+	popupMenu -e -dai abxPickerCharMenu;
+
+	if (size($pickerNodes) > 0){
+		setParent abxPickerCharTabs;
+
+		for ($each in $pickerNodes){
+			$charName="";
+			tokenize $each ":" $tokenBuffer;
+			if (size($tokenBuffer) < 2){
+				tokenize $each "_" $tokenBuffer;
+				if (size($tokenBuffer) >= 3){
+					$charName = ($tokenBuffer[0]);
+					for ($i=1;$i<size($tokenBuffer)-2;$i++)
+						$charName = ($charName + $tokenBuffer[$i]);
+				}	
+			}
+			else{
+				$charName = $tokenBuffer[0];
+			}
+			if (!`tabLayout -q -ex ($charName+"PkrLyt")`){
+				tabLayout -parent abxPickerCharTabs ($charName+"PkrLyt");
+				if ($charName != "")
+					menuItem -parent "abxPickerCharMenu" -label $charName -c ("abxPickerMenuCmd \""+$charName+"\"");
+				else
+					menuItem -parent "abxPickerCharMenu" -label "*Prefix*" -c ("abxPickerMenuCmd \""+$charName+"\"");
+			}
+		abxPickerMenuCmd $charName;
+		}		
+		
+	}
+
+	tabLayout -e -visible true abxPickerCharTabs;	
+
+	if (`tabLayout -exists ($lastChar+"PkrLyt")`){
+		tabLayout -e -st ($lastChar+"PkrLyt") abxPickerCharTabs;
+		textField -e -text $lastChar abxPickerCharText;
+		if ($lastTab != "" && $lastChar != "None"){
+			tabLayout -e -st $lastTab ($lastChar+"PkrLyt");
+			
+		}
+	}
+	iconTextButton -e -en 0 abxPickerSaveBtn;
+	iconTextButton -e -ebg 0  abxPickerSaveBtn;
+	}
+	
+}
+
+//----------------------------------------------------------------------
+// creates a new node and adds the custom attrs to store the picker data
+
+global proc int abxPickerNewNode (string $nodeName, string $bgImage, string $bgColor, int $charPrefix, int $mirrorPicker,float $pickerScale){
+
+	if (objExists($nodeName)){
+		warning "Character and Sub Character already exists. Aborting";
+		return 0;
+	}
+	createNode -name $nodeName "geometryVarGroup";
+	addAttr -longName "bgImage" -dt "string";
+	setAttr ($nodeName+".bgImage") -type "string" $bgImage;
+	
+	addAttr -longName "bgColor" -dt "string";
+	setAttr ($nodeName+".bgColor") -type "string" $bgColor;
+	addAttr -longName "count" -at "long";
+	addAttr -longName "data" -dt "stringArray";
+	addAttr -longName "width" -dt "Int32Array";
+	addAttr -longName "height" -dt "Int32Array";
+	addAttr -longName "overlay" -dt "stringArray";
+	addAttr -longName "command" -dt "stringArray";
+	addAttr -longName "image" -dt "stringArray";
+	addAttr -longName "label" -dt "stringArray";
+	addAttr -longName "charPrefix" -at bool;
+	setAttr ($nodeName+".charPrefix") $charPrefix;
+	addAttr -longName "mirrorPicker" -at bool;
+	setAttr ($nodeName+".mirrorPicker") $mirrorPicker;
+	addAttr -longName "pickerScale" -at "float";
+	setAttr ($nodeName+".pickerScale") $pickerScale;
+	return 1;
+}
+//-----------------------------------------------------------------------
+// reads the picker data from a node and draws the picker
+
+global proc abxPickerReadNode (string $node) {
+
+	// declarations
+	string $tokenBuffer[];
+	string $tokenBuffer2[];
+	string $tokenBufferNS[];
+	string $bgColorBuffer[];
+	string $bgPic;
+	string $charName = "";
+	string $charName2 = "";
+	string $subName = "";
+	// global prefix variable for passing to abxPickerSelect
+	global string $pickrPrefix;
+	
+	// load the node into memory
+
+
+	int $mirrorPicker = 0;
+	float $pickerScale = 1;
+	if (`attributeExists mirroPicker $node`)
+		$mirrorPicker = `getAttr ($node+".mirrorPicker")`;
+	if (`attributeExists pickerScale $node`)
+		$pickerScale = `getAttr ($node+".pickerScale")`;
+
+	int $count = `getAttr ($node+".count")`;
+	string $bgImage = `getAttr ($node+".bgImage")`;
+	$bgImage = `workspace -en $bgImage`;
+	string $bgColor = `getAttr ($node+".bgColor")`;
+	string $data[] = `getAttr ($node+".data")`;
+	int $width[] = `getAttr ($node+".width")`;
+	int $height[] =`getAttr ($node+".height")`;
+	string $overlay[] = `getAttr ($node+".overlay")`;
+	string $command[] = `getAttr ($node+".command")`;
+	string $image[] = `getAttr ($node+".image")`;
+	if (!attributeExists("label",$node))
+		addAttr -longName "label" -dt "stringArray" $node;
+	string $label[] = `getAttr ($node+".label")`;
+	int $charPrefix =  `getAttr ($node+".charPrefix")`;
+
+
+	tokenize $node ":" $tokenBufferNS;
+	if (size($tokenBufferNS)<2){
+		tokenize $node "_" $tokenBuffer;
+		if (size($tokenBuffer) >= 3){
+			$charName = ($tokenBuffer[0]);
+			$charName2 = ($tokenBuffer[0]+"_");
+			for ($i=1;$i<size($tokenBuffer)-2;$i++){
+				$charName = ($charName + $tokenBuffer[$i]);
+			}
+			$subName = $tokenBuffer[size($tokenBuffer)-2];
+		}
+		else if (size($tokenBuffer) == 2){
+			$charName = "";
+			$charName2 = "";
+			$subName = $tokenBuffer[0];
+		}	
+	}
+	else{
+			$charName = $tokenBufferNS[0];
+			$charName2 = ($tokenBufferNS[0]+"_");
+			tokenize $tokenBufferNS[1] "_" $tokenBuffer2;
+			$subName = $tokenBuffer2[size($tokenBuffer2)-2];
+	}
+	
+	tokenize $bgColor ":" $bgColorBuffer;
+	float $bgr = $bgColorBuffer[0];
+	float $bgg = $bgColorBuffer[1];
+	float $bgb = $bgColorBuffer[2];
+	if (!`tabLayout -q -ex ($charName+"PkrLyt")`){
+		tabLayout -parent abxPickerCharTabs ($charName+"PkrLyt");
+	}
+	if ($charName != ""){
+		if (size($tokenBufferNS) < 2)
+			formLayout -parent ($charName+"PkrLyt") -dtg ($charName2+"|"+$subName+"|"+$bgColor) -bgc $bgr $bgg $bgb -dpc "abxPickerCtrlDrop" ($charName2+$subName+"PkrLyt");
+		else
+			formLayout -parent ($charName+"PkrLyt") -dtg ($charName+":|"+$subName+"|"+$bgColor) -bgc $bgr $bgg $bgb -dpc "abxPickerCtrlDrop" ($charName2+$subName+"PkrLyt");
+	}
+	else{
+		formLayout -parent ($charName+"PkrLyt") -dtg (" |"+$subName+"|"+$bgColor) -bgc $bgr $bgg $bgb -dpc "abxPickerCtrlDrop" ($charName2+$subName+"PkrLyt");
+	}
+	if (`filetest -f $bgImage`){
+		int $imageDim[] = `abxPickerGetImageSize $bgImage`;
+		setParent ($charName2+$subName+"PkrLyt");
+		if (`about -os`=="mac")
+			//$bgPic = `iconTextButton -enable 0 -image $bgImage -di $bgImage -w ($imageDim[0]*$pickerScale) -h ($imageDim[1]*$pickerScale)`;
+			$bgPic = `iconTextButton -enable 0 -image $bgImage -w ($imageDim[0]*$pickerScale) -h ($imageDim[1]*$pickerScale) -dgc "abxPickerCtrlDrag" `;
+		else
+			$bgPic = `image -parent ($charName2+$subName+"PkrLyt") -enable 0 -image $bgImage -w ($imageDim[0]*$pickerScale) -h ($imageDim[1]*$pickerScale)`;
+	}
+	else{
+		if (`about -os`=="mac")
+			$bgPic = `iconTextButton -visible 0 -bgc $bgr $bgg $bgb`;
+		else
+			$bgPic = `image -parent ($charName2+$subName+"PkrLyt") -visible 0 -bgc $bgr $bgg $bgb`;
+		//print ("Image NOT Found "+$bgImage+"\n");
+	}
+
+		popupMenu -button 3 -parent ($charName2+$subName+"PkrLyt");
+		menuItem -label "BG Image..." -c abxPickerSetBGImage;
+		menuItem -label "Zoom In" -c "abxPickerZoom \"in\";evalDeferred(\"abxPickerRefresh 0\");" ;
+		menuItem -label "Zoom Out" -c "abxPickerZoom \"out\";evalDeferred(\"abxPickerRefresh 0\");";
+
+	tabLayout -e -tabLabel ($charName2+$subName+"PkrLyt") $subName ($charName+"PkrLyt");
+	
+	
+	formLayout -e 
+		-af $bgPic "top" 0 
+		-af $bgPic "left" 0 
+		-an $bgPic "right" 
+		-an $bgPic "bottom" 
+		($charName2+$subName+"PkrLyt");
+	
+	/*
+	// create a subLayout to attach controls to 
+	if ($charName != ""){
+		if (size($tokenBufferNS) < 2)
+			formLayout -dtg ($charName2+"|"+$subName+"|"+$bgColor) -ebg 0 -dpc "abxPickerCtrlDrop" ($charName2+$subName+"CtlLyt");
+		else
+			formLayout -dtg ($charName+":|"+$subName+"|"+$bgColor) -ebg 0 -dpc "abxPickerCtrlDrop" ($charName2+$subName+"CtlLyt");
+	}
+	else{
+		formLayout -dtg (" |"+$subName+"|"+$bgColor) -ebg 0 -dpc "abxPickerCtrlDrop" ($charName2+$subName+"CtlLyt");
+	}
+	print ("made for layout: " +$charName2+$subName+"CtlLyt\n");
+	
+	formLayout -e 
+		-af ($charName2+$subName+"CtlLyt") "top" 0 
+		-af ($charName2+$subName+"CtlLyt") "left" 0 
+		-af ($charName2+$subName+"CtlLyt") "right" 300
+		-af ($charName2+$subName+"CtlLyt") "bottom" 300
+		($charName2+$subName+"PkrLyt");
+	*/
+
+	// if namespaces are used prefix with colon else use underscore
+	if (size($tokenBufferNS)>1)
+		$pickrPrefix = ($charName+":");
+	else
+		$pickrPrefix = $charName2;
+	for ($i=0;$i<$count;$i++){
+		tokenize $data[$i] ":" $tokenBuffer;
+		if (size($tokenBuffer)==5){
+			int $xPos = int($tokenBuffer[0]) * $pickerScale;
+			int $yPos = int($tokenBuffer[1]) * $pickerScale;
+			float $bgr = $tokenBuffer[2];
+			float $bgg = $tokenBuffer[3];
+			float $bgb = $tokenBuffer[4];
+			string $control;
+		
+		
+			// if prefix flag is true
+			if ($charPrefix == 1){
+				// if the data node has a rename prefix
+				if ($charName2!=""){
+					// create the button that sets the pickrPrefix
+					if (`gmatch $command[$i] "*global string $pickrPrefix=\"\"*"`){
+						string $newPrefix = ("global string $pickrPrefix=\""+$pickrPrefix+"\";");
+						$command[$i] = substitute("global string $pickrPrefix=\"\";",$command[$i],$newPrefix);
+						// remove any duplicates
+						while (`gmatch $command[$i] "*global string $pickrPrefix=\"\"*"`){
+							$command[$i] = substitute("global string $pickrPrefix=\"\";",$command[$i],"");
+						}
+					}
+					else{
+						$command[$i] = ("global string $pickrPrefix=\""+$pickrPrefix+"\";"+$command[$i]);
+					}
+					$control = `abxPickerNewButton $xPos $yPos ($width[$i]*$pickerScale) ($height[$i]*$pickerScale) $bgr $bgg $bgb $image[$i] $command[$i] $label[$i]`;
+				}
+				else{
+					$control = `abxPickerNewButton $xPos $yPos ($width[$i]*$pickerScale) ($height[$i]*$pickerScale) $bgr $bgg $bgb $image[$i] $command[$i] $label[$i]`;
+				}
+			}
+			else {
+
+				$control = `abxPickerNewButton $xPos $yPos ($width[$i]*$pickerScale) ($height[$i]*$pickerScale) $bgr $bgg $bgb $image[$i] $command[$i] $label[$i]`;
+			}
+			//abxPickerSetPos ($charName2+$subName+"PkrLyt") $control $xPos $yPos ($width[$i]*$pickerScale) ($height[$i]*$pickerScale) ;
+			abxPickerSetPos ($charName2+$subName+"PkrLyt") $control $xPos $yPos ($width[$i]*$pickerScale) ($height[$i]*$pickerScale) ;
+		}
+	}
+
+
+
+
+	textField -e -text $charName abxPickerCharText;
+	// formLayout -e -visible true ($charName2+$subName+"PkrLyt");
+}
+
+//------------------------------------------------------------------
+// writes the picker data to a transform node
+
+global proc abxPickerWriteNode (string $picker) {
+	
+	int $buttonCount = `layout -q -nch $picker`;
+	string $uiName[] = `layout -q -ca $picker`;
+	string $bgImage = "";
+	if (`about -os` == "mac")
+		$bgImage = `iconTextButton -q -image $uiName[0]`;
+	else
+		$bgImage = `image -q -image $uiName[0]`;
+	string $pickerData = `layout -q -dtg $picker`;
+	string $nodeName = "";
+
+
+
+
+	string $pickerDataBuffer[];
+	tokenize $pickerData "|" $pickerDataBuffer;
+	if ($pickerDataBuffer[0] == " ")
+		$nodeName = ($pickerDataBuffer[1]+"_PIKR");
+	else 
+		$nodeName = ($pickerDataBuffer[0]+$pickerDataBuffer[1]+"_PIKR");
+	if (!objExists($nodeName))
+		abxPickerNewNode ($nodeName) "" "" 0 0 1;	
+
+	print ("Saving "+$nodeName+"\n");
+
+	setAttr ($nodeName+".bgImage") -type "string" $bgImage;
+	setAttr ($nodeName+".bgColor") -type "string" ($pickerDataBuffer[2]+":"+$pickerDataBuffer[3]+":"+$pickerDataBuffer[4]);
+	setAttr ($nodeName+".count") ($buttonCount-1);
+
+
+	// adds attributes to nodes for newer version of abxPicker
+	if (!`attributeExists mirrorPicker $nodeName`){
+		addAttr -longName "mirrorPicker" -at "bool" $nodeName;
+		setAttr ($nodeName+".mirrorPicker") 0;
+	}
+	if (!`attributeExists pickerScale $nodeName`){
+		addAttr -longName "pickerScale" -at "float" $nodeName;
+		setAttr ($nodeName+".pickerScale") 1.0;
+	}
+
+	int $mirrorPicker = `getAttr ($nodeName+".mirrorPicker")`;
+	float $pickerScale = `getAttr ($nodeName+".pickerScale")`;
+
+	
+	
+	string $data[];
+	int $width[];
+	int $height[];
+	string $overlay[];
+	string $image[];
+	string $command[];
+	string $label[];
+	
+
+
+
+	// assumes first child is the background image ($i=0) and ignores it
+
+	for ($i=1;$i<$buttonCount;$i++){
+		// if it hasnt been disabled
+		if (`control -q -en $uiName[$i]` == 1){
+
+			// parse the data for reverse scaling the left and top position of controls
+			string $tokenBuffer[];
+			//*
+			string $unscaledData = `control -q -dtg $uiName[$i]`;
+			tokenize $unscaledData ":" $tokenBuffer;
+			int $xPos = int((float($tokenBuffer[0])+0.5) / $pickerScale);
+			int $yPos = int((float($tokenBuffer[1])+0.5) / $pickerScale);
+			string $scaledData = "";
+			
+			for ($j=0;$j<size($tokenBuffer);$j++){
+				if ($j == 0){
+					$scaledData = ($xPos);
+				}
+				else if ($j == 1) {
+					$scaledData = ($scaledData+":"+$yPos);
+				}
+				else {
+					$scaledData = ($scaledData+":"+$tokenBuffer[$j]);
+				}
+
+			}
+			int $unscaledWidth = int(float(`control -q -width $uiName[$i]`)+0.5);
+			int $unscaledHeight = int(float(`control -q -height $uiName[$i]`)+0.5);
+
+			// $data[size($data)] = `iconTextButton -q -dtg $uiName[$i]`;
+			$data[size($data)] = $scaledData;
+			$width[size($width)] = ($unscaledWidth / $pickerScale);
+			$height[size($height)] = ($unscaledHeight / $pickerScale);
+			$overlay[size($overlay)] = `nodeIconButton -q -imageOverlayLabel $uiName[$i]`;
+			$image[size($image)] = `nodeIconButton -q -image1 $uiName[$i]`;
+			$command[size($command)] = `nodeIconButton -q -command $uiName[$i]`;
+			$label[size($label)] = `nodeIconButton -q -label $uiName[$i]`;
+		}
+	}
+
+
+	// set buttonCount to size of array
+	$buttonCount = size($data)+1;
+	
+	
+	int $charPrefix = `getAttr ($nodeName+".charPrefix")`;
+	
+	// build setAttr
+	string $setAttrCmd = ("setAttr "+$nodeName+".data -type stringArray "+($buttonCount-1));
+	for ($each in $data)
+		$setAttrCmd = ($setAttrCmd + " \"" + $each + "\"");
+	eval ($setAttrCmd);
+
+	string $setAttrCmd = ("setAttr "+$nodeName+".overlay -type stringArray "+($buttonCount-1));
+	for ($each in $overlay)
+		$setAttrCmd = ($setAttrCmd + " \"" + $each + "\"");
+	eval ($setAttrCmd);
+
+	string $setAttrCmd = ("setAttr "+$nodeName+".image -type stringArray "+($buttonCount-1));
+	for ($each in $image)
+		$setAttrCmd = ($setAttrCmd + " \"" + $each + "\"");
+	eval ($setAttrCmd);
+
+	// writes the command data, removes prefix code
+	
+	string $setAttrCmd = ("setAttr "+$nodeName+".command -type stringArray "+($buttonCount-1));
+	for ($each in $command) {
+		//if ($charPrefix == 1){
+			string $tokenBuffer[];
+			tokenize $each ";" $tokenBuffer;
+			string $newCommand = "";
+			$newCommand = $tokenBuffer[1];
+			for ($i=2;$i<size($tokenBuffer);$i++){
+				$newCommand = ($newCommand + ";" + $tokenBuffer[$i]);
+			}	
+			$setAttrCmd = ($setAttrCmd + " \"" + encodeString($newCommand) + "\"");
+		//}
+		//else {
+		//	$setAttrCmd = ($setAttrCmd + " \"" + encodeString($each) + "\"");
+		//}
+	}
+	eval ($setAttrCmd);
+
+	string $setAttrCmd = ("setAttr "+$nodeName+".width -type Int32Array "+($buttonCount-1));
+	for ($each in $width)
+		$setAttrCmd = ($setAttrCmd + " " + $each);
+	eval ($setAttrCmd);
+
+	string $setAttrCmd = ("setAttr "+$nodeName+".height -type Int32Array "+($buttonCount-1));
+	for ($each in $height)
+		$setAttrCmd = ($setAttrCmd + " " + $each);	 
+	eval ($setAttrCmd);
+	
+	if (!attributeExists("label",$nodeName))
+		addAttr -longName "label" -dt "stringArray" nodeName;
+	string $setAttrCmd = ("setAttr "+$nodeName+".label -type stringArray "+($buttonCount-1));
+	for ($each in $label)
+		$setAttrCmd = ($setAttrCmd + " \"" + encodeString($each) + "\"");
+	eval ($setAttrCmd);
+	
+}
+
+//------------------------------------------------------------------------
+// called when clicking the buttons, allows for additive/toggle selection
+global proc abxPickerSelect (string $selList){
+	string $selListBuffer[];
+	global string $pickrPrefix;
+	global string $pickrControl;
+	global string $pickrHiliteList[];
+	global int $pickrPress;
+
+	print ("PickerPrefix="+$pickrPrefix+"\n");
+	tokenize $selList " " $selListBuffer;
+	if ($pickrPrefix != ""){
+		for ($i=0;$i<size($selListBuffer);$i++){
+			string $pathPipeBuffer[];
+			tokenize $selListBuffer[$i] "|" $pathPipeBuffer;
+			if (size($pathPipeBuffer) > 1){
+				string $rebuiltPathName = "";
+				for ($j=0;$j<size($pathPipeBuffer);$j++){
+					if ($j == 0){
+						$rebuiltPathName = ($pickrPrefix+$pathPipeBuffer[$j]);
+					}
+					else {
+
+						$rebuiltPathName = ($rebuiltPathName + "|" +$pickrPrefix+$pathPipeBuffer[$j]);
+					}				
+				}
+				
+				$selListBuffer[$i] = $rebuiltPathName;
+			}
+			else {
+				$selListBuffer[$i] = ($pickrPrefix+$selListBuffer[$i]);
+			}
+		}
+	}
+		
+	int $mods = `getModifiers`;
+	// shift
+	if (($mods / 1) %2) {
+		select -add $selListBuffer;
+		if (`control -exists $pickrControl`){
+			abxPickerCtrlHilite $pickrControl;
+			$pickrHiliteList[`size $pickrHiliteList`] = $pickrControl;
+		}
+	}
+	// ctrl
+	else if (($mods / 4) %2) {
+		select -toggle $selListBuffer;
+		abxPickerCtrlClearHilite $pickrControl;
+	}
+	// nothing
+	else{
+		print $selListBuffer;
+		select $selListBuffer;
+		if (`control -exists $pickrControl`){
+			abxPickerClearHilites;
+			abxPickerCtrlHilite $pickrControl;
+			$pickrHiliteList[`size $pickrHiliteList`] = $pickrControl;
+		}	
+		
+	}
+	$pickrPress = true;
+	//setFocus MayaWindow;
+}
+
+//------------------------------------------------------------------------
+// called when toggling boolean values such as visibility
+global proc abxPickerToggle (string $selList, string $attrList){
+	global string $pickrPrefix;
+	string $tokenBufferNodes[];
+	string $tokenBufferAttrs[];
+	
+	tokenize $selList " " $tokenBufferNodes;
+	tokenize $attrList " " $tokenBufferAttrs;
+	
+	for ($each in $tokenBufferNodes){
+		for ($every in $tokenBufferAttrs){
+			if ($pickrPrefix != ""){
+				$oldVal = `getAttr ($pickrPrefix+$each+"."+$every)`;
+				if ($oldVal == 1)
+					setAttr ($pickrPrefix+$each+"."+$every) 0;
+				else if ($oldVal == 0)
+					setAttr ($pickrPrefix+$each+"."+$every) 1;
+			}
+			else{
+				$oldVal = `getAttr ($each+"."+$every)`;
+				if ($oldVal == 1)
+					setAttr ($each+"."+$every) 0;
+				else if ($oldVal == 0)
+					setAttr ($each+"."+$every) 1;
+			}
+		}
+	}
+}
+
+//------------------------------------------------------------------------
+// called when clicking the buttons, allows for additive/toggle selection
+global proc abxPickerKey (string $selList){
+	string $selListBuffer[];
+	global string $pickrPrefix;
+	tokenize $selList " " $selListBuffer;
+	if ($pickrPrefix != ""){
+		for ($i=0;$i<size($selListBuffer);$i++){
+			$selListBuffer[$i] = ($pickrPrefix+$selListBuffer[$i]);
+		}
+	}
+	setKeyframe $selListBuffer;
+}
+
+//-------------------------------------------------------------------------
+// called when toggling isolate object funtion
+global proc abxPickerIsolate (string $selList) {
+	select $selList;
+	global string $abxPickerIsoList;
+
+	// find all model views
+	string $modelViews[];
+	$editors = `lsUI -editors`;
+	for ($each in $editors) {
+		if (`modelEditor -q -exists $each`){
+			$modelViews[size($modelViews)] = $each;
+		}
+			
+	}
+	if ($selList != $abxPickerIsoList){
+		for ($each in $modelViews){
+			isolateSelect -state 1 $each;
+		}
+		$abxPickerIsoList = $selList;
+	}
+	else {
+		for ($each in $modelViews){
+			isolateSelect -state 0 $each;
+		}
+		$abxPickerIsoList = "";
+	}
+
+
+}
+
+
+
+
+//-------------------------------------------------------------------------
+// creates the control preset window
+
+global proc abxPickerBuildToolbox() {
+	if (`window -ex abxPickerToolWindow` != true) {
+		window -w 156 -h 311 -t "Buttons" -tlb true abxPickerToolWindow;
+		formLayout abxPickerToolForm;
+		tabLayout abxPickerToolTabs;
+		columnLayout -parent abxPickerToolTabs -rs 0 abxPickerToolColor ;
+		//columnLayout -rs 2;
+			rowLayout -nc 12;
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.5:0:0" "abxPickerCtrlColor" .5 0 0 "" "" "";
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.5:.25:0"  "abxPickerCtrlColor" .5 .25 0 "" "" "";
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.5:.5:0" "abxPickerCtrlColor" .5 .5 0 "" "" "";
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.25:.5:0" "abxPickerCtrlColor" .25 .5 0 "" "" "";
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:0:.5:0" "abxPickerCtrlColor" 0 .5 0 "" "" "";
+
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:0:.5:.25" "abxPickerCtrlColor" 0 .5 .25 "" "" "";
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:0:.5:.5" "abxPickerCtrlColor" 0 .5 .5 "" "" "";
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:0:.25:.5" "abxPickerCtrlColor" 0 .25 .5 "" "" "";
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:0:0:.5" "abxPickerCtrlColor" 0 0 .5 "" "" "";
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.25:0:.5" "abxPickerCtrlColor" .25 0 .5 "" "" "";
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.5:0:.5" "abxPickerCtrlColor" .5 0 .5 "" "" "";
+			abxPickerNewControl "default" 16 16 "iconOnly" "" "" "0:0:.5:0:.25" "abxPickerCtrlColor" .5 0 .25 "" "" "";
+			/*
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:0:0" -w 16 -h 16 -ebg 0 -bgc .5 0 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:.25:0" -w 16 -h 16 -ebg 0 -bgc .5 .25 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:.5:0" -w 16 -h 16 -ebg 0 -bgc .5 .5 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.25:.5:0" -w 16 -h 16 -ebg 0 -bgc .25 .5 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:.5:0" -w 16 -h 16 -ebg 0 -bgc 0 .5 0 -dgc "abxPickerCtrlColor";
+
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:.5:.25" -w 16 -h 16 -ebg 0 -bgc 0 .5 .25 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:.5:.5" -w 16 -h 16 -ebg 0 -bgc 0 .5 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:.25:.5" -w 16 -h 16 -ebg 0 -bgc 0 .25 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:0:.5" -w 16 -h 16 -ebg 0 -bgc 0 0 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.25:0:.5" -w 16 -h 16 -ebg 0 -bgc .25 0 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:0:.5" -w 16 -h 16 -ebg 0 -bgc .5 0 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:0:.25" -w 16 -h 16 -ebg 0 -bgc .5 0 .25 -dgc "abxPickerCtrlColor";
+			*/
+			setParent..;
+			rowLayout -nc 12;
+			nodeIconButton -style "iconOnly" -dtg "0:0:.75:0:0" -w 16 -h 16 -ebg 0 -bgc .75 0 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.38:.5:0" -w 16 -h 16 -ebg 0 -bgc .75 .38 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.75:.75:0" -w 16 -h 16 -ebg 0 -bgc .75 .75 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.38:.75:0" -w 16 -h 16 -ebg 0 -bgc .38 .75 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:.75:0" -w 16 -h 16 -ebg 0 -bgc 0 .75 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:.75:.38" -w 16 -h 16 -ebg 0 -bgc 0 .75 .38 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:.75:.75" -w 16 -h 16 -ebg 0 -bgc 0 .75 .75 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:..38:.75" -w 16 -h 16 -ebg 0 -bgc 0 .38 .75 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:0:.75" -w 16 -h 16 -ebg 0 -bgc 0 0 .75 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.38:0:.75" -w 16 -h 16 -ebg 0 -bgc .38 0 .75 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.75:0:.75" -w 16 -h 16 -ebg 0 -bgc .75 0 .75 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.75:0:..38" -w 16 -h 16 -ebg 0 -bgc .75 0 .38 -dgc "abxPickerCtrlColor";
+			setParent..;
+			rowLayout -nc 12;
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:0:0" -w 16 -h 16 -ebg 0 -bgc 1 0 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:.5:0" -w 16 -h 16 -ebg 0 -bgc 1 .5 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:1:0" -w 16 -h 16 -ebg 0 -bgc 1 1 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:1:0" -w 16 -h 16 -ebg 0 -bgc .5 1 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:1:0" -w 16 -h 16 -ebg 0 -bgc 0 1 0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:1:.5" -w 16 -h 16 -ebg 0 -bgc 0 1 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:1:1" -w 16 -h 16 -ebg 0 -bgc 0 1 1 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:.5:1" -w 16 -h 16 -ebg 0 -bgc 0 .5 1 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:0:0:1" -w 16 -h 16 -ebg 0 -bgc 0 0 1 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:0:1" -w 16 -h 16 -ebg 0 -bgc .5 0 1 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:0:1" -w 16 -h 16 -ebg 0 -bgc 1 0 1 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:0:.5" -w 16 -h 16 -ebg 0 -bgc 1 0 .5 -dgc "abxPickerCtrlColor";
+			setParent..;
+			rowLayout -nc 12;
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:.5:.5" -w 16 -h 16 -ebg 0 -bgc 1 .5 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:.75:.5" -w 16 -h 16 -ebg 0 -bgc 1 .75 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:1:.5" -w 16 -h 16 -ebg 0 -bgc 1 1 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.75:1:.5" -w 16 -h 16 -ebg 0 -bgc .75 1 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:1:.5" -w 16 -h 16 -ebg 0 -bgc .5 1 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:1:.75" -w 16 -h 16 -ebg 0 -bgc .5 1 .75 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:1:1" -w 16 -h 16 -ebg 0 -bgc .5 1 1 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:.75:1" -w 16 -h 16 -ebg 0 -bgc .5 .75 1 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:.5:1" -w 16 -h 16 -ebg 0 -bgc .5 .5 1 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.75:.5:1" -w 16 -h 16 -ebg 0 -bgc .75 .5 1 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:.5:1" -w 16 -h 16 -ebg 0 -bgc 1 .5 1 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:.5:.75" -w 16 -h 16 -ebg 0 -bgc 1 .5 .75 -dgc "abxPickerCtrlColor";
+			setParent..;
+			rowLayout -nc 12;
+			nodeIconButton -style "iconOnly" -dtg "0:0:.7:.4:.4" -w 16 -h 16 -ebg 0 -bgc .7 .4 .4 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.7:.5:.4" -w 16 -h 16 -ebg 0 -bgc .7 .5 .4 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.7:.7:.4" -w 16 -h 16 -ebg 0 -bgc .7 .7 .4 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:.7:.4" -w 16 -h 16 -ebg 0 -bgc .5 .7 .4 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.4:.7:.4" -w 16 -h 16 -ebg 0 -bgc .4 .7 .4 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.4:.7:.5" -w 16 -h 16 -ebg 0 -bgc .4 .7 .5 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.4:.7:.7" -w 16 -h 16 -ebg 0 -bgc .4 .7 .7 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.4:.5:.7" -w 16 -h 16 -ebg 0 -bgc .4 .5 .7 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.4:.4:.7" -w 16 -h 16 -ebg 0 -bgc .4 .4 .7 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.5:.4:.7" -w 16 -h 16 -ebg 0 -bgc .5 .4 .7 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.7:.4:.7" -w 16 -h 16 -ebg 0 -bgc .7 .4 .7 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.7:.4:.5" -w 16 -h 16 -ebg 0 -bgc .7 .4 .5 -dgc "abxPickerCtrlColor";
+			setParent..;
+			rowLayout -nc 7;
+			nodeIconButton -style "textOnly" -l "T" -dtg "0:0:-1:.0:.0" -w 16 -h 16 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.0:.0:.0" -w 16 -h 16 -ebg 0 -bgc .0 .0 .0 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.2:.2:.2" -w 16 -h 16 -ebg 0 -bgc .2 .2 .2 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.4:.4:.4" -w 16 -h 16 -ebg 0 -bgc .4 .4 .4 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.6:.6:.6" -w 16 -h 16 -ebg 0 -bgc .6 .6 .6 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:.8:.8:.8" -w 16 -h 16 -ebg 0 -bgc .8 .8 .8 -dgc "abxPickerCtrlColor";
+			nodeIconButton -style "iconOnly" -dtg "0:0:1:1:1" -w 16 -h 16 -ebg 0 -bgc 1 1 1 -dgc "abxPickerCtrlColor";
+			setParent..;
+			rowLayout -nc 2 -co2 3 3 -cw2 60 60;
+			nodeIconButton -style "textOnly" -ann "Drag from here to drop custom color" -ebg 0 -bgc .95 .95 .95 -label "Custom" -w 56 -h 30 -dgc "abxPickerCtrlColor" abxPickerClrCustom;			
+			colorSliderGrp -cw 1 30 -cw 2 120 
+				-cc ("float $custColor[] = `colorSliderGrp -q -rgb abxPickerClrCustomGrp`;"
+				+"nodeIconButton -e -bgc $custColor[0] $custColor[1] $custColor[2] abxPickerClrCustom;"
+				+"nodeIconButton -e -dtg (\"0:0:\"+$custColor[0]+\":\"+$custColor[1]+\":\"+$custColor[2]) abxPickerClrCustom;")
+ 				-rgb 1 1 1 abxPickerClrCustomGrp;
+			//textField -text "Custom" -cc "nodeIconButton -e -c `textField -q -text abxPickerClrTxt` abxPickerClrCustom" abxPickerClrTxt;
+			setParent..;
+			setParent..;
+		setParent..;
+		columnLayout -parent abxPickerToolTabs abxPickerToolImages;
+		//rowLayout -nc 2 -co2 3 3 -cw2 32 32;
+			//columnLayout -rs 4;
+			//rowLayout -nc 2 -co2 6 6 -cw2 36 36;
+			//nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -image "fileOpen.xpm" -dgc "abxPickerCtrlImage";
+			//textField -w 120 abxPickerCustomImageField;
+			//setParent..;
+			//setParent..;
+			rowLayout -nc 8 ;
+			nodeIconButton -style "textOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -ebg 0 -bgc .95 .95 .95 -dgc "abxPickerCtrlLabel";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -ebg 0 -bgc .95 .95 .95 -image "autoKeyframeOff.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -ebg 0 -bgc .95 .95 .95 -image "blackbox.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -ebg 0 -bgc .95 .95 .95 -image "Camera.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -ebg 0 -bgc .95 .95 .95 -image "channelBoxUseManips.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -ebg 0 -bgc .95 .95 .95 -image "circle.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -ebg 0 -bgc .95 .95 .95 -image "square.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -ebg 0 -bgc .95 .95 .95 -image "dot.png" -dgc "abxPickerCtrlImage";
+			setParent..;
+			rowLayout -nc 8 ;
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "defaultHand.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "autoKeyframeOn.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "fleur.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "light.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "menuIconAdd.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "timeStop.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "tumbleCursor.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "srt_M.png" -dgc "abxPickerCtrlImage";
+			setParent..;
+			rowLayout -nc 8 ;
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "render_blinn.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "render_lambert.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "render_shadingMap.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "render_useBackground.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "pickHandlesObj.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "pickPivotComp.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "pickPointComp.png" -dgc "abxPickerCtrlImage";
+			nodeIconButton -style "iconOnly" -w 32 -h 32 -dtg "0:0:-1:.9:.9" -bgc .95 .95 .95 -image "pickPointComp2.png" -dgc "abxPickerCtrlImage";
+			setParent..;
+			rowLayout -nc 3 -adj 2 -co3 3 6 6  -cw3 36 205 27 ;
+			nodeIconButton -style "iconOnly" -bgc .95 .95 .95 -label "Custom" -w 32 -h 30 -dgc "abxPickerCtrlImage" abxPickerImgCustom;			
+			textField -text "Custom" -w 200 -aie 1 -ec "nodeIconButton -e -image `textField -q -text abxPickerImgTxt` abxPickerImgCustom" abxPickerImgTxt;
+			symbolButton -image "fileOpen.png" 
+				-c ("string $multipleFilters = \"PNG (*.png);;JPEG (*.jpg);;Bitmap (*.bmp);;XPM (*.xpm);;All Files (*.*)\";"
+				+"string $imagePath[] = `fileDialog2 -ds 2 -fileFilter $multipleFilters -selectFileFilter \"PNG\" -cap \"Choose Background Image\" -fm 1`;"
+				+"if ($imagePath[0]!=\"\") { textField -e -text $imagePath[0] abxPickerImgTxt;"
+				+"nodeIconButton -e -image $imagePath[0] abxPickerImgCustom;}");
+			//symbolButton -image "factoryIcon.png" -command "python(\"import maya.app.general.resourceBrowser as resourceBrowser;resBrowser = resourceBrowser.resourceBrowser();path = resBrowser.run();del resBrowser;\")";
+			//symbolButton -image "factoryIcon.png" -command "python(\"import maya.app.general.resourceBrowse as resourceBrowser\");python(\"import maya.app.general.resourceBrowse\")";
+			setParent..;
+			setParent..;
+			setParent..;
+		columnLayout -parent abxPickerToolTabs abxPickerToolcmd;
+		//rowLayout -nc 2 -co2 3 3 -cw2 60 60;
+			rowLayout -nc 4 ;
+			nodeIconButton -style "textOnly" -ann "Select and Use Move Tool" -bgc .95 .95 .95 -label "Move" -w 56 -h 30 -dgc "abxPickerCtrlCommand" -c "/*selectT*/";
+			nodeIconButton -style "textOnly" -ann "Select and Use Rotate Tool" -bgc .95 .95 .95 -label "Rotate" -w 56 -h 30 -dgc "abxPickerCtrlCommand" -c "/*selectR*/";
+			nodeIconButton -style "textOnly" -ann "Select and Use Scale Tool" -bgc .95 .95 .95 -label "Scale" -w 56 -h 30 -dgc "abxPickerCtrlCommand" -c "/*selectS*/";	
+			nodeIconButton -style "textOnly" -ann "Select and Show Manip" -bgc .95 .95 .95 -label "Manip" -w 56 -h 30 -dgc "abxPickerCtrlCommand" -c "/*selectM*/";		
+			setParent..;
+			rowLayout -nc 4 ;
+			nodeIconButton -style "textOnly" -ann "Select Object" -bgc .95 .95 .95 -label "Select" -w 56 -h 30 -dgc "abxPickerCtrlCommand" -c "/*select*/";
+			nodeIconButton -style "textOnly" -ann "Key Selected Object" -bgc .95 .95 .95 -label "Key" -w 56 -h 30 -dgc "abxPickerCtrlCommand" -c "/*key*/";
+			nodeIconButton -style "textOnly" -ann "Toggle Selected Attr On|Off (select attr in channelbox)" -bgc .95 .95 .95 -label "Toggle" -w 56 -h 30 -dgc "abxPickerCtrlCommand" -c "/*toggle*/";
+			nodeIconButton -style "textOnly" -ann "Store Attr Values for Pose" -bgc .95 .95 .95 -label "Pose" -w 56 -h 30 -dgc "abxPickerCtrlCommand" -c "/*pose*/";
+			setParent..;
+			rowLayout -nc 1 ;
+			nodeIconButton -visible 0 -style "textOnly" -ann "Isolate" -bgc .95 .95 .95 -label "Isolate" -w 56 -h 30 -dgc "abxPickerCtrlCommand" -c "/*isolate*/";
+			setParent..;
+		rowLayout -nc 2 -co2 3 3 -cw2 60 60;
+			nodeIconButton -style "textOnly" -ann "Drag from here to drop custom command" -bgc .95 .95 .95 -label "Custom" -w 56 -h 30 -dgc "abxPickerCtrlCommand" abxPickerCmdCustom;			
+			textField -text "Custom" -w 150 -aie 1 -ec "iconTextButton -e -c `textField -q -text abxPickerCmdTxt` abxPickerCmdCustom" abxPickerCmdTxt;
+			setParent..;
+			setParent..;
+		columnLayout -parent abxPickerToolTabs abxPickerToolLabel;
+		//rowLayout -nc 2 -co2 3 3 -cw2 60 60;
+			rowLayout -nc 4 ;
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "God" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "Mvr" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "Dir" -w 56 -h 20 -dgc "abxPickerCtrlLabel";			
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "IK" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			setParent..;
+			rowLayout -nc 4 ;
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "Key" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "KeyAll" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "SelAll" -w 56 -h 20 -dgc "abxPickerCtrlLabel";			
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "FK" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			setParent..;
+			rowLayout -nc 4 ;
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "Vis" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "Lf" -w 56 -h 20 -dgc "abxPickerCtrlLabel";			
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "Rt" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			setParent..;
+			rowLayout -nc 4 ;
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "Root" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "Hide" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "Show" -w 56 -h 20 -dgc "abxPickerCtrlLabel";			
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 -label "Body" -w 56 -h 20 -dgc "abxPickerCtrlLabel";
+			setParent..;
+		rowLayout -nc 2 -co2 3 3 -cw2 60 60;
+			nodeIconButton -style "textOnly" -ann "Drag from here to drop custom label" -bgc .95 .95 .95 -label "Custom" -w 56 -h 30 -dgc "abxPickerCtrlLabel" abxPickerLblCustom;
+			textField -text "Custom" -w 150 -aie 1 -ec "nodeIconButton -e -label `textField -q -text abxPickerLblTxt` abxPickerLblCustom" abxPickerLblTxt;
+			setParent..;
+			setParent..;
+		formLayout -parent abxPickerToolTabs abxPickerToolScript;
+			nodeIconButton -style "textOnly" -bgc .95 .95 .95 - ann "Drag from here to drop custom script" -label "Script" -w 56 -h 30 -dtg "abxPickerScrptTxt" -dgc "abxPickerCtrlScript" abxPickerScrptCustom;			
+			scrollField -text "Add Custom Command Here." -ec "nodeIconButton -e -c `scrollField -q -text abxPickerScrptTxt` abxPickerScrptCustom" abxPickerScrptTxt;
+			formLayout -e -af abxPickerScrptCustom "left" 3 -af abxPickerScrptCustom "top" 3 abxPickerToolScript;
+			formLayout -e -af abxPickerScrptTxt "left" 3 -ac abxPickerScrptTxt "top" 3 abxPickerScrptCustom -af abxPickerScrptTxt "bottom" 3 -af abxPickerScrptTxt "right" 3 abxPickerToolScript;
+			//cmdScrollFieldExecuter -h 100 abxPickerCmdTxt;
+
+			
+		tabLayout -e -tabLabel "abxPickerToolColor" "Color" abxPickerToolTabs;
+		tabLayout -e -tabLabel "abxPickerToolImages" "Image" abxPickerToolTabs;
+		tabLayout -e -tabLabel "abxPickerToolcmd" "Command" abxPickerToolTabs;
+		tabLayout -e -tabLabel "abxPickerToolLabel" "Label" abxPickerToolTabs;
+		tabLayout -e -tabLabel "abxPickerToolScript" "Script" abxPickerToolTabs;
+		tabLayout -e -visible true abxPickerToolTabs;
+
+		formLayout -e 
+			-af abxPickerToolTabs "top" 2 
+			-af abxPickerToolTabs "left" 2 
+			-af abxPickerToolTabs "right" 0
+			-af abxPickerToolTabs "bottom" 0
+			abxPickerToolForm;	
+
+		showWindow abxPickerToolWindow;
+	}
+	else {
+		showWindow abxPickerToolWindow;
+	}
+}
+////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
+
+
+//-------------------------------------------------------------------------
+// creates the control preset window
+
+global proc abxPickerPropertyToolbox(string $control) {
+	if (`window -ex abxPickerPropWindow` != true) {
+		window -w 156 -h 311 -t "Buttons" -tlb true abxPickerPropWindow;
+		formLayout abxPickerPropForm;
+
+
+		formLayout -e 
+			-af abxPickerToolTabs "top" 2 
+			-af abxPickerToolTabs "left" 2 
+			-af abxPickerToolTabs "right" 0
+			-af abxPickerToolTabs "bottom" 0
+			abxPickerToolForm;	
+
+		showWindow abxPickerPropWindow;
+	}
+	else {
+		showWindow abxPickerPropWindow;
+	}
+}
+////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
+
+
+global proc abxPickerSetBGImage () {
+	
+
+	string $multipleFilters = "PNG (*.png);;JPEG (*.jpg);;Bitmap (*.bmp);;XPM (*.xpm);;All Files (*.*)";
+	string $imagePath[] = `fileDialog2 -ds 2 -fileFilter $multipleFilters -selectFileFilter "PNG" -cap "Choose Background Image" -fm 1`;
+	
+	if ($imagePath[0] != ""){
+
+		// set image of current tab
+		// get visible picker node
+		$currentChar = `tabLayout -q -st abxPickerCharTabs`;
+		string $currentSubTabLayout = `tabLayout -q -st $currentChar`;
+		string $currentNodeLyt = $currentSubTabLayout;
+		int $subStrEnd = (size($currentNodeLyt)-6);
+		string $currentNode = (substring($currentNodeLyt, 1,$subStrEnd)+"_PIKR");
+
+		string $pickerNodes[] = `layout -q -ca $currentSubTabLayout`;
+		string $imageControl = $pickerNodes[0];
+
+		int $imgDim[] = `abxPickerGetImageSize $imagePath[0]`;
+		float $pickerScale = 1;
+	
+		if (`attributeExists pickerScale $currentNode`)
+			$pickerScale = `getAttr ($currentNode+".pickerScale")`;
+
+		if (`about -os` == "mac")
+			iconTextButton -e -visible 1 -w ($imgDim[0]*$pickerScale) -h ($imgDim[1]*$pickerScale) -image $imagePath[0] $imageControl;
+		else
+			image -e -visible 1 -w ($imgDim[0]*$pickerScale) -h ($imgDim[1]*$pickerScale) -image $imagePath[0] $imageControl;
+
+		// set bg attribute of current tabs picker
+		setAttr -type "string" ($currentNode+".bgImage") $imagePath[0];
+
+	}
+}
+
+
+
+global proc abxPickerMenuCmd (string $character){
+
+	string $pickerNodes[];
+	string $pickerNodesAlt[];
+	if ($character != ""){
+		$pickerNodes = `ls ($character+"_*_PIKR")`;
+		$pickerNodes = stringArrayCatenate($pickerNodes,`ls ($character+":*_PIKR")`);
+	}
+	else{ 
+		// if a charname prefix is used, find only nameless nodes
+		$pickerNodesAlt = `ls "*_PIKR"`;
+		int $i = 0;
+		string $tokenBuffer[];
+		for ($each in $pickerNodesAlt){
+			tokenize $each "_" $tokenBuffer;
+			if (size($tokenBuffer)<3){
+				$pickerNodes[$i] = $each;
+				$i++;
+			}
+		}
+	}
+	
+	for ($node in $pickerNodes){
+		string $charName = "";
+		string $charName2 = "";
+		string $tokenBuffer[];
+		string $tokenBuffer2[];
+		string $subName="";
+		tokenize $node ":" $tokenBuffer;
+		
+		// if there is no namespaces in use
+		if (size($tokenBuffer) < 2){
+			// break apart underscores
+			tokenize $node "_" $tokenBuffer;
+			// if it has a character name
+			if (size($tokenBuffer) >= 3){
+				$charName = ($tokenBuffer[0]);
+				$charName2 = ($tokenBuffer[0]+"_");
+				for ($i=1;$i<size($tokenBuffer)-2;$i++){
+					$charName = ($charName + $tokenBuffer[$i]);
+				}		
+			}
+			$subName = $tokenBuffer[size($tokenBuffer)-2];
+		}
+		// if there is a namespace
+		else{
+			$charName = $tokenBuffer[0];
+			$charName2 = ($tokenBuffer[0]+"_");
+			tokenize $tokenBuffer[1] "_" $tokenBuffer2;
+			$subName = $tokenBuffer2[size($tokenBuffer2)-2];
+		}
+		
+		// if the Character tab and subchar tab doesn't exist load the node
+		if (!`tabLayout -q -ex ($charName+"PkrLyt")`){
+			if (!`formLayout -q -ex ($charName2+$subName+"PkrLyt")`)
+				abxPickerReadNode $node;
+		}
+		// if the character tab exists but the subchar tab doesn't load the node
+		else{
+			if (!`formLayout -q -ex ($charName2+$subName+"PkrLyt")`)
+				abxPickerReadNode $node;
+		}
+		tabLayout -e -st ($charName+"PkrLyt") abxPickerCharTabs; 
+		if ($charName != "")	
+			textField -e -text $charName abxPickerCharText;
+		else
+			textField -e -text "*Prefix*" abxPickerCharText;
+	}
+}
+
+global proc abxPickerBrowsePath (string $sampleImageName[], string $fileType) {
+	textFieldButtonGrp -e -text $sampleImageName[0] abxPickerImagePath;
+
+}
+
+global proc abxPickerScriptJob () {
+	if (`window -q -ex abxPickerWindow`)
+	abxPickerRefresh 0;
+}
+
+global proc int abxPickerToggleAutoFocusSJ (){
+	// create script job to refresh picker window on scene loads
+	string $listArray[] = `scriptJob -lj`;
+	string $tokenBuffer[];
+	int $foundJob = 0;
+	int $jobNum =0;
+	int $toggleState = 0;
+	for ($i=0;$i<size($listArray);$i++){
+		// if the script jobs are found Kill them
+		if (`gmatch $listArray[$i] "*abxPickerAutoFocus*"`){
+			tokenize $listArray[$i] ":" $tokenBuffer;
+			$JobNum = $tokenBuffer[0];
+			scriptJob -k (int($JobNum));
+			$foundJob = 1;
+		}
+	}
+	// if no script jobs were found then start new ones
+	if ($foundJob == 0) {
+		int $jobNum = `scriptJob -e "SelectionChanged" "abxPickerAutoFocus"`;
+		$toggleState = 1;
+	}
+	return $toggleState;
+}
+
+// focuses the abxPicker active character based on current selection list
+global proc abxPickerAutoFocus (){
+
+	global int $pickrPress;
+	if ($pickrPress == true){
+		$pickrPress = false;
+	}
+	else {
+		// get the selected object
+		string $sel[] = `ls -sl`;
+		string $selObj = $sel[0];
+		string $tokenBuffer[];
+		tokenize $selObj ":" $tokenBuffer;
+		if (size($tokenBuffer) < 2){
+			tokenize $selObj "_" $tokenBuffer;
+		}
+		if (size($tokenBuffer)>1){
+			$tabName = ($tokenBuffer[0]+"PkrLyt");
+			// if a picker UI exists with that name
+			if (`tabLayout -q -exists $tabName`){
+				// set that char to the current tab
+				if (`tabLayout -q -exists abxPickerCharTabs`){
+					tabLayout -e -st $tabName abxPickerCharTabs;
+					textField -e -text $tokenBuffer[0] abxPickerCharText;
+				}
+			}
+		}
+		abxPickerClearHilites;
+	}
+}
+
+global proc abxPickerClearHilites (){
+		// remove any selection hilites
+	global string $pickrHiliteList[];
+	global string $pickrControl;
+	string $each = "";
+
+	for ($each in $pickrHiliteList){
+		abxPickerCtrlClearHilite $each;
+		/*
+		if (`nodeIconButton -exists $each`){
+			// get the original color
+			string $data = `control -q -dtg $each`;
+			//print ($each+".dtg = "+$data+"\n");
+			string $tokenBuffer[];
+			tokenize $data ":" $tokenBuffer;
+			if (size($tokenBuffer)==5){
+				// set the original color on the control
+				eval("nodeIconButton -e -ebg 0 -bgc "+$tokenBuffer[2]+" "+$tokenBuffer[3]+" "+$tokenBuffer[4]+" \""+$each+"\"\n");
+			}
+		}
+		*/
+	}
+	clear($pickrHiliteList);
+}
+
+global proc abxPickerHelp() {
+		if (!`window -q -ex abxPickerHelpWin`){
+		//windowPref -r abxPickerHelpWin;
+		window -s 1 -tlb 1 -t "abxPicker Help" -h 400 -w 450 abxPickerHelpWin;
+		
+			columnLayout -rs 1 -adj 1 -w 400 -cat "both" 0;
+			text -al "left" -label (
+			" abxPicker is a Character Control Interface that allows you to\n"
+			+" create a schematic layout of your character's animation controls\n"
+			+" for simplified selection and animation.\n");
+			scrollLayout -cr true -w 400 -h 270 abxPickerHelpScrl;
+			columnLayout -rs 1 -adj 1 -w 400 -cat "both" 0;
+			text -al "left" -font "boldLabelFont" -label "\n Making a New Interface a.k.a. \"Sheet\"\n";
+			text -al "left" -label (
+				 "    1. Press the \"New Picker Sheet\" button in the upper left corner.\n"
+				+"    2. Enter a Name for your character\n"
+				+"    3. Enter a SubSet Name such as \"Body\" or \"Hands\" or \"Face\"\n"
+				+"    4. Browse for a background image or leave blank and choose a color\n"
+				+"    5. Press \"OK\" and your new picker sheet is shown. Also notice a \n"
+				+"       PIKR node is now visible in your outliner. This node stores the \n"
+				+"       data for your interface and can be exported/imported to other scenes \n\n");
+			text -al "left" -font "boldLabelFont" -label " Create and Layout Buttons\n";
+			text -al "left" -label (
+				 "    1. Select a control or object in maya's viewport that you want to \n"
+				+"       create a button for \n"
+				+"    2. Middle-Mouse-Button drag and drop one of the colored buttons in the  \n"
+				+"       lower left corner onto the picker sheet. This creates a new button that \n"
+				+"       will select the current object \n"
+				+"    3. Reposition the button by MMB draging it to a new position \n"
+				+"    4. Resize button by Ctrl+MMB draging. Where you release will define \n"
+				+"       the lower right corner of the button\n"
+				+"    5. Duplicate buttons by Shift+MMB draging an existing button\n"
+				+"    6. Continue to create and layout buttons for your character \n"
+				+"    7. Remove buttons by MMB drag and drop to the trash can \n"
+				+"    8. Be sure to save your changes by clicking the \"Save Picker Sheet\"\n"
+				+"       Button in the upper left corner \n\n");
+			text -al "left" -font "boldLabelFont" -label " Edit Button Color, Commands, add Labels \n";
+			text -al "left" -label (
+				 "    1. Press \"More...\" to show the button pallete \n"
+				+"    2. Change colors by MMB draging and droping over existing buttons \n"
+				+"    3. Change the command by selecting a new object in the viewport and \n"
+				+"       then MMB drag and drop over existing buttons. Move, Rotate, Scale, \n"
+				+"       and Manip will select the object and automatically switch tools.\n"
+				+"       Key command will key all keyable attributes on selected objects.\n"
+				+"       Toggle will toggle selected channels in channel editor between \n"
+				+"       values of 0 and 1 (useful for visibility buttons or other)\n" 
+				+"    4. Change Labels by MMB drag and drop over existing buttons. Create \n"
+				+"       your own labelsby entering text into the \"custom\" field, press enter,\n"
+				+"       and then MMB drag the button \n\n");
+			text -al "left" -font "boldLabelFont" -label " Using the Picker to Pick Things\n";
+			text -al "left" -label (
+				 "    1. Left Click the Character Menu located in the top middle of the Picker\n"
+				+"       window to choose the character you wish to work with\n"
+				+"    2. Left click buttons to select the corresponding object/control\n"
+				+"    3. Shift + Left click to add objects to the selection list \n"
+				+"    4. Ctrl + Left click to remove objects from the selection list\n\n");
+			text -al "left" -font "boldLabelFont" -label " Working with Referencing/Pipeline \n";
+			text -al "left" -label (
+				 "    If your developing character's in a pipeline using referencing you'll  \n"
+				+"    probably want the character's name to be unspecified until that scene is \n"
+				+"    referenced. abxPicker supports rename prefixes or namespaces that\n"
+				+"    specify the character's name. To set this up do the following\n"
+				+"    1. In your character scene file, create a new picker sheet and select.\n"
+				+"       Use Reference Prefix or Namespace. \n"
+				+"    2. You'll notice that the character name is listed in the character menu as \n"
+				+"       *prefix* Go about making the rest of your character picker normally.\n"
+				+"       and thats it. When you reference the scene the prefix will be the name.\n\n");
+			text -al "left" -font "boldLabelFont" -label " Renaming a Picker Sheet \n";
+			text -al "left" -label (
+				 "    If you would like to rename a character simply alter the name of the PIKR  \n"
+				+"    node in the format <charname>_<tabname>_PIKR. \n"
+				+"    If you would like to convert a picker sheet to use reference prefixes simply\n"
+				+"    remove the character name from the PIKR node like this <tabname_PIKR>\n"
+				+"    then open the attribute editor for that node and expand the Extra\n"
+				+"    Attributes and enable the \"Char Prefix\".\n");
+
+			setParent..;
+			setParent..;
+			rowLayout -nc 2 -cw2 300 200;
+				text -label "       abxPicker.mel ©2012 J. Adam Burke\n       http://www.adamburke.net\n       Version 2.5 (2012)";
+				button -w 60 -label "OK" -c "deleteUI -window abxPickerHelpWin";
+			scrollLayout -e -h 270 abxPickerHelpScrl;
+			showWindow abxPickerHelpWin;
+			}
+			else{showWindow abxPickerHelpWin;}
+}

@@ -1,0 +1,54 @@
+// storeSwitchConnections
+
+// records the tripple shading connections in the notes section of the triple shading switches
+// this can be parsed later to restore their connections
+
+global proc storeSwitchConnections () {
+
+	string $tssNodes[] = `ls -type tripleShadingSwitch`;
+	
+	for ($each in $tssNodes){
+		
+		// get the list of connections into the shading switch  .input[#].inShape / .input[#].inTriple
+
+		string $foundSources[];
+		string $foundTriples[];
+
+		int $numOfConnections = `getAttr -size ($each+".input")`;
+
+		for ($i=0;$i<$numOfConnections;$i++){
+
+			string $sourceShape = `connectionInfo -sfd ($each+".input["+$i+"].inShape")`;
+			string $sourceTriple = `connectionInfo -sfd ($each+".input["+$i+"].inTriple")`;
+
+			if (size($sourceShape)> 0 && size($sourceTriple)> 0 ){
+				if ($sourceShape != "" && $sourceTriple != ""){
+					$foundSources[size($foundSources)] = $sourceShape;
+					$foundTriples[size($foundTriples)] = $sourceTriple;
+				}
+
+
+			}
+			
+
+		}
+	
+		string $compiledString = "";
+
+		for ($j=0;$j<size($foundSources);$j++){
+			$compiledString += ("connectAttr -f "+$foundSources[$j]+" "+$each+".input["+$j+"].inShape;\n");
+			$compiledString += ("connectAttr -f "+$foundTriples[$j]+" "+$each+".input["+$j+"].inTriple;\n");
+
+		}
+
+		//evalEcho ("setAttr -type \"string\" \""+$each+".notes\" \""+$compiledString+"\";");
+
+		if (!`attributeExists "notes" $each`)
+			addAttr -dt "string" -ln "notes" -sn "nts" $each;
+
+		setAttr -type "string" ($each+".notes") $compiledString;
+
+
+	}
+
+}

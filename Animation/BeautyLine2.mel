@@ -1,0 +1,248 @@
+/*				BEAUTY LINE v.2.0
+						
+						for Maya 4.5
+						by Guillaume ROCHERON
+						rch@clubinternet.fr
+
+
+
+DESCRIPTION : 	Like in traditional animation, BeautyLine allows you to view and work with the Movement Line of your objects.
+		This script allows you to switch from a keyfamed animation to a curve based animation and
+		vice versa.
+		
+		It creates a curve point corresponding to each keyframe of your object.
+		By this way, you don't animate with keyframe but with a curve.
+		If you want to add more control on your object, you just have to add points on the curve. It's like adding
+ 		a key on a keyframed animation.
+
+
+INSTALLATION : 	Copy BeautyLine2.mel to your script directory 
+			ex : "c:\documents and setting\administrator\my documents\maya\4.5\scripts"
+		Copy BeautyLine.xpm to your icon directory 
+			ex : "c:\documents and setting\administrator\my documents\maya\4.5\prefs\icons"
+
+		Source the script ( script editor => file/source script ) then type BeautyLine2Install.
+		An icon is added onto your current shelf.
+
+
+*/
+
+global proc BeautyLine2 () {
+
+	string $BeautyLine2Window = "BeautyLine2Window";
+	string $BeautyLineCheck[] = `ls -tr "BeautyLine*"`;
+	string $selection[] = `ls -sl`;
+	if ( size($selection)!= 1 ) {
+		print "//error : please select an object\n";
+		return;	
+	}
+	int $BLstart = `findKeyframe -w first $selection[0]`;
+	int $BLend = `findKeyframe -w last $selection[0]`;
+	
+	if (`window -exists $BeautyLine2Window` )
+		deleteUI $BeautyLine2Window;
+
+	window -tlb on -width 350 -height 400  -title "BeautyLine v.2.0" $BeautyLine2Window; 
+	columnLayout -h 10 -adjustableColumn true BLBase;	
+		text -align right -l "2003, Guillaume ROCHERON - rch@clubinternet.fr";
+		separator -st none -h 12;
+		rowLayout -bgc 0.9 0.6 0.6  -nc 3 -cw3 90 210 70;
+			text  -bgc 0.9 0.6 0.6 -l " Selected object";
+			textField -en off -w 210 -tx $selection[0] BLobject;
+			button -bgc 0.9 0.6 0.6  -l "update" -c "BeautyLine2Update";
+		setParent ..;
+		separator -st none -h 8;
+		frameLayout -label "Time Attributes" -collapse false -collapsable false;
+			columnLayout;
+			separator -st none -h 10;
+			intSliderGrp -cw3 60 70 150 -v $BLstart -min $BLstart -max ($BLend - 1 ) -field true -l "Start" BLstartSLD;
+			intSliderGrp -cw3 60 70 150 -v $BLend -min ( $BLstart + 1 ) -max $BLend -field true -l "End" BLendSLD;
+			separator -st none -h 10;
+			setParent ..;
+		setParent BLBase;
+		frameLayout -label "Curve Attributes" -collapse false -collapsable false;
+			columnLayout;
+			separator -st none -h 10;
+			radioButtonGrp 	-cw4 100 55 55 55 -numberOfRadioButtons 3 -sl 2
+    					-label "Curve Degree" -labelArray3 "1" "2" "3" BLdegreeButton;
+			radioButtonGrp 	-cw4 119 110 60 70  -numberOfRadioButtons 3 -sl 2
+					-label "Object Orientation" -labelArray3 "From BeautyLine" "Orginal" "None" BLrotationButton;
+			separator -st none -h 10;
+    			setParent ..;
+		setParent BLBase;
+		button -bgc 0.8 0.8 0.8 -h 30 -l "Make Beauty Line" -c ( "BeautyLine2Proc `intSliderGrp -q -v BLstartSLD` `intSliderGrp -q -v BLendSLD` `radioButtonGrp -q -sl BLdegreeButton`");		
+		separator -st none -h 10;
+
+		frameLayout -label "BeautyLine to Keyframes" -collapse false -collapsable false BLtoKeyLayout;
+		columnLayout -adjustableColumn true ;
+			separator -st none -h 10;
+			radioButtonGrp 	-cw3 110 100 100 -cal 1 center -numberOfRadioButtons 2 -sl 2
+					-label "Keyframing" -labelArray2 "Every Frames" "Optimized" 
+					-on1 "floatSliderGrp -e -en off BLsimplificationSld"
+					-on2 "floatSliderGrp -e -en on BLsimplificationSld" BLkeyButton;
+			floatSliderGrp -cw3 95 50 150 -field true -l "Simplification" -v 0.2 -max 1 -min 0.001 BLsimplificationSld;
+			separator -st none -h 10;
+		button -bgc 0.8 0.8 0.8 -h 30 -l "Return to Keyframes" -c "BeautyLine2Bake" BLsimplificationSld ;
+
+	showWindow $BeautyLine2Window;
+	if ( $BeautyLineCheck[0] == "" )
+		frameLayout -e -en off  BLtoKeyLayout;
+}
+
+
+global proc BeautyLine2Proc (int $BLstart, int $BLend, int $degree) {
+
+	string $selection = `textField -q -tx BLobject`;
+	string $BLconstructionCurve;
+	string $BLresultCurve[];
+	string $BLdriver;
+	string $BLdriverShape[];
+	int $BLorient = `radioButtonGrp -q -sl BLrotationButton`;
+
+	if ($selection == "") {
+		print "//error : please select an object\n";
+		return;
+	}
+	spaceLocator;
+	$BLdriver = `rename "BeautyLineDriver1"`;
+	cycleCheck -e off;
+	for ($i=$BLstart;$i<=$BLend+100;$i++) {
+		currentTime $i;
+		float $position[] = `getAttr ($selection + ".translate")`;
+		if ($i==$BLstart) {
+			curve -d $degree -p $position[0] $position[1] $position[2];
+			$BLconstructionCurve = `rename BeautyLineConstruction1`;
+		} else {
+			curve -a -p $position[0] $position[1] $position[2] $BLconstructionCurve;
+			if ($i>=$BLend) {
+				float $position[] = `getAttr ($selection + ".translate")`;
+				curve -a -p $position[0] $position[1] $position[2] $BLconstructionCurve;
+				break;
+			}
+		}
+		$i = (`findKeyframe -which next $selection`);
+	}
+	currentTime $BLstart;
+	if ($BLorient == 2 ) {
+		cutKey -clear -time ":" -attribute translateX -hierarchy none -controlPoints 0 -shape 1 $selection;
+		cutKey -clear -time ":" -attribute translateY -hierarchy none -controlPoints 0 -shape 1 $selection;
+		cutKey -clear -time ":" -attribute translateZ -hierarchy none -controlPoints 0 -shape 1 $selection;
+	} else {
+		cutKey -clear -time ":" -attribute translateX -hierarchy none -controlPoints 0 -shape 1 $selection;
+		cutKey -clear -time ":" -attribute translateY -hierarchy none -controlPoints 0 -shape 1 $selection;
+		cutKey -clear -time ":" -attribute translateZ -hierarchy none -controlPoints 0 -shape 1 $selection;
+		cutKey -clear -time ":" -attribute rotateX -hierarchy none -controlPoints 0 -shape 1 $selection;
+		cutKey -clear -time ":" -attribute rotateY -hierarchy none -controlPoints 0 -shape 1 $selection;
+		cutKey -clear -time ":" -attribute rotateZ -hierarchy none -controlPoints 0 -shape 1 $selection;
+	}			
+	if ( $degree != 1 ) {
+		$BLresultCurve = `fitBspline -tol 0.1 $BLconstructionCurve`;
+		delete $BLconstructionCurve;
+	} else {
+		$BLresultCurve[0] = $BLconstructionCurve;
+	}
+	color -ud 6 $BLresultCurve[0];
+	print ( $BLresultCurve[0] + "\n" );
+	select -r $BLdriver; select -tgl $BLresultCurve[0];
+	if ($BLorient != 1 )
+		pathAnimation -fractionMode true -follow false -startTimeU $BLstart -endTimeU $BLend;
+	if ($BLorient == 1 )
+		pathAnimation -fractionMode true -follow true -startTimeU $BLstart -endTimeU $BLend;
+	parent $selection $BLdriver;
+	select -r $BLresultCurve[0];
+	string $BeautyLine = `rename "BeautyLine1"`;
+	$BLdriverShape = `listRelatives -shapes $BLdriver`;
+	setAttr ( $BLdriverShape[0] + ".visibility" ) 0;
+	addAttr -ln BLstart -at long  -dv $BLstart $BLdriver;
+	addAttr -ln BLend -at long  -dv $BLend $BLdriver;
+	addAttr -ln BeautyLine -dt "string" $BLdriver;
+	setAttr -type "string" ( $BLdriver + ".BeautyLine") $BeautyLine;
+	window -e -vis off BeautyLine2Window;
+	select -r $selection;
+	print ("// Beauty Line created from frame " + $BLstart + " to " + $BLend + "\n");
+}
+
+
+global proc BeautyLine2Update () {
+
+	string $selection[] = `ls -sl`;
+	int $BLtime = `currentTime -q`;
+	if ($selection[0] == "" )
+		return;
+
+	currentTime -e `playbackOptions -q -ast` ;
+	int $BLstart = `findKeyframe -w first $selection[0]`;
+	int $BLend = `findKeyframe -w last $selection[0]`;
+	
+	textField -e -tx $selection[0] BLobject;
+	intSliderGrp -e -v $BLstart -min $BLstart -max ($BLend - 1 ) -field true BLstartSLD;
+	intSliderGrp -e -v $BLend -min ( $BLstart + 1 ) -max $BLend -field true BLendSLD;
+	currentTime $BLtime;
+}
+
+global proc BeautyLine2Bake () {
+	
+	string $selection = `textField -q -tx BLobject`;
+	string $BLparent[] = `listRelatives -p $selection`;
+	string $BLcheckParent = `match BeautyLineDriver $BLparent[0]`;
+	int $BLkeyMethod = `radioButtonGrp -q -sl BLkeyButton`;
+	if ( $BLcheckParent != "BeautyLineDriver" ) {
+		print "//error : the selected object is not animated with a BeautyLine\n";	
+		return;
+	}
+	cycleCheck -e off;
+	int $BLstart = `getAttr ($BLparent[0] + ".BLstart" )`;
+	int $BLend = `getAttr ($BLparent[0] + ".BLend" )`;
+	currentTime $BLstart;
+	string $BLbase[] = `duplicate -rr -un $selection`;
+	hide $selection;
+	parent -w $BLbase[0];
+	setKeyframe;
+	for ($i=$BLstart+1;$i<=$BLend;$i++) {
+		currentTime $i;
+		select -r $selection;
+		string $BLcopy[] = `duplicate -rr -un`;
+		parent -w $BLcopy[0];
+		float $position[] = `getAttr ($BLcopy[0] + ".translate")`;
+		float $rotation[] = `getAttr ($BLcopy[0] + ".rotate")`;
+		float $scale[] = `getAttr ($BLcopy[0] + ".scale")`;
+		setAttr ( $BLbase[0] + ".translate" ) $position[0] $position[1] $position[2]; 
+		setAttr ( $BLbase[0] + ".rotate" ) $rotation[0] $rotation[1] $rotation[2]; 
+		setAttr ( $BLbase[0] + ".scale" ) $scale[0] $scale[1] $scale[2]; 
+		select -r $BLbase[0]; setKeyframe ($BLbase[0] + ".translate"); setKeyframe ($BLbase[0] + ".rotate"); setKeyframe ($BLbase[0] + ".scale");
+		delete $BLcopy[0];	
+	}
+	if ( $BLkeyMethod == 2 ) {
+		float $BLsimplification = `floatSliderGrp -q -v BLsimplificationSld`;
+		filterCurve -f simplify -timeTolerance $BLsimplification {$BLbase[0] + ".translateX", $BLbase[0] + ".translateY", $BLbase[0] + ".translateZ"};
+		filterCurve -f simplify -timeTolerance $BLsimplification {$BLbase[0] + ".rotateX", $BLbase[0] + ".rotateY", $BLbase[0] + ".rotateZ"};
+		filterCurve -f simplify -timeTolerance $BLsimplification {$BLbase[0] + ".scaleX", $BLbase[0] + ".scaleY", $BLbase[0] + ".scaleZ"};
+	}
+	cutKey -clear -time ":" -attribute visibility -hierarchy none -controlPoints 0 -shape 1 $BLbase[0];
+	delete $selection;
+	delete `getAttr ($BLparent[0] + ".BeautyLine")`;
+	delete $BLparent[0];
+	rename $BLbase[0] $selection;
+	window -e -vis off BeautyLine2Window;
+	print ("//Beauty Line object animation baked from frame " + $BLstart + " to " + $BLend + "\n");
+}
+
+global proc BeautyLine2Install () {
+	
+	global string $gShelfTopLevel;
+	string $selTab = ( $gShelfTopLevel + "|" + `tabLayout -q -selectTab $gShelfTopLevel` );
+
+	shelfButton
+	        -enableCommandRepeat 1
+	        -enable 1
+	        -width 34
+	        -height 34
+	        -manage 1
+	        -visible 1
+	        -label "BeautyLine v.2.0" 
+	        -image1 "BeautyLine2.xpm" 
+	        -style "iconOnly" 
+	 	-parent $selTab
+ 	 	-command "BeautyLine2";
+
+}

@@ -1,0 +1,88 @@
+// cacheDynamics
+// Created by: jason
+// Date: 2013/04/15 11:24:00
+
+global proc cacheDynamic(){
+
+window -title "cache dynamics son" dynamicCacheWindow;
+rowColumnLayout -numberOfColumns 2;
+         
+button -c "cacheDynamics" -label "cache it";
+button -c "trashDynamics" -label "trash it";
+
+
+showWindow dynamicCacheWindow;
+
+
+}
+
+
+
+
+
+global proc cacheDynamics()
+{
+   //get the namespace of selected
+   string $sel[] = `ls -sl`;
+   for($tmp in $sel)
+   {
+       
+       
+       string $parts[];
+       tokenize($tmp,":",$parts);
+       string $nameSpace = $parts[0];
+       
+       //get start time
+        global string $gPlayBackSlider;
+        float $rangeArray[2];
+        $rangeArray = `timeControl -q -rangeArray $gPlayBackSlider`;
+   
+       //find all of the hair systems with that namespace
+       string $allHairs[] = `ls -type hairSystem ($nameSpace+":*")`;
+       select $allHairs;
+       for($hair in $allHairs)
+       {
+
+            setAttr ($hair+".startFrame") $rangeArray[0];
+            
+        }
+       
+       doHairDiskCache 1 { "2", 1, 1, 10, 1 };
+   }
+   
+   //cache them 
+   
+   //turn to static
+}
+
+
+global proc trashDynamics()
+{
+    
+   //get the namespace of selected
+   string $sel[] = `ls -sl`;
+   for($tmp in $sel)
+   {
+       string $parts[];
+       tokenize($tmp,":",$parts);
+       string $nameSpace = $parts[0];
+       
+       //find all of the hair systems with that namespace
+       string $allHairs[] = `ls -type hairSystem ($nameSpace+":*")`;
+       select $allHairs;
+       
+       for($hair in $allHairs)
+       {
+           string $cache[] = `listConnections -source 1 ($hair+".diskCache")`;
+           print $cache;
+           if(`objExists $cache[0]`)
+           {
+               delete $cache[0];
+           }
+       }
+   }
+   
+   //cache them 
+   
+   //turn to static
+}

@@ -1,0 +1,19 @@
+// makeTexturesOnMDrive
+
+global proc makeTexturesOnMDrive () {
+
+	string $mayaFiles[] = `ls -type file -type psdFileTex -type mentalrayTexture`;
+
+	for ($each in $mayaFiles){
+		string $texPath = `getAttr ($each+".ftn")`;
+		if ($texPath != ""){
+			if (`gmatch $texPath "P:/*"`){
+				int $strSize = size($texPath);
+				string $newPath = ("M"+`substring $texPath 2 $strSize`);
+				print ($newPath+"\n");	
+
+				setAttr -type "string" ($each+".ftn") $newPath;
+			}
+		}
+	}
+}

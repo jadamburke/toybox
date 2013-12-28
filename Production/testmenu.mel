@@ -1,0 +1,16 @@
+// testmenu
+global proc testmenu () {
+
+global string $gMainWindow;
+
+
+	if (`menu -q -exists  ppMainMenu`){
+    		menu -e -dai  ppMainMenu2;
+    	}
+	else {
+		setParent $gMainWindow ;
+    		menu -l "??" -p MayaWindow -to true ppMainMenu2 ;
+    	}
+
+
+}

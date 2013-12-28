@@ -1,0 +1,96 @@
+// combineLightMaps
+global proc combineLightMaps () {
+
+	string $lightMapNodes[] = `ls -type misss_fast_lmap_maya`;
+
+	string $mrTextureNodes[];
+	string $shadingGroupNodes[];
+	string $shaderNodes[];
+
+	string $newLmap = `shadingNode -asUtility misss_fast_lmap_maya -n "misss_fast_lmap_mayaGlobal"`;
+	string $newMRMap = `shadingNode -asTexture mentalrayTexture -n "mentalrayTextureGlobal"`;
+	setAttr ($newMRMap+".miWritable") 1;
+	setAttr ($newMRMap+".miDepth") 4;
+	setAttr ($newMRMap+".miWidth") 2560;
+	setAttr ($newMRMap+".miHeight") 720;
+	connectAttr ($newMRMap+".message") ($newLmap+".lightmap");
+	
+	
+	// sample the incoming and outgoing connections
+	for ($each in $lightMapNodes){
+		if ($each != "globalLightMap"){
+			// find any connected MR  Texture nodes 
+			string $sourceMRNodes[] = `listConnections -s 1  ($each+".lightmap")`;
+			//string $sourceMRTextures[] = `connectionInfo -sfd ($each+".lightmap")`
+			for ($every in $sourceMRNodes){
+				if (!`stringArrayContains $every $mrTextureNodes`){
+					$mrTextureNodes[size($mrTextureNodes)] = $every;
+				}
+			}
+			
+			// get any shading groups that it is assigned to
+			string $destSGNodes[] = `listConnections -d 1  ($each+".message")`;
+			for ($every in $destSGNodes){
+				if (!`stringArrayContains $every $shadingGroupNodes`){
+					$shadingGroupNodes[size($shadingGroupNodes)] = $every;
+				}
+				
+			}
+
+			// disconnect shading groups
+			string $SGplugs[] = `connectionInfo -dfs ($each+".message")`;
+			for ($every in $SGplugs){
+				disconnectAttr ($each+".message") ($every);
+
+			}
+		}
+
+	}
+
+
+
+	for ($each in $mrTextureNodes){
+		// get destination shader nodes
+		string $destShaderNodes[] = `listConnections -d 1  ($each+".message")`;
+		for ($every in $destShaderNodes){
+			// if its not a lmap node then store it
+			if (`objectType $every` != "misss_fast_lmap_maya" && `objectType $every` != "mentalrayGlobals" && `objectType $every` != "defaultRenderUtilityList"){
+				if (!`stringArrayContains $every $shaderNodes`){
+					$shaderNodes[size($shaderNodes)] = $every;
+				}
+			}
+			
+		}
+
+
+		// disconnect all output destinations
+		string $SGplugs[] = `connectionInfo -dfs ($each+".message")`;
+		for ($every in $SGplugs){
+			disconnectAttr ($each+".message") ($every);
+		}	
+		
+
+	}
+
+
+	// connect all the SG to the lmap
+	for ($each in $shadingGroupNodes){
+		if (`attributeExists "miLightMapShader" $each`){
+			evalEcho ("connectAttr -f "+$newLmap+".message "+$each+".miLightMapShader");
+		}
+
+	}
+
+
+	// connect the MRTexture to all the shaders
+	for ($each in $shaderNodes){
+		if (`attributeExists "lightmap" $each`){
+			evalEcho ("connectAttr -f "+$newMRMap+".message "+$each+".lightmap");
+		}
+
+	}
+
+
+	// 
+
+}

@@ -1,0 +1,1 @@
+Sets the 8, 9, & 0 hotkeys to show the Outliner, Hypershade, and Graph Editor

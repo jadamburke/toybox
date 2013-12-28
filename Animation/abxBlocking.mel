@@ -1,0 +1,135 @@
+global proc abxBlocking(){
+	if (`window -q -ex abxBlockingWindow`){
+		showWindow abxBlockingWindow;
+	}
+	else{
+	
+	string $parent = `window -w 200 -h 300 -t abxBlocking -tlb true abxBlockingWindow`;
+	$panelName = "abxBlocking";
+	setParent $parent;
+	$panelName = `columnLayout -rs 5 -cal "center" -cat "both" 0 -adj true $panelName` ;
+
+	tabLayout -tv false abxStagesTab;
+	formLayout abxBlockingLyt;
+		columnLayout -rs 1 -cal "center" -cat "both" 4 -adj true blockingColLyt;
+
+			button -w 100 -label `optionVar -q inTangentType` abxBlockingTanType;
+			popupMenu -button 1;
+			menuItem -label "Stepped" -c "keyTangent -global -itt linear -ott step;button -e -l Stepped abxBlockingTanType";
+ 			menuItem -label "Spline" -c "keyTangent -global -itt spline -ott spline;button -e -l Spline abxBlockingTanType";
+			menuItem -label "Clamped" -c "keyTangent -global -itt clamped -ott clamped;button -e -l Clamped abxBlockingTanType";
+ 			menuItem -label "Linear" -c "keyTangent -global -itt linear -ott linear;button -e -l Linear abxBlockingTanType";
+ 			menuItem -label "Flat" -c "keyTangent -global -itt flat -ott flat;button -e -l Flat abxBlockingTanType";	
+			menuItem -label "Plateau" -c "keyTangent -global -itt plateau -ott plateau;button -e -l Plateau abxBlockingTanType";
+
+			frameLayout -label "Breakdown" -labelAlign "top" -cll true -borderStyle "etchedIn";
+				columnLayout -rs 1 -cal "center" -cat "both" 4 -adj true;
+					rowLayout -numberOfColumns 3 -ct3 "both" "both" "both" -co3 0 0 0 -cl3 "center" "center" "center" -cw3 55 55 55 -adj 2;
+						button -label "|--|-----|" -al "center" -c "abxBreakdown .25";
+						button -label "|----|----|" -al "center" -c "abxBreakdown .5";
+						button -label "|------|--|" -al "center" -c "abxBreakdown .75";
+						setParent ..;
+						separator;
+					setParent ..;
+				setParent ..;
+				frameLayout -label "Extremes" -labelAlign "top" -cll true -borderStyle "etchedIn";
+					columnLayout -rs 1 -cal "center" -cat "both" 4 -adj true;
+						button -label "Push";
+						button -label "Pull" ;
+						separator;
+						rowLayout -nc 3 -ct3 "both" "both" "both" -cl3 "center" "right" "left" -cw3 40 40 40 -adj 1;
+							button -label "Auto Hold";
+							text -label " Pad:";
+							intField -value 5;
+							setParent..;
+					setParent..;
+				setParent..;
+				frameLayout -label "Tangent Type" -labelAlign "top" -cll true -borderStyle "etchedIn";
+					columnLayout -rs 1 -cal "center" -cat "both" 4 -adj true;
+						rowLayout -nc 3 -co3 0 0 0 -ct3 "both" "both" "both" -cl3 "center" "center" "center" -cw3 20 50 50 -adj 1;
+							text -label "Step";
+							button -label "Sel Keys";
+							button -label "All Curve";
+							setParent..;
+						rowLayout -nc 3 -ct3 "both" "both" "both" -cl3 "center" "center" "center" -cw3 50 50 50 -adj 1;	
+							optionMenu;
+								menuItem -label "Linear";
+					 			menuItem -label "Spline";
+								menuItem -label "Clamped";
+					 			menuItem -label "Plateau";
+					 			menuItem -label "Flat";	
+					 		button -label "Sel Keys";
+							button -label "All Curve";
+							setParent..;
+						setParent..;
+					setParent..;
+					rowLayout -nc 3 -ct3 "both" "both" "both" -cl3 "center" "center" "center" -cw3 50 50 50 -adj 1;	
+					button -label "Key" -c "abxBlockingKey 0";
+					button -label "BD" -c "abxBlockingKey 1";
+					button -label "Special" -c "abxBlockingKey 2";
+					setParent..;
+
+		setParent ..;
+	setParent..;
+	
+	formLayout -e
+		-af blockingColLyt top 0
+		-af blockingColLyt left 0
+		-af blockingColLyt right 0
+		-af blockingColLyt bottom 0
+		abxBlockingLyt;
+	
+	//return $panelName;
+	showWindow abxBlockingWindow;
+	}
+}
+
+global proc abxBreakdown(float $weight) {
+	$theCurrentFrame = `currentTime -q`;
+	$selNodes = `ls -sl`;
+	for ($each in $selNodes){
+
+		$selectedAttr = `listAnimatable $each`;
+		for ($every in $selectedAttr){
+
+			$previousKeyTime = `findKeyframe -which previous $every`;
+			$nextKeyTime = `findKeyframe -which next $every`;
+			$previousKeyValue = `getAttr -t $previousKeyTime $every`;
+			$nextKeyValue = `getAttr -t $nextKeyTime $every`;
+			float $newVal = (($nextKeyValue-$previousKeyValue)*$weight)+$previousKeyValue;
+			setKeyframe -v $newVal $every;
+		}
+
+
+	}
+	currentTime -e $theCurrentFrame;
+
+
+}
+
+global proc abxTangentChange(string $tanType){
+	
+	
+
+
+}
+
+global proc abxBlockingKey(int $mode){
+	string $members[] = `ls -sl`;
+	if ($mode == 0){
+		setKeyframe $members;
+	}
+	else if ($mode == 1){
+		setKeyframe -bd true $members;
+	}
+	else if ($mode == 2){
+		setKeyframe $members;
+		for ($each in $members){
+			string $curves[] = `keyframe -q -name $each`;
+			for ($every in $curves)
+				keyframe -time `currentTime -q` -e -tds on $every;
+		}
+	}
+
+
+}

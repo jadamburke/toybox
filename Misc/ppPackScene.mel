@@ -1,0 +1,356 @@
+// ppPackScene 
+// tool for packing up a given scene file or scene files and 
+
+// options
+// 1. current scene file includes
+// 2. extra scene files to include
+// 3. reference scenes
+// 4. texture files
+// 5. image planes
+// 6. sound files
+// 7. environment files
+	// env script paths
+	// userSetup.mel
+	// workspace.mel
+// 8. special effects caches
+	// particle cache files
+	// ncache files
+
+// UI for loading the ppPackScene script and giving the user options for what to include
+// ideally it should create a pack script file as it parses through files
+// then that pack script should be run to collect the images files and folders etc. 
+// then it should zip them all up neatly into file and remove the temp files
+
+global proc ppPackScene () {
+
+	if (`window -ex ppPackSceneWindow` != true)
+	{
+		window -w 400 -h 300 -t "ppPackScene" -in "ppPackScene" -s true -tb true ppPackSceneWindow;
+ 
+		columnLayout -rs 1 -w 400 -cal "center" -cat "both" 0 -adj true ppPackSceneColLyt;
+		rowLayout -numberOfColumns 3 -rat 1 "both" 5 -rat 2 "both" 5 -rat 3 "both" 5 -cl3 "right" "left" "left" -cw3 5 300 75 -adjustableColumn 2 -ct3 "both" "both" "both" -co3 5 5 5 ppPackSceneFLRow;
+			text -label "" -al "right" ppPackSceneFLLbl;
+			textScrollList -w 400 ppPackSceneFLScrlLst;
+			columnLayout;
+				button -w 60 -label "Add File" -c "ppPackSceneAddFile ppPackSceneFLScrlLst" ppPackSceneAddFBtn ;
+				button -w 60 -label "Remove" -c "textScrollList -e -removeItem (`textScrollList -q -selectItem ppPackSceneFLScrlLst`) ppPackSceneFLScrlLst" ppPackSceneRmFBtn;
+				button -w 60 -label "Add This" -c (" ppPackSceneAddCurrentScene;");
+				separator -h 40;
+				button -w 60 -label "Clear" -c "textScrollList -e -ra ppPackSceneFLScrlLst";
+				setParent ..;
+			setParent ..;
+		
+		checkBoxGrp -l "Include Basic Workspace" -v1 0 ppPackSceneWrkCB;		
+		checkBoxGrp -l "Include Reference Scenes" -v1 1 ppPackSceneRefCB;
+		checkBoxGrp -l "Include Textures" -v1 1 ppPackSceneTexCB;
+		checkBoxGrp -l "Include Audio" -v1 1 ppPackSceneAudCB;
+		checkBoxGrp -en 0 -l "Include Image Planes" ppPackSceneImgPlnCB;
+
+		checkBoxGrp -en 0 -l "Outside of Proj Files";
+		checkBoxGrp -en 1 -l "Compress to Zip" -v1 1 ppPackSceneZipCB;
+
+		// todo: list assets found in assets
+		//checkBoxGrp -en 0 -l "Include Asset Libraries";
+		
+		// todo: list previs shots
+		//checkBoxGrp -en 0 -l "Include All Previs Work Scenes";
+
+		// todo: 
+
+		button -label "Pack Scenes" -h 30 -w 60 -c "ppPackSceneProc `textScrollList -q -ai ppPackSceneFLScrlLst` `checkBoxGrp -q -v1 ppPackSceneRefCB` `checkBoxGrp -q -v1 ppPackSceneTexCB` `checkBoxGrp -q -v1 ppPackSceneAudCB` `checkBoxGrp -q -v1 ppPackSceneImgPlnCB` `checkBoxGrp -q -v1 ppPackSceneWrkCB` `checkBoxGrp -q -v1 ppPackSceneZipCB`";
+
+		// add the current scene to the scroll list
+		string $currentScene = `file -q -sn`;
+		
+		//textScrollList -e -append `workspace -pp $currentScene` ppPackSceneFLScrlLst;
+
+		window -e -w 400 -h 300 ppPackSceneWindow;
+		showWindow ppPackSceneWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 413 -h 300 ppPackSceneWindow;
+		showWindow ppPackSceneWindow;
+    	}
+
+	
+
+}
+
+
+global proc ppPackSceneAddFile (string $scrollListName){
+	
+	string $customPath[] = `fileDialog2 -dialogStyle 2 -fileMode 1 -cap "Choose A Scene File"`;
+	textScrollList -e -append `workspace -pp $customPath[0]` $scrollListName;
+}
+global proc ppPackSceneAddCurrentScene(){
+	string $scene = `file -q -sn`;
+	string $projScenePath = `workspace -pp $scene`;
+	textScrollList -e -append $projScenePath ppPackSceneFLScrlLst;
+	
+}
+
+global proc ppPackSceneUpdateList (){
+	
+}
+
+global proc ppPackSceneProc (string $filesToPack[], int $refFlag, int $texFlag, int $audFlag, int $imgPlnFlag, int $wrkFlag, int $zipFlag){
+
+	string $packFiles[];
+	$packFiles[0] = `workspace -pp $filesToPack[0]`;
+	string $workspace = `workspace -q -rd`;
+
+	// check first file to see if it is already open
+	if (`file -q -sn` != `workspace -en $filesToPack[0]`){
+		file -f -o `workspace -en $filesToPack[0]`;
+	}
+	
+	
+	// start processing the file
+	if ($refFlag){
+		string $results[] = `ppPackSceneGetNodeTypePath "reference"`;
+		for ($each in $results){
+			if (`workspace -en $each` != `workspace -pp $each`)
+			$packFiles[size($packFiles)] = `workspace -pp $each`;
+		}
+	}
+	if ($texFlag){
+		string $results[] = `ppPackSceneGetNodeTypePath "file"`;
+		for ($each in $results){
+			if (`workspace -en $each` != `workspace -pp $each`)
+			$packFiles[size($packFiles)] = `workspace -pp $each`;
+		}
+		string $results[] = `ppPackSceneGetNodeTypePath "psdFileTex"`;
+		for ($each in $results){
+			if (`workspace -en $each` != `workspace -pp $each`)
+			$packFiles[size($packFiles)] = `workspace -pp $each`;
+		}
+		string $results[] = `ppPackSceneGetNodeTypePath "mentalrayTexture"`;
+		for ($each in $results){
+			if (`workspace -en $each` != `workspace -pp $each`)
+			$packFiles[size($packFiles)] = `workspace -pp $each`;
+		}
+	}
+	if ($audFlag){
+		string $results[] = `ppPackSceneGetNodeTypePath "audio"`;
+		for ($each in $results){
+			if (`workspace -en $each` != `workspace -pp $each`)
+			$packFiles[size($packFiles)] = `workspace -pp $each`;
+		}
+	}
+	
+
+	// run a save changes file open on the next scene
+	
+	for ($i=1;$i<size($filesToPack);$i++){
+		if (`fileExtension $filesToPack[$i]` == "ma" || `fileExtension $filesToPack[$i]` == "mb"){
+			file -f -o `workspace -en $filesToPack[$i]`;
+			$packFiles[$i] = `workspace -pp $filesToPack[$i]`; 
+			// start processing the file
+			if ($refFlag){
+				string $results[] = `ppPackSceneGetNodeTypePath "reference"`;
+				for ($each in $results){
+					if (`workspace -en $each` != `workspace -pp $each`)
+					$packFiles[size($packFiles)] = `workspace -pp $each`;
+				}
+			}
+			if ($texFlag){
+				string $results[] = `ppPackSceneGetNodeTypePath "file"`;
+				for ($each in $results){
+					if (`workspace -en $each` != `workspace -pp $each`)
+					$packFiles[size($packFiles)] = `workspace -pp $each`;
+				}
+				string $results[] = `ppPackSceneGetNodeTypePath "psdFileTex"`;
+				for ($each in $results){
+					if (`workspace -en $each` != `workspace -pp $each`)
+					$packFiles[size($packFiles)] = `workspace -pp $each`;
+				}
+				string $results[] = `ppPackSceneGetNodeTypePath "mentalrayTexture"`;
+				for ($each in $results){
+					if (`workspace -en $each` != `workspace -pp $each`)
+					$packFiles[size($packFiles)] = `workspace -pp $each`;
+				}
+			}
+			if ($audFlag){
+				string $results[] = `ppPackSceneGetNodeTypePath "audio"`;
+				for ($each in $results){
+					if (`workspace -en $each` != `workspace -pp $each`)
+					$packFiles[size($packFiles)] = `workspace -pp $each`;
+				}
+			}
+		}
+	}
+
+	
+	string $noDuplicates[] = `stringArrayRemoveDuplicates $packFiles`;
+
+	for ($each in $noDuplicates){
+		print ($each+"\n");
+	}
+	//callPython "zipStuff" "zipManyFiles" $noDuplicates;
+	ppPackSceneBuildTempFolders ($noDuplicates,$wrkFlag, $zipFlag);
+}
+
+
+
+// pack procedure. either the currently open scene or a scene file
+// best way is to open the scene files at least in the bg without interface so that files
+// can be traced and more.
+
+// return value is the file path to the pack file
+global proc string ppPackSceneSceneFile (string $workspace, string $sceneFile) {
+
+	string $fileQuery[] = `file -list -withoutCopyNumber`;
+	string $thisFile = $fileQuery[0];
+	string $packFile = "";
+
+	if ($workspace == ""){
+		if ($sceneFile == ""){
+			// get the list of references and sort them by type
+			
+		}
+		else {
+			// open the current project scene file
+
+			// get the list of references and sort them by type
+		}
+	}
+	else {
+		if ($workspace != `workspace -rd`){
+			if ($sceneFile != ""){
+				
+			}
+			else {
+				error ("Cannot export current scene if it is not also the current workspace\n");
+			}
+		}
+		else {
+			
+		}
+		
+	}
+	return $packFile;
+
+}
+
+//ls -type file -type psdFileTex -type mentalrayTexture
+global proc string[] ppPackSceneGetNodeTypePath (string $nodeType){
+
+	string $nodes[] = `ls -type $nodeType`;
+	
+	string $results[];
+
+	for ($each in $nodes){
+		if ($nodeType == "reference"){
+			if (!`gmatch $each "*shared*"` && !`gmatch $each "*_UNKNOWN*"`){
+				// need to do something to handle an error returned in fhte RN is broken
+				int $failure = catch(eval("referenceQuery -f \""+$each+"\""));
+				if (!$failure){
+					string $path = eval("referenceQuery -f \""+$each+"\"");
+					$path = `workspace -en $path`;
+					if (`filetest -r $path` && !`filetest -d $path`)
+						$results[size($results)] = `workspace -en $path`;
+				}
+			}
+		}
+		else if ($nodeType == "audio"){
+			string $path = `getAttr ($each+".filename")`;
+			$path = `workspace -en $path`;
+			if (`filetest -r $path` && !`filetest -d $path`)
+				$results[size($results)] = `workspace -en $path`;
+		}
+		else if ($nodeType == "file" || $nodeType == "psdFileTex" || $nodeType == "mentalrayTexture"){
+			// get the .ftn attribute
+			string $path = `getAttr ($each+".ftn")`;
+			$path = `workspace -en $path`;
+			if (`filetest -r $path` && !`filetest -d $path`)
+				$results[size($results)] = `workspace -en $path`;
+		}
+		else if ($nodeType == "imagePlane"){
+			// get the .imageName attribute
+			string $path = `getAttr ($each+".imageName")`;
+			if (`filetest -r $path` && !`filetest -d $path`)		
+				$results[size($results)] = `workspace -en $path`;
+		}
+		// TODO: add the rest of the node types that potentially have external sources
+		
+	}
+	return $results;
+}
+
+
+global proc ppPackSceneRunPackFile (string $packFile){
+	
+}
+
+global proc ppPackSceneBuildTempFolders (string $files[], int $wrkFlag, int $zipFlag){
+	string $workspacePath = `workspace -q -rd`;
+	string $tokenBuffer[];
+	tokenize $workspacePath "/" $tokenBuffer;
+	string $workspaceName = $tokenBuffer[size($tokenBuffer)-1];
+	string $tempFolder = `getenv TEMP`;
+
+	string $tempLocation = ($tempFolder+"/ppPackSceneTEMP/"+$workspaceName);
+
+	// remove the temp proj if it already exists
+	string $cmd =  ("system (\"rmdir /S /Q \\\""+$tempLocation+"\\\"\")");
+	evalEcho($cmd);
+	
+	sysFile -md $tempLocation;
+	
+	for ($each in $files){
+		string $tokenBuffer2[];
+		tokenize $each "/" $tokenBuffer2;
+		string $filePath = $tokenBuffer2[0];
+		for ($i=1;$i<(size($tokenBuffer2)-1);$i++){
+			$filePath += ("/"+$tokenBuffer2[$i]);
+		}
+		evalEcho ("sysFile -md \""+$tempLocation+"/"+$filePath+"\"");
+		evalEcho ("sysFile -cp \""+$tempLocation+"/"+$each+"\" \""+$workspacePath+$each+"\"") ;
+	}
+
+	if ($wrkFlag == 1){
+		// make the root folders of the project
+		string $subFolders[] = `getFileList -folder $workspacePath`;
+		for ($each in $subFolders){
+			if (`filetest -d ($workspacePath+$each)`){
+				sysFile -md ($tempLocation+"/"+$each);
+			}
+		}
+		
+	}
+	
+	sysFile -cp ($tempLocation+"/workspace.mel") ($workspacePath+"workspace.mel");
+	$files[size($files)] = "workspace.mel";
+	
+	
+	if ($zipFlag){
+		ppPackSceneZipIt ($workspaceName,$files);
+		//string $deferCmd =  ("sysFile -delete \""+$tempLocation+"\";");
+		string $deferCmd =  ("system (\"rmdir /S /Q \\\""+$tempLocation+"\\\"\")");
+		print ($deferCmd+"\n");
+		evalDeferred $deferCmd ;
+	}
+	if (`exists ppFileBrowse`) ppBrowsePath ($tempFolder+"/ppPackSceneTEMP/");
+}
+
+global proc ppPackSceneZipIt (string $workspaceName, string $files[]){
+	
+	print ("// FILES TO ZIP\n");
+	print $files;
+	print ("// END OF FILES TO ZIP\n");
+	
+	// processes the folder struct into a zip
+	string $path = (`getenv TEMP`+"/ppPackSceneTEMP/");
+
+	string $command = "import zipit;reload (zipit);zipit.zipshitup('{\"path\":\""+$path+"\",\"files\":[";
+	for ($i=0;$i<size($files);$i++){
+		if ($i != 0)
+			$command += ",";
+		$command += ("\""+$workspaceName+"/"+$files[$i]+"\"");
+	}
+	$command += "]}')";
+	print ($command+"\n");
+	python ($command);
+	
+}

@@ -1,0 +1,38 @@
+// restoreDeformedShader
+
+
+// when you deform a referenced piece of geo, it makes the ref geo an intermediateObj, then creates a new geo to deform.
+// but sometimes this shader assignment to the new "deformed" geo is lost so you must get it back from the now intermediate geo
+// this script does that
+
+
+global proc restoreDeformedShader () {
+
+	$selectedGeo = `ls -sl -long`;
+
+	for ($each in $selectedGeo){
+		$childrenShapes = `listRelatives -shapes -fullPath $each`;
+		string $originalShape  = $childrenShapes[0];
+		string $shadingGroups[] = `listConnections -s 1 ($originalShape+".instObjGroups[0]")`;
+		if (size($shadingGroups) != 0){
+			for ($every in $childrenShapes){
+				evalEcho("sets -e -forceElement "+$shadingGroups[0]+" "+$every);
+			}
+		}
+		else {
+			print ("Nothing Found\n");
+		}
+
+			//string $shader[] = `listConnections -s 1 ($each+".miMaterialShader")`;
+			//if (size($shader)==0){
+			//	$shader = `listConnections -s 1 ($each+".surfaceShader")`;
+				
+			//}
+
+
+		
+	}
+
+
+}
+

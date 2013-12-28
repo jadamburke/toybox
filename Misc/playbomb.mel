@@ -1,0 +1,443 @@
+string $playbombVersionStr = "1.18b";
+
+float $playbombData[];
+string $playbombSceneNames[];
+string $playbombWarnings[];
+
+string $playbombTSSceneList;
+
+eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/ppPlayblast.mel\"");
+
+global proc playbomb ()  {
+	global string $playbombVersionStr;
+	global string $playbombTSSceneList;
+
+	if (`window -ex playbombWindow` != true)  {
+		formLayout playbombFrmLyt;
+		string $window = `window -w 800 -title ("playbomb Generator v" + $playbombVersionStr) playbombWindow`;
+		columnLayout;
+		$playbombTSSceneList = `textScrollList -w 800 -numberOfRows 10 -allowMultiSelection true -dkc "playbombDeleteSelected" playbombTScrlList`;
+		rowLayout -nc 11;
+		button -label "Run Playbomb" -command ("window -e -visible 0 " + $window + "; playbombRun");
+		text -label "   ";
+		button -label "Add Scene(s)" -command "playbombAddScene";
+		text -label "   ";
+		button -label "Delete Selected" -command "playbombDeleteSelected";
+		button -label "Clear List" -command ("textScrollList -e -removeAll " + $playbombTSSceneList);
+		text -label "   ";
+		button -label "Move Up" -command "playbombMoveSelected -1";
+		button -label "Move Down" -command "playbombMoveSelected 1";
+		text -label "   ";
+		button -label "Cancel" -command ("window -e -visible 0 " + $window);
+
+		formLayout -e playbombFrmLyt;
+		showWindow $window;
+	} else
+		showWindow playbombWindow;
+}
+
+global proc playbombAddScene ()  {
+	global string $playbombTSSceneList;
+
+	string $multipleFilters = "Maya Files (*.ma *.mb);;Maya ASCII (*.ma);;Maya Binary (*.mb);;All Files (*.*)";
+	string $result[] = `fileDialog2 -fileFilter $multipleFilters -selectFileFilter "Maya Files" -dialogStyle 2 -fm 4 -cap "Choose scene file(s)" -okc "Choose"`;
+	if (size($result) > 0)  {
+		string $sceneFile;
+		for ($sceneFile in $result)  {
+			string $sceneList[] = `textScrollList -q -allItems $playbombTSSceneList`;
+			if (!stringArrayContains($sceneFile, $sceneList))
+				textScrollList -e -append $sceneFile $playbombTSSceneList;
+			else
+				warning("Scene file is already in playbomb Scene List");
+		}
+	}
+}
+
+global proc playbombDeleteSelected ()  {
+	global string $playbombTSSceneList;
+	
+	int $delIdx[] = `textScrollList -q -sii $playbombTSSceneList`;
+	for ($i = size($delIdx)-1; $i >= 0; --$i)
+		textScrollList -e -rii $delIdx[$i] $playbombTSSceneList;
+}
+
+global proc playbombMoveSelected (int $dir)  {
+	global string $playbombTSSceneList;
+
+	int $numItems = `textScrollList -q -ni $playbombTSSceneList`;
+	string $selItems[] = `textScrollList -q -si $playbombTSSceneList`;
+	int $selItemsIdx[] = `textScrollList -q -sii $playbombTSSceneList`;
+
+	string $newIdxStr = "";
+	int $numSel = size($selItemsIdx);
+	if ($dir == -1)  {
+		for ($i = 0; $i < $numSel; ++$i)  {
+			string $sel = $selItems[$i];
+			int $selIdx = $selItemsIdx[$i];
+			if ($selIdx > ($i+1))  {
+				textScrollList -e -rii $selIdx $playbombTSSceneList;
+				textScrollList -e -ap ($selIdx-1) $sel $playbombTSSceneList;
+				$newIdxStr += (" -sii " + ($selIdx-1));
+			}
+		}
+	} else  {
+		for ($i = 0; $i < $numSel; ++$i)  {
+			string $sel = $selItems[$numSel-$i-1];
+			int $selIdx = $selItemsIdx[$numSel-$i-1];
+			if ($selIdx < ($numItems-$i))  {
+				textScrollList -e -rii $selIdx $playbombTSSceneList;
+				textScrollList -e -ap ($selIdx+1) $sel $playbombTSSceneList;
+				$newIdxStr += (" -sii " + ($selIdx+1));
+			}
+		}
+	}
+	eval("textScrollList -e " + $newIdxStr + " " + $playbombTSSceneList);
+}
+
+
+
+global proc playbombGatherData ()  {
+	global float $playbombData[];	// for each scene: startFrame endFrame nearClip farClip locatorScale per-frame:[tx ty tz rx ry rz focal]
+	global string $playbombSceneNames[];
+	global string $playbombWarnings[];
+
+
+
+	// remove any duplicates from scene list
+	global string $playbombTSSceneList;
+	string $origSceneList[] = `textScrollList -q -allItems $playbombTSSceneList`;
+	string $sceneList[] = stringArrayRemoveDuplicates($origSceneList);
+	if (size($origSceneList) != size($sceneList))
+		warning("Duplicate scene entries were detected in the list.  Only the first occurrance will be processed.");
+
+	if (size($sceneList) == 0)  {
+		warning("No scenes chosen to generate playbomb from");
+		return;
+	}
+
+	if (`file -q -mf`)  {
+		string $result = `confirmDialog -title "Scene Needs Saving" -message "The scene appears to need saving.  You can cancel playbomb and save it, or continue with playbomb and not save scene" -button "Cancel and Save" -button "Continue Without Saving" -defaultButton "Cancel and Save" -cancelButton "Cancel and Save" -dismissString "Cancel and Save"`;
+		if ($result == "Cancel and Save")  {
+			print("playbomb: Cancelled.\n");
+			return;
+		}
+	}
+
+	// set Maya so that it doesn't open extra windows on scene open
+	global int $gUseScenePanelConfig;
+	int $save_gUseScenePanelConfig = $gUseScenePanelConfig;
+	$gUseScenePanelConfig = false;
+
+	clear($playbombData);
+	clear($playbombSceneNames);
+	clear($playbombWarnings);
+
+	string $camAttrsNoFL[] = {"tx", "ty", "tz", "rx", "ry", "rz"};
+
+	int $idx = 0;
+	string $scene;
+	for ($scene in $sceneList)  {
+		print("playbomb: Opening scene file " + $scene + "\n");
+		string $shortScene = basenameEx($scene); //basename($scene, ".m.");
+		$playbombSceneNames[size($playbombSceneNames)] = $shortScene;
+
+		// 0:Server 1:Job 2:ShotFolder 3:Seq 4:Shot 5:dept 6:subDept 7:take 8:version 9:ext
+		string $shotInfo[] = abxShotsGetFromPath($scene);
+
+		// Bizzarely, it appears that the frame rate setting of the previous scene affects the frame range of
+		//  the newly-loaded scene, especially if the new scene was created from an Export Selected, like the
+		//  camera masters.  It looks like they don't get written out with the standard scriptNode expressions
+		//  to properly setup the time slider.
+		// So, we will always set the frame rate to 30 fps before loading a scene.  This may cause problems for
+		//  scenes which are (incorrectly) set to 24 fps.
+		//currentUnit -t ntsc;
+		//refresh -f;
+		file -mf false;
+		if (`exists ppDoNewSceneQuiet`) ppDoNewSceneQuiet "empty";
+		file -f -options "v=0" -prompt 0 -uc 0 -o $scene;
+
+		float $startT = `playbackOptions -q -min`;
+		float $endT = `playbackOptions -q -max`;
+
+		if ($startT != int($startT) || $endT != int($endT))  {
+			$playbombWarnings[size($playbombWarnings)] = ("Scene: " + $shortScene + "  Start and/or end frames are not integers");
+			$startT = int($startT);
+			$endT = int($endT);
+		}
+
+		if ($endT - $startT < 3)
+			$playbombWarnings[size($playbombWarnings)] = ("Scene: " + $shortScene + "  Scene length is less than 3 frames");
+
+		$playbombData[$idx++] = $startT;
+		$playbombData[$idx++] = $endT;
+
+		//if ($startT != 101)
+		//	$playbombWarnings[size($playbombWarnings)] = ("Scene: " + $shortScene + "  Does not start at frame 101");
+
+		string $camera = "renderCam";
+		if (! `objExists $camera`)  {
+			$camera = "master:renderCam";
+			if (! `objExists $camera`)  {
+				$playbombWarnings[size($playbombWarnings)] = ("Scene: " + $shortScene + "  Could not find renderCam");
+				$camera = "persp";
+			}
+		}
+
+		//float $camAp[] = `getAttr ($camera + ".cameraAperture")`;
+		//if ($camAp[0] != .98 || $camAp[1] != .735)
+			//$playbombWarnings[size($playbombWarnings)] = ("Scene: " + $shortScene + "  Camera Film Gate not set to 35mm Full Aperture");
+
+		//if (`currentUnit -q -a` != "deg" || `currentUnit -q -l` != "cm" || `currentUnit -q -t` != "ntsc")
+		//	$playbombWarnings[size($playbombWarnings)] = ("Scene: " + $shortScene + "  Units not set to cm/deg/ntsc");
+		//
+		// set overscan to 1.0
+		setAttr ($camera+".overscan") 1.0;
+
+		 //DONT DO THE GREEN SCREEN STUFFS /////////////////////////////////////
+		//string $rootNodes[] = `ls -assemblies`;
+		// hide all root DAG nodes but _CHARACTERS_ and _PROPS_
+		//string $visibleList[] = {"_CHARACTERS_","_PROPS_"};
+		//for ($each in $rootNodes){
+		//	if (!stringArrayContains($each,$visibleList))
+		//		catch(eval("setAttr "+$each+".visibility 0"));
+		//	else
+		//		catch(eval("setAttr "+$each+".visibility 1"));
+		//}
+		
+
+
+
+
+		// make the background color green and make sure its set to the write color mode
+
+		//
+		//
+		//
+		int $imgWidth = 1920;
+		int $imgHeight = 1080;
+		float $postScale = 0.91;
+		float $hA;
+		float $hV;
+		// check for project defaults file and get settings from there
+		if (`exists abxProjectGetShotDetails`){
+			string $prjDetails[] = abxProjectGetShotDetails(`workspace -q -rd`);
+			if (size($prjDetails)>7){
+				//print ("// startDetails\n");
+				//print $prjDetails;
+				$lock = $prjDetails[0];
+				$fps = $prjDetails[1];
+				$imgWidth = $prjDetails[2];
+				$imgHeight = $prjDetails[3];
+				$hA = $prjDetails[5];
+				$hV =  $prjDetails[6];
+				$aspect = $prjDetails[4];
+				$sceneScale = $prjDetails[7];
+				$renderer = $prjDetails[8];
+			}	
+			else{
+				warning("Project Defaults File Not Found. Reverting to 1920 X 1080");
+			}
+		}
+		else {
+			warning("abxProject.mel not sourced. Skipping project defaults check.");
+		}
+
+		string $renderPath = (`workspace -q -rd`+"../../RENDER/_ALL_SHOTS/");
+		//string $renderPath = (`workspace -q -rd`+"images/_ALL_SHOTS/");
+		//M:/Skylanders_PP10069/3D/skylanders_maya/
+
+		string $sceneName = `file -q -shn -sn`;
+		$sceneName = basenameEx ($sceneName);
+
+		// DONT DO THE GREEN SCREEN STUFFS /////////////////////////////////////
+		//$fileName = ($sceneName+"_green");
+		
+
+		$fileName = ($sceneName);
+		string $tokenBuffer[];
+		tokenize $sceneName "_" $tokenBuffer;
+
+		//string $camLog = (`workspace -q -rd`+"/data/log/"+$sceneName+"_CAMDATA.txt");
+
+		//writeCameraLogFile $camLog;
+			
+		string $shotName = ($tokenBuffer[0]+"_"+$tokenBuffer[1]);
+		string $seqName = ($tokenBuffer[0]);
+		string $pbPath = "";
+		$pbPath = ($renderPath+$seqName+"/"+$shotName+"/playblasts/"+$sceneName);
+
+		// blank out the maya screen so that stepping through the animation goes faster
+		setNamedPanelLayout "Single Perspective View";
+		//outlinerPanel -rp `getPanel -withFocus`;
+
+		// make the render cam have the focus 
+		string $activePanel = `getPanel -withFocus`; 
+		evalEcho("lookThroughModelPanel "+$camera+" "+$activePanel);
+		// make sure textures are on
+		modelEditor -e -allObjects false -ignorePanZoom true $activePanel;
+		modelEditor -e -grid false -strokes true -nurbsSurfaces true -polymeshes true -dynamics true -fluids true -nParticles true $activePanel;
+
+		modelEditor -e -cameras false -displayAppearance "smoothShaded" -dtx true $activePanel;
+		// DONT DO THE GREEN SCREEN STUFFS /////////////////////////////////////
+		//displayPref -displayGradient false;
+		//displayRGBColor background 0 1 0;
+		
+
+		print (`playblast -ae`+"\n");
+		int $doCommit = 1;
+		evalEcho("ppPlayblastDoBlast2 "+$camera+" \""+$pbPath+"\" \""+$fileName+"\" \"png\" "+`playbackOptions -q -min`+" "+`playbackOptions -q -max`+" "+$imgWidth+" "+$imgHeight+" "+$doCommit+" \""+$shotInfo[3]+"\"\n");
+
+		/* DONT NEED THIS
+
+		$playbombData[$idx++] = `getAttr ($camera + ".nearClipPlane")`;
+		$playbombData[$idx++] = `getAttr ($camera + ".farClipPlane")`;
+		float $locScl = `getAttr ($camera + ".locatorScale")`;
+		if ($locScl < .001)  {
+			$playbombWarnings[size($playbombWarnings)] = ("Scene: " + $shortScene + "  Camera locator scale is ~0");
+			$locScl = .001;
+		}
+		$playbombData[$idx++] = $locScl;
+
+		// set up a locator parent-constrained to the camera - this will give cam data in world space
+		string $locs[] = `spaceLocator -a -p 0 0 0`;
+		string $loc = $locs[0];
+		select -r $camera;
+		select -add $loc;
+		parentConstraint -weight 1;
+
+		//for ($t in {$startT, ($startT + $endT)*.5, $endT})  {
+		for ($t = $startT; $t <= $endT; ++$t)  {
+			currentTime $t;
+			for ($at in $camAttrsNoFL)
+				$playbombData[$idx++] = `getAttr ($loc + "." + $at)`;
+			$playbombData[$idx++] = `getAttr ($camera + ".fl")`;
+		}
+		*/
+	}
+
+	// set Maya setting back to original value
+	$gUseScenePanelConfig = $save_gUseScenePanelConfig;
+}
+/*
+global proc playbombCreate ()  {
+	global float $playbombData[];
+	global string $playbombSceneNames[];
+
+	if (size($playbombSceneNames) == 0)
+		return;
+
+	file -f -new;
+	setAttr defaultResolution.pixelAspect 1.0;
+	setAttr defaultResolution.width 1920;
+	setAttr defaultResolution.height 1080;
+	currentUnit -l cm -a deg -t ntsc;
+
+	// create the playbomb
+	string $playbomb[] = `camera`;
+	rename $playbomb[0] "playbomb";
+	setAttr playbomb.cameraAperture .98 .735;
+
+	string $camAttrs[] = {"tx", "ty", "tz", "rx", "ry", "rz", "fl"};
+	string $camAttrsWithScale[] = {"tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "fl"};
+
+	string $playbombExprStr = "//make this expr stick to playbomb\nint $vis = playbomb.visibility;\nplaybomb.visibility = $vis;\n\n";
+
+	int $uberFrame = 101;
+	int $frame;
+	int $idx = 0;
+	int $minFrame = 100000000, $maxFrame = -100000000;
+	float $nearMin = 100000000, $farMax = 0, $locMax = 0;
+	for ($scene in $playbombSceneNames)  {
+		// create the scene cam
+		string $sceneCam = ($scene + "_Cam");
+		string $cam[] = `camera`;
+		rename $cam[0] $sceneCam;
+		setAttr ($sceneCam + ".cameraAperture") .98 .735;
+
+		int $startT = $playbombData[$idx++];
+		int $endT = $playbombData[$idx++];
+		int $midT = ($startT + $endT) * .5;
+
+		if ($startT < $minFrame) $minFrame = $startT;
+		if ($endT > $maxFrame) $maxFrame = $endT;
+
+		float $nearClip = $playbombData[$idx++];
+		float $farClip = $playbombData[$idx++];
+		float $locScl = $playbombData[$idx++];
+
+		if ($nearClip < $nearMin) $nearMin = $nearClip;
+		if ($farClip > $farMax) $farMax = $farClip;
+		if ($locScl > $locMax) $locMax = $locScl;
+
+		setAttr ($sceneCam + ".nearClipPlane") $nearClip;
+		setAttr ($sceneCam + ".farClipPlane") $farClip;
+		setAttr ($sceneCam + ".locatorScale") $locScl;
+
+		int $frame;
+		for ($frame = $startT; $frame <= $endT; ++$frame)  {
+			// set the playbomb at start, mid and end frame values
+			if ($frame == $startT || $frame == $midT || $frame == $endT)  {
+				currentTime $uberFrame;
+				for ($at in $camAttrs)  {
+					setKeyframe -v $playbombData[$idx++] -at $at "playbomb";
+				}
+				$idx -= 7;
+				$playbombExprStr += ("if (frame == " + $uberFrame + ") headsUpMessage \"playbomb Scene: " + $scene + "  Frame: " + $frame + "\";\n");
+				++$uberFrame;
+			}
+
+			currentTime $frame;
+			for ($at in $camAttrs)  {
+				setKeyframe -v $playbombData[$idx++] -at $at $sceneCam;
+			}
+		}
+
+		// lock the scene cam attrs
+		for ($at in $camAttrsWithScale) 
+			setAttr -l true ($sceneCam + "." + $at);
+	}
+
+	// playbomb gets min/max of all scene cams
+	setAttr "playbomb.nearClipPlane" $nearMin;
+	setAttr "playbomb.farClipPlane" $farMax;
+	setAttr "playbomb.locatorScale" $locMax;
+
+	// lock playbomb attrs
+	for ($at in $camAttrsWithScale) 
+		setAttr -l true ("playbomb." + $at);
+
+	// create expression to show playbomb scene and frame
+	expression -n "playbombTextExpr" -s $playbombExprStr -o playbomb -ae 1 -uc all;
+
+	// animation range
+	int $uberMaxFrame = ($uberFrame-1);
+	if ($minFrame > 101) $minFrame = 101;
+	if ($maxFrame < $uberMaxFrame) $maxFrame = $uberMaxFrame;
+	playbackOptions -min 101 -max $uberMaxFrame -ast $minFrame -aet $maxFrame;
+	currentTime 101;
+
+	clear($playbombData);
+	clear($playbombSceneNames);
+
+	select -r playbomb;
+}
+*/
+
+global proc playbombRun ()  {
+	print("playbomb: Begin.\n");
+
+	playbombGatherData();
+	//playbombCreate();
+
+	// if any warnings were generated, display them in a pop-up window at the end
+	global string $playbombWarnings[];
+	if (size($playbombWarnings) > 0)  {
+		confirmDialog -title "Scene Warning" -button "OK"
+			-message ("The following scene files reported problems:\n\n" + stringArrayToString($playbombWarnings, "\n"));
+		clear($playbombWarnings);
+	}
+
+	print("playbomb: Done.\n");
+}
+
+

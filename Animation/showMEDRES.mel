@@ -1,0 +1,14 @@
+//
+//
+ global proc showMEDRES ()
+ {
+ source "smResSwitch.mel";
+  string $sel[] =`ls -sl`;
+ for ($each in $sel)
+        {
+        select -r $each;
+        smResSwitch "" "MEDRES";
+        }
+ if (`size $sel` <= 0)
+        smResSwitch "" "MEDRES";
+}

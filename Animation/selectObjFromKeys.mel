@@ -1,0 +1,16 @@
+// selectObjFromKeys
+// Created by: freelanceny18
+// Date: 2013/12/18 12:33:03
+
+global proc selectObjFromKeys(){
+
+	string $animCurves[] = `keyframe -q -name`;
+	string $selectList[];
+	for ($each in $animCurves){
+		string $effects[] = `listConnections -plugs false $each`;
+		$selectList = stringArrayCatenate($selectList,$effects);
+		//$selectList[size($selectList)] = $selectListNew;
+	}
+	select $selectList;
+
+}

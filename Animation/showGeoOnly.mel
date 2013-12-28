@@ -1,0 +1,25 @@
+// toggleGeo
+
+string $surfaceview_currentPanel = `getPanel -withFocus`;  
+//modelEditor -e -allObjects 0 $surfaceview_currentPanel; 
+//modelEditor -e -grid 0 $surfaceview_currentPanel; 
+modelEditor -e -nurbsSurfaces 1 $surfaceview_currentPanel; 
+modelEditor -e -polymeshes 1 $surfaceview_currentPanel; 
+
+modelEditor -e -df 0 $surfaceview_currentPanel; 
+modelEditor -e -dim 0 $surfaceview_currentPanel; 
+modelEditor -e -fl 0 $surfaceview_currentPanel; 
+modelEditor -e -gr 0 $surfaceview_currentPanel; 
+modelEditor -e -tx 0 $surfaceview_currentPanel; 
+modelEditor -e -j 0 $surfaceview_currentPanel; 
+modelEditor -e -lt 0 $surfaceview_currentPanel; 
+modelEditor -e -pl 0 $surfaceview_currentPanel; 
+modelEditor -e -lc 0 $surfaceview_currentPanel; 
+modelEditor -e -ikh 0 $surfaceview_currentPanel; 
+modelEditor -e -dy 0 $surfaceview_currentPanel; 
+modelEditor -e -hs 0 $surfaceview_currentPanel; 
+modelEditor -e -fo 0 $surfaceview_currentPanel; 
+modelEditor -e -pv 0 $surfaceview_currentPanel; 
+modelEditor -e -ha 0 $surfaceview_currentPanel; 
+modelEditor -e -str 0 $surfaceview_currentPanel; 
+modelEditor -e -nc 0 $surfaceview_currentPanel; 

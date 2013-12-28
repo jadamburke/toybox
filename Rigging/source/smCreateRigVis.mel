@@ -1,0 +1,73 @@
+  // create a rig vis mover
+ global proc smCreateRigVis ()
+ {
+  curve -name rigVis -d 1 -p 1.142887 1.002557 0 -p 1.301206 1.400654 0 -p 2.020337 1.400654 0 -p 2.219385 1.79875 0 -p 2.717006 1.79875 0 -p 3.115102 1.400654 0 -p 3.115102 1.400654 0 -p 2.517958 1.400654 0 -p 2.517958 1.002557 0 -p 3.115102 1.002557 0 -p 2.717006 0.604461 0 -p 2.219385 0.604461 0 -p 2.020337 1.002557 0 -p 1.142887 1.002557 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 ;
+  rename `listRelatives -s -c -f "rigVis"` "rigVisShape";
+// add the attrs for showing and hiding movers
+
+string $sels[] = `ls -sl`;
+string $each;
+for ($each in $sels)
+ {
+	addAttr -at bool -ln clusters $each;
+	setAttr -e -keyable true -cb 1 ($each + ".clusters");
+
+	addAttr -at bool -ln tgts $each;
+	setAttr -e -keyable true -cb 1 ($each + ".tgts");
+
+	addAttr -at bool -ln curves $each;
+	setAttr -e -keyable true -cb 1 ($each + ".curves");
+
+	addAttr -at bool -ln ffd $each;
+	setAttr -e -keyable true -cb 1 ($each + ".ffd");
+
+	addAttr -at bool -ln excess $each;
+	setAttr -e -keyable true -cb 1 ($each + ".excess");
+
+		addAttr -at bool -ln sculpts $each;
+	setAttr -e -keyable true -cb 1 ($each + ".sculpts");
+
+		addAttr -at bool -ln locators $each;
+	setAttr -e -keyable true -cb 1 ($each + ".locators");
+
+		addAttr -at bool -ln ikHandles $each;
+	setAttr -e -keyable true -cb 1 ($each + ".ikHandles") ;
+	
+		addAttr -at bool -ln nonLinears $each;
+	setAttr -e -keyable true -cb 1 ($each + ".nonLinears") ;
+	
+		addAttr -at bool -ln hairCrvs $each;
+	setAttr -e -keyable true -cb 1 ($each + ".hairCrvs") ;
+
+		addAttr -at bool -ln follicles $each;
+	setAttr -e -keyable true -cb 1 ($each + ".follicles") ;
+	
+		addAttr -at bool -ln distance $each;
+	setAttr -e -keyable true -cb 1 ($each + ".distance") ;
+	
+		addAttr -at bool -ln wires $each;
+	setAttr -e -keyable true -cb 1 ($each + ".wires") ;
+
+		addAttr -at bool -ln baseWires $each;
+	setAttr -e -keyable true -cb 1 ($each + ".baseWires") ;
+	
+	setAttr -e -k 0 ($each + ".tx");
+	setAttr -e -k 0 ($each + ".ty");
+	setAttr -e -k 0 ($each + ".tz");
+
+        setAttr -e -k 0 ($each + ".rx");
+	setAttr -e -k 0 ($each + ".ry");
+	setAttr -e -k 0 ($each + ".rz");
+
+        setAttr -e -k 0 ($each + ".sx");
+	setAttr -e -k 0 ($each + ".sy");
+	setAttr -e -k 0 ($each + ".sz");
+	
+	setAttr -e -k 0 ($each + ".v");
+	
+
+
+ }
+}
+
+//

@@ -1,0 +1,4 @@
+Properly Instances Rig Geometry when referenced through asset manager 
+ 
+ 
+ 

@@ -1,0 +1,326 @@
+//riggin script
+
+
+//Make window
+global proc jSon ()
+{
+window -title "select the joints u wanna rename, name and press" theWindow;
+rowColumnLayout -numberOfColumns 2;
+textField getName;
+button -c "toName" -label "rename";
+textField prefix;
+button -c "addFront" -label "add infront";
+textField suffix;
+button -c "addEnd" -label "add behind";
+textField jointName;
+button -c "autoFKProc" -label "FK!";
+
+textField createControl;
+button -c "controllerMaker" -label "Make Control";
+rowColumnLayout -numberOfColumns 1;
+button -c "selectFKproc" -label "selected FK!";
+//rowColumnLayout -numberOfColumns 2 ;
+intSliderGrp -label "follicleNumber" -field true -fieldMinValue 1 -fieldMaxValue 20 -minValue 1 -maxValue 10 -value 1 numOfFols;
+button -c "folNum" -label "make follicles";
+
+showWindow theWindow;
+
+
+}
+
+//the Name part
+
+
+//rename process
+
+global proc toName ()
+
+{
+
+// query the textField
+string $text = `textField -q -text getName`;
+
+//create array from selected joints
+string $selectedArray[] = `ls -selection`;
+int $number = 1;
+
+//create a loop that names every one of them
+for($tmp in $selectedArray)
+
+{
+
+string $padNumber = $number;
+
+if($number < 10) $padNumber = ("0"+$padNumber);
+
+string $namedJoint = `rename $tmp($text +"_"+ $padNumber)`;
+
+$number = $number + 1;
+
+
+
+
+}
+}
+
+//add to end process
+
+global proc addEnd ()
+{
+//query the text field
+string $text = `textField -q -text suffix`;
+
+//make array from selected stuff
+string $selectedArray2[] = `ls -selection`;
+
+//make loop that names everyone
+for($tmp in $selectedArray2)
+
+{
+string $subs = `rename $tmp($tmp + $text)`;
+
+
+}
+
+}
+
+
+//add to beginning process
+global proc addFront ()
+{
+//get the text field
+string  $text = `textField -q -text prefix`;
+
+//make array from selected stuff
+string $selectedArray3[] = `ls -selection`;
+
+//make the loop to do it all!
+for($tmp in $selectedArray3)
+
+{
+string $pre = `rename $tmp($text + $tmp)`;
+
+}
+
+
+}
+
+
+
+
+//auto FK part
+
+global proc autoFKProc ()
+{
+//query the text field
+string $text = `textField -q -text jointName`;
+
+
+//select the joints you want
+string  $theseFingers[] = `ls $text`;
+
+//make a loop
+for($tmp in $theseFingers)
+
+{
+//Find the root name of each joint to name the controllers on
+string $rootName = substitute("_JNT", $tmp, "");
+
+//create and name the controller
+string $controller[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+string $control = `rename $controller[0] ($rootName + "_CTL")`;
+
+//create the group used for automation
+string $controlUse = `group -empty -n ($rootName + "_ctl_USE")`;
+parent $control $controlUse;
+
+//create a group for the controller
+string $controlGrp = `group -empty -n ($rootName + "_ctl_use_GRP")`;
+parent $controlUse $controlGrp;
+
+//get the controller over to the joint
+string $tempConstraint[] = `parentConstraint $tmp $controlGrp`;
+delete $tempConstraint [0];
+//?????QUESTION- do i need to make $tempConstraint an array?
+// can i just make it a string?????
+
+//orient constraint the joints to the controllers
+orientConstraint $control $tmp;
+
+
+
+
+}
+}
+
+//selected auto FK part
+
+global proc selectFKproc ()
+{
+
+
+//select the joints you want
+string  $theseFingers2[] = `ls -selection`;
+
+//make a loop
+for($tmp in $theseFingers2)
+
+{
+//Find the root name of each joint to name the controllers on
+string $rootName = substitute("_JNT", $tmp, "");
+
+//create and name the controller
+string $controller[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+string $control = `rename $controller[0] ($rootName + "_CTL")`;
+
+//create the group used for automation
+string $controlUse = `group -empty -n ($rootName + "_ctl_USE")`;
+parent $control $controlUse;
+
+//create a group for the controller
+string $controlGrp = `group -empty -n ($rootName + "_ctl_use_GRP")`;
+parent $controlUse $controlGrp;
+
+//get the controller over to the joint
+string $tempConstraint[] = `parentConstraint $tmp $controlGrp`;
+delete $tempConstraint [0];
+
+//orient constraint the joints to the controllers
+parentConstraint $control $tmp;
+
+
+
+
+}
+}
+
+//custom controllers son
+
+global proc controllerMaker ()
+{
+string $theseGuys[] = `ls -selection`;
+
+string $texts = `textField -q -text createControl`;
+for($tmp in $theseGuys)
+{
+string $theShape[] = `listRelatives -s $tmp`;
+parent -r -s $theShape[0] $texts;
+
+delete $tmp;
+}
+
+
+//ribbon script
+
+//make window - fields for: how many folicles, 
+
+}
+
+
+global proc folNum()
+{
+
+
+//float for later
+float $u = 0;
+
+//get the nurb
+
+string $theNrb[] = `ls -selection`;
+
+//query text
+int $value = `intSliderGrp -q -value numOfFols`;
+print ("input"+$value+"\n");
+
+
+int $value2= $value+1;
+
+for($i=1;$i<$value2;$i++)
+{
+print ($i+"\n");
+
+//get nrb shape
+string $nrbName = $theNrb[0];
+string $nrbShape = ($nrbName +"Shape");
+
+string $name = substitute("_NRB",$nrbName,"");
+
+
+//make and connect the follicles son
+string $fol = `createNode follicle`;
+string $folShapeName = `rename $fol($name+"_"+$i+"_FCLShape")`;
+
+string $folTrans = firstParentOf($folShapeName);
+string $folTransName = `rename $folTrans($name+"_"+$i+"_FCL")`;
+
+connectAttr ($nrbShape+".worldMatrix[0]") ($folShapeName+".inputWorldMatrix");
+connectAttr ($nrbShape+".local") ($folShapeName+".inputSurface");
+
+connectAttr ($folShapeName+".outTranslate") ($folTransName+".translate");
+connectAttr ($folShapeName+".outRotate") ($folTransName+".rotate");
+
+
+//put them in the right places son
+float $z = 1;
+float $y = $z/($value-1);
+print ("i_=_"+$i+"_att_"+$y+"\n");
+
+
+
+
+
+
+
+if($i==1)
+{
+print "pass son";
+setAttr ($folTransName+".parameterU") 0.001;
+setAttr ($folTransName+".parameterV") 0.5;
+}
+
+else if($i==$value)
+{
+setAttr ($folTransName+".parameterU") 0.999;
+setAttr ($folTransName+".parameterV") 0.5;
+}
+
+else
+{
+float $u = $u+$y; 
+
+setAttr ($folTransName+".parameterU") $u;
+setAttr ($folTransName+".parameterV") 0.5;
+}
+print ("U="+$u+"\n");
+
+
+//time to add joints-maybe add a checkbox for them?
+
+string $theJNT = `joint -radius .2 -n ($name+"_"+$i+"_JNT")`;
+parent -w;
+string $jointGRP;
+
+if(`objExists ($name+"_jnt_GRP")`)
+{
+$jointGRP = ($name+"_jnt_GRP");
+parent $theJNT $jointGRP;
+}
+
+else
+{
+string $jointGRP = `group -n ($name+"_jnt_GRP")`;
+}
+
+string $theCTL[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+string $theCTLName = `rename $theCTL[0] ($name+"_"+$i+"_jnt_CTL")`;
+
+string $theGRP = `group -n ($name+"_"+$i+"_jnt_ctl_GRP")`;
+
+parentConstraint $theCTLName $theJNT;
+//parent $theCTLName $theGRP;
+parentConstraint $folTransName $theGRP;
+
+
+}
+}
+

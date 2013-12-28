@@ -1,0 +1,83 @@
+// importAnmOnSelected
+
+global proc importAnmOnSelected () {
+
+	global string $importOnAnmPath ="";
+
+	string $tmpWorkspace = `workspace -q -dir`;
+	workspace -dir `workspace -q -fn`;
+	fileBrowser "importAnmOnSelectedProc" "importANM" "mayaAscii" 0 ;
+	workspace -dir $tmpWorkspace;
+	
+	$sel = `ls -sl`;
+	select -cl;
+	string $each2;
+	for ($each2 in $sel){
+		string $tokenbuffer[];
+		tokenize $each2 "_" $tokenbuffer;
+		$prefix = $tokenbuffer[0];
+		$connect = "connect";
+
+		file -type "mayaAscii" -ra 1 -rpr "tempName" -import -channels 0 -constructionHistory 0 -exp 0 -con 0 -sh 0 -de 1 $importOnAnmPath;
+
+
+		// this part is taken from smFileWin smImportAnm procedure ===================
+
+		if (`objExists ExportableKeysSet`)
+		rename ExportableKeysSet ExportableKeysSet_old;
+
+		string $sel[]= `ls -ap "tempName_*"`;
+		for ($each in $sel)
+		{
+			string $newName = "";
+			string $buffer[];
+			int $tokes = `tokenize $each "_" $buffer`;
+			int $i;
+			//print $i; print $buffer;
+			for ($i = 1; $i < $tokes - 1; $i++)
+			{
+				$newName += ($buffer[$i] + "_");
+			}
+			// print ($newName + $buffer[$tokes -1] + " is the new name\n");
+			rename $each  ($newName + $buffer[$tokes -1]);
+		}
+		
+		switch ($connect)
+		{
+			case "connect":
+				if (`objExists ExportableKeysSet`)
+					select ExportableKeysSet;
+				smConnectAnimCurve "" "force" "rename" $prefix "";
+			break;
+			
+			case "query":
+				if (`checkBox -q -v  smImportAnmCheckBox` == 1)
+				{
+					{
+					if (`objExists ExportableKeysSet`)
+						select ExportableKeysSet;
+					smConnectAnimCurve "" "force" "rename" $prefix "" ;
+					}
+				}
+			break;
+			case "append":
+				smAppendChannelWin;
+				textField -e -tx ($prefix + "_") smAppendChannelWin_tpf;
+				intField -e -v `currentTime -q` smAppendChannelWin_if;
+				select ExportableKeysSet;
+			break;
+			default:
+				print "no option selected for smImportAnm\n";
+			break;
+		}	
+		select -clear;
+	}
+
+}
+
+global proc importAnmOnSelectedProc (string $fileName , string $fileType ) {
+
+	global string $importOnAnmPath;
+	$importOnAnmPath = $fileName;
+
+}

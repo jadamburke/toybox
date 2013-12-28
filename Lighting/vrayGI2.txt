@@ -1,0 +1,4 @@
+VRay bake global illumination step 2 
+ 
+ 
+ 

@@ -1,0 +1,564 @@
+// timeWarp
+
+global proc abxTimeWarp() {
+
+	if (`window -ex abxTimeWarpWindow` != true)
+	{
+		window -w 150 -h 200 -t "abxTimeWarp" -in "abxTimeWarp" -s true -tb true abxTimeWarpWindow;
+			
+
+		columnLayout -rs 1 -cal "center" -cat "both" 0 -adj true abxTimeWarpColLyt;
+
+		button -label "New TimeWarp" -h 20 -w 60 -c "timeWarpNew;";
+		
+		separator -style "in" -h 3 sep0 ;
+
+		optionMenu -l "Node:" abxTimeWarpListMenu;
+		string $nodes[] = `ls -type "geometryVarGroup" "*timeWarp*"`;
+		if (size($nodes)>0){
+			for ($each in $nodes){
+				menuItem -l $each;
+			}
+		}
+		//setParent ..;
+
+		button -label "Add Selected" -h 20 -w 60 -c "timeWarpAddConnection `optionMenu -q -value abxTimeWarpListMenu`";
+		button -label "Add with Compensate" -h 20 -w 60 -c "timeWarpAddConnectionWithCompensation `optionMenu -q -value abxTimeWarpListMenu`";
+		button -label "Connect to Global Time" -h 20 -w 60 -c "abxTimeWarpAddToGlobalTime `optionMenu -q -value abxTimeWarpListMenu`";
+		button -label "Remove Selected" -h 20 -w 60 -c "timeWarpDelConnection `optionMenu -q -value abxTimeWarpListMenu`";
+		separator -style "in" -h 3 sep1 ;
+		button -label "Toggle On/Off" -h 20 -w 60 -c "timeWarpDisable `optionMenu -q -value abxTimeWarpListMenu`" abxTimeWarpOnOffBtn;
+		button -label "Bake TimeWarp On Sel" -enable 1 -h 20 -w 60 -c "bakeTimeWarp `optionMenu -q -value abxTimeWarpListMenu`";
+		button -label "Select TimeWarp Curves" -enable 1 -h 20 -w 60 -c "selectTimeWarpCurves";
+		button -label "Select Non TimeWarp Curves" -enable 1 -h 20 -w 60 -c "selectNonTimeWarpCurves";
+		button -label "Set Key in Time Warp" -enable 1 -h 20 -w 60 -c "keyWithTimeWarp `optionMenu -q -value abxTimeWarpListMenu`";
+		button -label "Goto Current TW Frame" -enable 1 -h 20 -w 60 -c "gotoTimeWarpFrame `optionMenu -q -value abxTimeWarpListMenu`";
+
+		separator -style "in" -h 3 sep2 ;
+
+		button -label "Toggle Snapping" -c "abxTimeWarpSnapToggle" ;
+
+		window -e -w 150 -h 200 abxTimeWarpWindow;
+		showWindow abxTimeWarpWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 150 -h 200 abxTimeWarpWindow;
+		showWindow abxTimeWarpWindow;
+    	}
+
+}
+
+
+global proc timeWarpNew () {
+
+string $sel[] = `ls -sl`;
+
+// make time warp node (unique one)
+int $i =1;
+while(`objExists ("timeWarp"+$i)`)
+	$i++;
+$timeWarpNode = ("timeWarp"+$i);
+createNode "geometryVarGroup" -name $timeWarpNode;
+
+// add custom attributes to control time
+
+select $timeWarpNode;
+addAttr -sn "frame" -k 1 -at "float" $timeWarpNode;
+addAttr -sn "weight" -smn 0 -smx 1 -k 1 -at "float" $timeWarpNode;
+addAttr -ln "onOff"  -at long  -min 0 -max 1 -dv 1 $timeWarpNode;
+setAttr -cb 1 ($timeWarpNode+".onOff");
+setAttr ($timeWarpNode+".weight") 1;
+
+setAttr ($timeWarpNode+".tx") -k 0;
+setAttr ($timeWarpNode+".ty") -k 0;
+setAttr ($timeWarpNode+".tz") -k 0;
+setAttr ($timeWarpNode+".rx") -k 0;
+setAttr ($timeWarpNode+".ry") -k 0;
+setAttr ($timeWarpNode+".rz") -k 0;
+setAttr ($timeWarpNode+".sx") -k 0;
+setAttr ($timeWarpNode+".sy") -k 0;
+setAttr ($timeWarpNode+".sz") -k 0;
+setAttr ($timeWarpNode+".visibility") -k 0;
+
+// create animation node and give it default 1:1 time animation
+// createNode animCurveTU -name ($timeWarpNode+"_frame");
+setKeyframe -t 101 -v 101 ($timeWarpNode+".frame");
+setKeyframe -t 201 -v 201 ($timeWarpNode+".frame");
+setAttr ($timeWarpNode+"_frame.pst") 1;
+setAttr ($timeWarpNode+"_frame.pre") 1;
+
+// create blend node to blend between time and timewarp
+
+createNode multiplyDivide -name ($timeWarpNode+"_mult");
+
+connectAttr ($timeWarpNode+".weight") ($timeWarpNode+"_mult.i1x");
+connectAttr ($timeWarpNode+".onOff") ($timeWarpNode+"_mult.i2x");
+
+createNode setRange -name ($timeWarpNode+"_range");
+
+connectAttr ($timeWarpNode+"_mult.ox") ($timeWarpNode+"_range.vx");
+connectAttr ($timeWarpNode+"_mult.ox") ($timeWarpNode+"_range.vy");
+setAttr ($timeWarpNode+"_range.nx") 0; 
+setAttr ($timeWarpNode+"_range.ny") 1; 
+setAttr ($timeWarpNode+"_range.mx") 1; 
+setAttr ($timeWarpNode+"_range.my") 0; 
+setAttr ($timeWarpNode+"_range.onx") 0; 
+setAttr ($timeWarpNode+"_range.ony") 0; 
+setAttr ($timeWarpNode+"_range.omx") 1; 
+setAttr ($timeWarpNode+"_range.omy") 1; 
+
+
+
+createNode blendWeighted -name ($timeWarpNode+"_blend");
+connectAttr ($timeWarpNode+".frame") ($timeWarpNode+"_blend.i[0]");
+connectAttr ("time1.outTime") ($timeWarpNode+"_blend.i[1]");
+
+connectAttr ($timeWarpNode+"_range.ox") ($timeWarpNode+"_blend.w[0]");
+connectAttr ($timeWarpNode+"_range.oy") ($timeWarpNode+"_blend.w[1]");
+
+createNode unitToTimeConversion -name ($timeWarpNode+"_unit");
+connectAttr ($timeWarpNode+"_blend.o")  ($timeWarpNode+"_unit.i");
+
+float $convFactor = 1/(`fpsNumeric`/6000);
+setAttr ($timeWarpNode+"_unit.conversionFactor") $convFactor;
+
+select -clear $sel;
+
+timeWarpAddConnection($timeWarpNode);
+
+
+menuItem -p abxTimeWarpListMenu -l ($timeWarpNode);
+
+
+}
+
+global proc timeWarpAddConnection(string $timeWarpNode) {
+
+	/* make inverse timewarp curve
+	$start = `findKeyframe -first ($timeWarpNode+".frame")`;
+	$end = `findKeyframe -last ($timeWarpNode+".frame")`;
+	int $j=0;
+	float $twInvVal[];
+	createNode animCurveUU twTemp;
+	for ($j=$start;$j<=$end;$j++){
+		$twInvVal[$j] = `keyframe -t $j -q -ev ($timeWarpNode+".frame")`;
+		setKeyframe -f $twInvVal[$j] -v $j twTemp;
+	}
+	*/
+
+
+	$sel = `ls -sl`;
+	for ($each in $sel){
+		$type = `objectType $each`;
+		if ($type =="transform" || $type =="joint" ){
+			string $keyable[] = `listAttr -k $each`;
+			for ($every in $keyable){
+				if (`connectionInfo -isDestination ($each+"."+$every)`) {
+					string $sourceNode[] = `listConnections -source 1 ($each+"."+$every)`;
+					if (attributeExists("input",$sourceNode[0])){
+						string $blendNode = ($timeWarpNode+"_blend");
+						if (`connectionInfo -isDestination ($sourceNode[0]+".input")`)	
+							warning ($sourceNode[0]+".input already has connection, skipped");
+						else
+							connectAttr ($timeWarpNode+"_unit.o") ($sourceNode[0]+".input");
+					}
+				}
+			}
+		}
+		else if ($type == "animCurveTU" || $type == "animCurveTA" || $type == "animCurveTL" || $type == "animCurveTT"){
+			string $blendNode = ($timeWarpNode+"_blend");
+			if (`connectionInfo -isDestination ($each+".input")`)	
+				warning ($each+".input already has connection, skipped");
+			else
+				connectAttr ($timeWarpNode+"_unit.o") ($each+".input");
+		}
+		else if ($type == "brush") {
+			connectAttr -f ($timeWarpNode+"_unit.o") ($each+".time");
+		}
+	}
+
+}
+
+global proc timeWarpAddConnectionWithCompensation(string $timeWarpNode){
+	
+	// first offset the keyframes to compensate for the time warp curve so that the animation doesn't change when added to timewarp
+	
+	$sel = `ls -sl`;
+	// for each selected object
+	for ($each in $sel){
+		// if its a transform or joint
+		$type = `objectType $each`;
+		if ($type =="transform" || $type =="joint" ){
+			// not implemented
+		}
+		// if its an animation curve
+		else if ($type == "animCurveTU" || $type == "animCurveTA" || $type == "animCurveTL" || $type == "animCurveTT"){
+
+			int $keyCount = `keyframe -q -kc $each`;
+			int $i=0;
+
+			float $oldTime[];
+			float $newTime[];
+					
+			// store the time of all keyframes in array	
+			for ($i=0;$i<$keyCount;$i++){
+				float $temp1[] = `keyframe -index $i -q ($each)`;
+				float $temp2[] =  `keyframe -t $temp1[0] -q -ev ($timeWarpNode+".frame")`;
+				//float $temp2[] =  `keyframe -t $temp1[0] -q -ev $transposedCurveNode`;
+
+				$oldTime[$i] = $temp1[0];
+				$newTime[$i] = $temp2[0];
+				keyframe -e -absolute -index $i -tc (-5000+$oldTime[$i]) ($each);
+			} 
+
+			for ($i=($keyCount-1);$i>=0;$i--){
+				keyframe -e -a -index $i -tc $newTime[$i] ($each);
+				float $confirm[] = `keyframe -index $i -q ($each)`;
+				print ("Was at "+$oldTime[$i]+". New Time"+$newTime[$i]+". Confirm"+$confirm[0]+"\n");
+			}	
+
+		}
+	}
+	
+	// then connect the curves to the time warp
+	$type = `objectType $sel[0]`;
+	if ($type == "animCurveTU" || $type == "animCurveTA" || $type == "animCurveTL" || $type == "animCurveTT"){
+		timeWarpAddConnection($timeWarpNode);
+	}
+
+}
+
+global proc timeWarpDelConnection(string $timeWarpNode) {
+
+	$sel = `ls -sl`;
+	for ($each in $sel){
+		$type = `objectType $each`;
+		if ($type =="transform" || $type =="joint" ){
+			string $keyable[] = `listAttr -k $each`;
+			for ($every in $keyable){
+				if (`connectionInfo -isDestination ($each+"."+$every)`) {
+					string $sourceNode[] = `listConnections -source 1 ($each+"."+$every)`;
+					if (attributeExists("input",$sourceNode[0])){
+						string $blendNode = ($timeWarpNode+"_blend");
+						if (`connectionInfo -isDestination ($sourceNode[0]+".input")`)
+							disconnectAttr ($timeWarpNode+"_unit.o") ($sourceNode[0]+".input");
+					}
+				}
+			}
+		}
+		else if ($type == "animCurveTU" || $type == "animCurveTA" || $type == "animCurveTL" || $type == "animCurveTT"){
+			string $blendNode = ($timeWarpNode+"_blend");
+			if (`connectionInfo -isDestination ($each+".input")`)
+				disconnectAttr ($timeWarpNode+"_unit.o") ($each+".input");
+		}
+	}
+}
+
+
+global proc string transposeAnimCurve(string $animCurveNode){
+	int $keyCount = `keyframe -q -kc $animCurveNode`;
+	float $startTime = `findKeyframe -which first $animCurveNode`;
+	float $endTime = `findKeyframe -which last $animCurveNode`;
+	int $i=0;
+
+	float $curveValue[];
+	string $transposedCurve = `createNode animCurveTU`;
+
+	for ($i=$startTime;$i<$endTime;$i++){
+		$curveValue = `keyframe -t ($i) -q -ev $animCurveNode`;
+		setKeyframe -t $curveValue[0] -v ($i) $transposedCurve;
+		//print ("setKeyframe -t "+$curveValue[$i]+" -v "+($i)+" "+$transposedCurve+"\n");
+	}
+
+	
+	return $transposedCurve;
+
+}
+
+global proc bakeTimeWarp(string $timeWarpNode){
+// store all keyframe time values
+// disconnect timewarp
+// apply time warp offsets to keyframe time values
+
+	
+	$sel = `ls -sl`;
+	$transposedCurveNode = transposeAnimCurve(($timeWarpNode+"_frame"));
+	select $sel;
+	for ($each in $sel){
+		
+		$type = `objectType $each`;
+		// disconnect time warp
+		
+		string $keyable[] = `listAttr -k $each`;
+
+		/*
+		for ($every in $keyable){
+			if (`connectionInfo -isDestination ($each+"."+$every)`) {
+				string $sourceNode[] = `listConnections -source 1 ($each+"."+$every)`;
+				if (attributeExists("input",$sourceNode[0])){
+					string $blendNode = ($timeWarpNode+"_blend");
+					if (`connectionInfo -isDestination ($sourceNode[0]+".input")`)
+						disconnectAttr ($timeWarpNode+"_unit.o") ($sourceNode[0]+".input");
+				}
+			}
+		}
+		*/
+		
+		
+		if ($type =="transform" || $type =="joint" ){
+		for ($every in $keyable){
+			if (`connectionInfo -isDestination ($each+"."+$every)`) {
+				string $sourceNode[] = `listConnections -source 1 ($each+"."+$every)`;
+				if (attributeExists("input",$sourceNode[0])){
+					int $keyCount = `keyframe -q -kc ($each+"."+$every)`;
+					int $i=0;
+
+					float $oldTime[];
+					float $newTime[];
+					
+					// store the time of all keyframes in array	
+					for ($i=0;$i<$keyCount;$i++){
+						float $temp1[] = `keyframe -index $i -q ($each+"."+$every)`;
+						//float $temp2[] =  `keyframe -t $temp1[0] -q -ev ($timeWarpNode+".frame")`;
+						float $temp2[] =  `keyframe -t $temp1[0] -q -ev $transposedCurveNode`;
+						$oldTime[$i] = $temp1[0];
+						$newTime[$i] = $temp2[0];
+						keyframe -e -absolute -index $i -tc (-5000+$oldTime[$i]) ($each+"."+$every);
+					} 
+
+					for ($i=($keyCount-1);$i>=0;$i--){
+						keyframe -e -a -index $i -tc $newTime[$i] ($each+"."+$every);
+						float $confirm[] = `keyframe -index $i -q ($each+"."+$every)`;
+						print ("Was at "+$oldTime[$i]+". New Time"+$newTime[$i]+". Confirm"+$confirm[0]+"\n");
+					}
+				}
+			}
+		}
+		}
+		
+		else if ($type == "animCurveTU" || $type == "animCurveTA" || $type == "animCurveTL" || $type == "animCurveTT"){
+		
+				// new method should measure the scale values for each key, then work backwards scaling each key
+				// by the pivot of the previous key. Then offset all keys by the offset of the first keyframe.
+				
+				
+				// also consider adding a tolerance that inserts keys where the tolerance would be too great to 
+				// preserve the stretched curve
+				
+				// new method
+				/*
+				string $blendNode = ($timeWarpNode+"_blend");
+				if (`connectionInfo -isDestination ($each+".input")`){
+					int $keyCount = `keyframe -q -kc ($each)`;
+					int $i=0;
+					
+					float $oldTime[];
+					float $newTime[];
+					float $oldPrevKeyDist[];
+					float $newPrevKeyDist[];
+					float $scaleChange[];
+					
+					// store the time of all keyframes in array	
+					for ($i=0;$i<$keyCount;$i++){
+						float $temp1[] = `keyframe -index $i -q ($each)`;
+						//float $temp2[] =  `keyframe -t $temp1[0] -q -ev ($timeWarpNode+".frame")`;
+						float $temp2[] =  `keyframe -t $temp1[0] -q -ev $transposedCurveNode`;
+						$oldTime[$i] = $temp1[0];
+						$newTime[$i] = $temp2[0];
+						
+						float $oldPrevKeyDist;
+						float $newPrevKeyDist;
+						if ($i > 0){
+							$oldPrevKeyDist = $oldTime[$i] - $oldTime[$i-1];
+							$newPrevKeyDist = $newTime[$i] - $newTime[$i-1];
+							$scaleChange[$i] = ($newPrevKeyDist/$oldPrevKeyDist);
+						}
+						else{
+							$oldPrevKeyDist = 0;
+							$newPrevKeyDist = 0;
+							$scaleChange[$i] = 0;
+						}
+						
+						
+						// move the keyframes to a negative time so that index order doesn't get changed
+						// keyframe -e -absolute -index $i -tc (-5000+$oldTime[$i]) ($each);
+					} 
+					
+					// work backwards from end of animation curve towards beginning
+					for ($i=($keyCount-1);$i>=0;$i--){
+						// move the keys to the correct time
+						//keyframe -e -a -index $i -tc $newTime[$i] ($each);
+						if ($i != 0){
+							float $scalePivot = $oldTime[$i-1]
+							scaleKey -animation "keys" 
+							float $confirm[] = `keyframe -index $i -q ($each)`;
+							print ("Was at "+$oldTime[$i]+". New Time"+$newTime[$i]+". Confirm"+$confirm[0]+"\n");
+						}
+					}
+				}
+				*/
+			
+				// old method
+				string $blendNode = ($timeWarpNode+"_blend");
+				if (`connectionInfo -isDestination ($each+".input")`){
+					int $keyCount = `keyframe -q -kc ($each)`;
+					int $i=0;
+
+					float $oldTime[];
+					float $newTime[];
+					
+					// store the time of all keyframes in array	
+					for ($i=0;$i<$keyCount;$i++){
+						float $temp1[] = `keyframe -index $i -q ($each)`;
+						//float $temp2[] =  `keyframe -t $temp1[0] -q -ev ($timeWarpNode+".frame")`;
+						float $temp2[] =  `keyframe -t $temp1[0] -q -ev $transposedCurveNode`;
+						$oldTime[$i] = $temp1[0];
+						$newTime[$i] = $temp2[0];
+						// move the keyframes to a negative time so that index order doesn't get changed
+						keyframe -e -absolute -index $i -tc (-5000+$oldTime[$i]) ($each);
+					} 
+					// work backwards from end of animation curve towards beginning
+					for ($i=($keyCount-1);$i>=0;$i--){
+						// move the keys to the correct time
+						keyframe -e -a -index $i -tc $newTime[$i] ($each);
+						float $confirm[] = `keyframe -index $i -q ($each)`;
+						print ("Was at "+$oldTime[$i]+". New Time"+$newTime[$i]+". Confirm"+$confirm[0]+"\n");
+					}	
+
+
+
+				}
+			
+				
+		}
+		
+		
+	}
+	timeWarpDelConnection($timeWarpNode);
+	delete $transposedCurveNode;
+	
+		
+
+}
+
+
+global proc timeWarpDisable(string $timeWarpNode) {
+	//if (`exists $timeWarpNode`){
+	$timeWarpState = `getAttr ($timeWarpNode+".onOff")`;
+		if ($timeWarpState == 0){
+			setAttr ($timeWarpNode+".onOff") 1;
+			button -e -l "Toggle Off" abxTimeWarpOnOffBtn;
+
+		}
+		else{
+			setAttr ($timeWarpNode+".onOff") 0;
+			button -e -l "Toggle On" abxTimeWarpOnOffBtn;
+		}
+		if (`headsUpDisplay -exists HUDAbxTimeWarp`){
+			headsUpDisplay -refresh HUDAbxTimeWarp;
+		}
+	//}
+}
+
+global proc float fpsNumeric () {
+
+	string $frameRateUnit = `currentUnit -q -f -t`;
+	switch ($frameRateUnit){
+		case "film":
+			return 24;
+			break;
+		case "ntsc":
+			return 30;
+			break;
+		case "game":
+			return 60;
+			break;
+		default:
+			return 0;
+			break;
+	}
+	
+
+}
+
+global proc selectNonTimeWarpCurves () {
+	select -clear;
+	$temp = `lsType animCurveTU`;
+	$temp2 = `lsType animCurveTA`;
+	$temp3 = `lsType animCurveTL`;
+	$temp4 = stringArrayCatenate($temp,$temp2);
+	$animNodes = stringArrayCatenate($temp4,$temp3);
+	
+	for ($each in $animNodes){
+		if ($each != "<done>" && $each != "timeWarp1_frame"){
+			if (!(`connectionInfo -isDestination ($each+".input")`)){
+				select -add $each;
+			}
+		}
+	}
+}
+
+global proc selectTimeWarpCurves () {
+	select -clear;
+	$temp = `lsType animCurveTU`;
+	$temp2 = `lsType animCurveTA`;
+	$temp3 = `lsType animCurveTL`;
+	$temp4 = stringArrayCatenate($temp,$temp2);
+	$animNodes = stringArrayCatenate($temp4,$temp3);
+	
+	for ($each in $animNodes){
+		if ($each != "<done>" && $each != "timeWarp1_frame"){
+			if ((`connectionInfo -isDestination ($each+".input")`)){
+				select -add $each;
+			}
+		}
+	}
+}
+
+global proc keyWithTimeWarp (string $timeWarpNode) {
+	$sel = `ls -sl`;
+	float $currentTimeWarpFrame = `getAttr ($timeWarpNode+".frame")`;
+	for ($each in $sel){
+
+		string $selectedChnl[];
+		string $keyable[];
+		$selectedChnl = `channelBox -q -sma mainChannelBox`;
+		$selSSAChnl = `channelBox -q -ssa mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSSAChnl);
+		$selSHAChnl = `channelBox -q -sha mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSHAChnl);
+		$selSOAChnl = `channelBox -q -soa mainChannelBox`;
+		$selectedChnl = stringArrayCatenate($selectedChnl,$selSOAChnl);
+		if (size($selectedChnl)>0)
+			$keyable = $selectedChnl;
+		else
+			$keyable = `listAttr -k $each`;
+
+		for ($every in $keyable) {	
+			setKeyframe -i -time $currentTimeWarpFrame -at $every $each;
+		}
+	}
+}
+
+global proc abxTimeWarpSnapToggle () {
+
+	global string $gPlayBackSlider;
+	if (`timeControl -q -snap $gPlayBackSlider`)
+		timeControl -e -snap false $gPlayBackSlider;
+	else 
+		timeControl -e -snap true $gPlayBackSlider;
+
+}
+
+global proc abxTimeWarpAddToGlobalTime (string $timeWarpNode) {
+
+	connectAttr ($timeWarpNode+"_unit.o") ("time1.timewarpIn_Raw");
+
+
+}
+
+global proc gotoTimeWarpFrame (string $timeWarpNode){
+
+	currentTime -e `getAttr ($timeWarpNode+".frame")` -u false ;
+}

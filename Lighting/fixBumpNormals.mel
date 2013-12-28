@@ -1,0 +1,78 @@
+// fixBumpNormals
+// Attaches the bumpMap to a proxy value so it renders correctly in the bump normals pass
+// Created by: raphe
+// Date: 2013/03/20
+
+global proc fixBumpNormals(){
+
+	// adds a proxy attr to the defaultRenderGlobals node
+	string $vrayBumpProxyFound = attributeExists("vrayBumpProxy","defaultRenderGlobals");
+	if ($vrayBumpProxyFound == 0){
+	 	addAttr -ln "vrayBumpProxy" -at double -min 0 -max 1 -dv 0 defaultRenderGlobals;
+	 	print "Adding vrayBumpProxy attr to the defaultRenderGlobals node ...";
+	}
+
+	// $vrayMtls = `ls -type VRayMtl -type VRayFastSSS2 -type VRayCarPaintMtl`;
+	$vrayMtls = `ls -type VRayMtl -type VRayFastSSS2`;
+
+	for($vrayMtl in $vrayMtls){
+		$connected = 0;
+		$base = 0;
+		$connections = `listConnections -c 1 $vrayMtl`;
+		for($connection in $connections){
+			if($connection == $vrayMtl + ".bumpMapR"){
+				$connected = 1;
+				break;
+			}
+			if($connection == $vrayMtl + ".bumpMapG"){
+				$connected = 1;
+				break;
+			}
+			if($connection == $vrayMtl + ".bumpMapB"){
+				$connected = 1;
+				break;
+			}
+			if($connection == $vrayMtl + ".bumpMap"){
+				$connected = 1;
+				break;
+			}
+			// if($connection == $vrayMtl + ".base_bumpMapR"){
+			// 	$connected = 1;
+			// 	$base = 1;
+			// 	break;
+			// }
+			// if($connection == $vrayMtl + ".base_bumpMapG"){
+			// 	$connected = 1;
+			// 	$base = 1;
+			// 	break;
+			// }
+			// if($connection == $vrayMtl + ".base_bumpMapB"){
+			// 	$connected = 1;
+			// 	$base = 1;
+			// 	break;
+			// }
+			// if($connection == $vrayMtl + ".base_bumpMap"){
+			// 	$connected = 1;
+			// 	$base = 1;
+			// 	break;
+			// }
+		}
+		if($connected){
+			print ($vrayMtl + " has bump input, skipping\n");
+		}else{
+			print ($vrayMtl + " has no bump input, attaching to defaultRenderGlobals -> vrayBumpProxy\n");
+			if($base == 1){
+				connectAttr -f defaultRenderGlobals.vrayBumpProxy ($vrayMtl + ".base_bumpMap.base_bumpMapR");
+				connectAttr -f defaultRenderGlobals.vrayBumpProxy ($vrayMtl + ".base_bumpMap.base_bumpMapG");
+				connectAttr -f defaultRenderGlobals.vrayBumpProxy ($vrayMtl + ".base_bumpMap.base_bumpMapB");
+			}else{
+				connectAttr -f defaultRenderGlobals.vrayBumpProxy ($vrayMtl + ".bumpMap.bumpMapR");
+				connectAttr -f defaultRenderGlobals.vrayBumpProxy ($vrayMtl + ".bumpMap.bumpMapG");
+				connectAttr -f defaultRenderGlobals.vrayBumpProxy ($vrayMtl + ".bumpMap.bumpMapB");
+			}
+			setAttr ($vrayMtl + ".bumpMapType") 0;
+			setAttr ($vrayMtl + ".bumpMult") 0;
+		}
+	}
+}
+

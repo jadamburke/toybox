@@ -1,0 +1,72 @@
+// conformShadingNetworkNames
+// Created by: adam
+// Date: 2012/04/06 18:35:38
+
+// this will conform shading nodes so that all the shader names
+global proc conformShadingNetworkNames(){
+
+// renames shader netork nodes to conform to shaderName_nodeType
+// also removes underscores in shader base name for easier parsing of names
+	string $sgNodes[] =`ls -type shadingEngine`;
+
+	for ($sgNode in $sgNodes){
+		string $incoming[] = `listConnections -p 0 -s 1 $sgNode`;
+		string $sgShaders[] = `ls -mat $incoming`;
+		string $newSGName = "";
+
+		string $uniqueShaders[] = stringArrayRemoveDuplicates($sgShaders);
+
+		// for each incoming connections
+		for ($shader in $uniqueShaders){
+
+			string $tokenBuffer[];
+			string $shaderBaseName = "";
+			tokenize $shader "_" $tokenBuffer;
+			if (size($tokenBuffer) > 1){
+				print ($shader + " contains an underscore\n");
+				$shaderBaseName = $tokenBuffer[0];
+				for ($i=1;$i<size($tokenBuffer);$i++){
+					string $letter = `substring $tokenBuffer[$i] 1 1 `;
+					int $tokenSize = size($tokenBuffer[$i]);
+					string $word = `substring $tokenBuffer[$i] 2 $tokenSize`;
+					$letter = `toupper $letter`;
+					$shaderBaseName = ($shaderBaseName + $letter + $word);
+				}
+			}
+			else {
+				print ($shader + " does not contains an underscore\n");
+				$shaderBaseName = $shader;
+			}
+
+			if ($shader != $shaderBaseName){
+				rename $shader $shaderBaseName;
+				$shader = $shaderBaseName;
+			}
+
+			// list history of incoming node
+			string $shaderHistory[] = `listHistory $shader`;
+
+			// for each in history
+			for ($node in $shaderHistory){
+				$nodeType = `objectType $node`;
+	
+				if (`objExists $node` && $node != $shader){
+					if (!`gmatch $node ($shader+"_"+$nodeType+"*")`){
+						rename $node ($shaderBaseName+"_"+$nodeType);
+					}
+				}
+
+			}
+
+			$newSGName = ($shaderBaseName+"SG");
+
+		}
+		if ($sgNode != $newSGName){
+			rename $sgNode $newSGName;
+		}
+	}
+
+
+
+
+}

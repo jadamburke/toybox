@@ -1,0 +1,11 @@
+// pfxAddLeafOrient
+global proc pfxAddLeafOrient() {
+	$sel = `ls -sl`;
+	for ($each in $sel){
+		if (`objectType $each` == "brush"){
+			setAttr -type "string" ($each+".runtimeScript") "leafOrient";
+		}
+	}
+
+
+}

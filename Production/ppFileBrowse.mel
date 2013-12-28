@@ -1,0 +1,49 @@
+// ppFileBrowse
+
+
+global proc ppBrowseProject
+ () {
+	$projPath = toNativePath(`workspace -q -rd`); 
+	
+	if (`about -os ` == "mac")
+		
+		exec ("open -a finder \""+$projPath+"\"");
+	
+	else 
+		system(("start explorer "+$projPath));
+}
+
+
+global proc ppBrowseJob
+ () {
+	$projPath = toNativePath(`workspace -q -rd`); 
+
+	string $tokenBuffer[];
+	tokenize $projPath "\\" $tokenBuffer;
+	string $jobPath = "";
+	print ("size of tokenbuffer="+size($tokenBuffer)+"\n");
+	
+	for ($i=0;$i<size($tokenBuffer)-2;$i++){
+		if ($i==0){
+			if ($tokenBuffer[$i] ==""){
+				$jobPath = "//";
+			}
+			else {
+				$jobPath += ($tokenBuffer[$i]);
+			}
+		}
+		else {
+			$jobPath += ("\\"+$tokenBuffer[$i]);
+		}
+	}
+	
+	
+	print ("Job = "+$jobPath+"\n");
+	if (`about -os ` == "mac")
+		
+		exec ("open -a finder \""+$jobPath+"\"");
+	
+	else 
+		system(("start explorer "+$jobPath));
+
+}

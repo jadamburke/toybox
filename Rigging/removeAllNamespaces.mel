@@ -1,0 +1,19 @@
+// removeAllNamespaces
+
+global proc removeAllNamespaces() {
+
+	int $iterations = 10;
+	for ($i=0;$i<$iterations;$i++){
+	// set namespace to root namespace
+	namespace -set ":";
+	string $foundNamespaces[] = `namespaceInfo -lon`;
+	for ($each in $foundNamespaces){	
+		// if its not an autodesk standard namespace remove the namesspace and move its children to the root namespace
+		if ($each != "UI" && $each != "shared"){
+			evalEcho("namespace -f -mv "+$each+" \":\"");
+			evalEcho("namespace -rm "+$each);
+		}
+	}	
+	}
+
+}

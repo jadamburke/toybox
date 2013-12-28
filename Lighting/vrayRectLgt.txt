@@ -1,0 +1,4 @@
+VRay rectangle light 
+ 
+ 
+ 

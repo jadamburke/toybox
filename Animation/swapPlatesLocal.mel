@@ -1,0 +1,93 @@
+// localBP
+
+global proc swapPlatesLocal(){
+	string $imagePlanes[] = `ls -type imagePlane`;
+	string $ignorePlanes[] = `ls -type imagePlane -referencedNodes`;
+
+	string $imPath1;
+	string $imPath2;
+	
+	string $destinationPath = (`getenv HOME`+"/desktop/temp_bgplates/");
+	
+	for ($each in $imagePlanes){
+		// ignore referenced image planes
+		if (!stringArrayContains($each, $ignorePlanes)){
+			int $copyFlag = 0;
+			$imPath1 = `getAttr ($each+".imageName")`;
+			if (`attributeExists "imageSwap" $each`){
+				$imPath2 = `getAttr ($each+".imageSwap")`;
+				if (`filetest -r $imPath2`){
+					setAttr -type "string" ($each+".imageName") $imPath2;
+					setAttr -type "string" ($each+".imageSwap") $imPath1;
+				}
+				else{
+					$copyFlag = 1;
+				}
+					
+			}
+			else {
+				addAttr -longName "imageSwap" -dt "string" $each;
+				$copyFlag = 1;
+			}
+			if ($copyFlag == 1) {
+				print ($each+" copy Flag is True\n");
+				if (`getAttr ($each+".useFrameExtension")`){
+						print ($each+"useFrameExtension True\n");
+						string $dir = dirname ($imPath1);
+						string $fileName = basenameEx($imPath1);
+						print ($fileName+"\n");
+						string $tokenBuffer[];
+						tokenize $fileName "." $tokenBuffer;
+						string $delin = ".";
+						if (size($tokenBuffer) < 2){
+							$delin = "_";
+							tokenize $fileName "_" $tokenBuffer;
+							$fileName = $tokenBuffer[0];
+							for ($i=1;$i<(size($tokenBuffer)-1);$i++){
+								$fileName += $tokenBuffer[$i];
+							}
+						}
+						else{
+							$fileName = $tokenBuffer[0];
+						}
+						string $filesToCopy[] = evalEcho("getFileList -folder \""+$dir+"/\" -filespec \""+$fileName+$delin+"*\"");
+						print ("// Copying Files...\n");
+						print $filesToCopy;
+						sysFile -makeDir ($destinationPath+$fileName);
+						
+						int $amount = 0;
+						int $index = 0;
+						progressWindow
+							-title "Copying Back Plates To Desktop"
+	           			-progress $amount
+							-status "Preparing to Copy"
+							-isInterruptable true;
+						
+						for ($every in $filesToCopy){
+							string $fileNameMinusExt = basenameEx($every);
+							//print("c:/\"Program Files\"/Autodesk/Maya2012/bin/imconvert.exe \""+$dir+"/"+$every+"\" \""+$destinationPath+$fileName+"/"+$fileNameMinusExt+".iff\"\n");
+							//system("c:/\"Program Files\"/Autodesk/Maya2012/bin/imconvert.exe \""+$dir+"/"+$every+"\" \""+$destinationPath+$fileName+"/"+$fileNameMinusExt+".iff\"");
+							//system("c:/\"Program Files\"/Autodesk/Maya2012/bin/imconvert.exe -scale .125 \""+$dir+"/"+$every+"\" \""+$destinationPath+$fileName+"/"+$every+"\"");
+
+							sysFile -copy ($destinationPath+$fileName+"/"+$every) ($dir+"/"+$every);
+							$index++;
+							$amount = (float($index)/float(size($filesToCopy)))*100;
+							progressWindow -edit -progress $amount -status ("Copying: "+$amount+"%");
+							
+						}
+						string $fileNameMinusExt = basenameEx($every);
+						progressWindow -endProgress;
+						//setAttr -type "string" ($each+".imageName") ($destinationPath+$fileName+"/"+$fileNameMinusExt+".iff");
+						setAttr -type "string" ($each+".imageName") ($destinationPath+$fileName+"/"+$every);
+						setAttr -type "string" ($each+".imageSwap") $imPath1;
+						//setAttr -type "string" ($each+".imageSwap") ($destinationPath+$fileName+"/"+$every);
+					
+				}
+				else{
+					// just copy the single file
+				}
+			}
+		}
+	}
+
+}

@@ -1,0 +1,188 @@
+///////////////ADD ATTRIBUTES TO IK FK CONTROL 
+///////////////THIS ATRIBUTES NEED TO STORE NAMES OF JOINTS AND CONTROLS AND IK FK ATTRIBUTE NAME 
+///////////////PLUS NEED TO CREATE FK POLE VECTOR : MAYBE LOCATOR PARENT UNDER FK SHOULDER POSITIONED AT IK POLE VECTOR
+
+//vk_ikfkNames()
+global proc vk_ikfkNames()
+{
+string $allSels[]=`ls -sl`;
+for($mySel in $allSels)
+	{
+
+	string $parts[];
+	tokenize ($mySel,"_",$parts);
+	string $side = $parts[0];
+
+	addAttr -ln "shoulderJoint"  -dt "string"  $mySel;
+	addAttr -ln "elbowJoint"  -dt "string"  $mySel;
+	addAttr -ln "wristJoint"  -dt "string"  $mySel;
+	addAttr -ln "fkShoulderControl"  -dt "string"  $mySel;
+	addAttr -ln "fkElbowControl"  -dt "string"  $mySel;
+	addAttr -ln "fkWristControl"  -dt "string"  $mySel;
+	addAttr -ln "ikWristControl"  -dt "string"  $mySel;
+	addAttr -ln "fkPoleVector"  -dt "string"  $mySel;
+	addAttr -ln "ikPoleVector"  -dt "string"  $mySel;
+	addAttr -ln "ikFkAttrName"  -dt "string"  $mySel;
+
+	setAttr -type "string" ($mySel+".fkShoulderControl") ($side+"_shoulder_CTRL");
+	setAttr -type "string" ($mySel+".fkElbowControl") ($side+"_shoulder_CTRL");
+	setAttr -type "string" ($mySel+".fkWristControl") ($side+"_wrist_CTRL");
+	setAttr -type "string" ($mySel+".ikWristControl") ($side+"_ikArm_CTRL");
+	setAttr -type "string" ($mySel+".fkPoleVector") ($side+"_fkArmPV_CTRL");
+	setAttr -type "string" ($mySel+".ikPoleVector") ($side+"_ikArmPV_CTRL");
+	setAttr -type "string" ($mySel+".ikFkAttrName") ("IKFK");
+	}
+}
+
+
+// switch to ik and match to fk pos
+global proc vk_matchIkToFk(string $myWristJnt, string $myIkWristCtrl, string $myIkFkCtrl, string $myFkPoleVector, string  $myIKPoleVector,string $myIKFKAttrName)
+{
+
+    string $myTempWristNull = `group -em -n "temp_null_ik_fk_switching"`;
+    string $myOrientC[]=`orientConstraint -w 1 $myWristJnt $myTempWristNull`;
+    delete $myOrientC;
+    string $myOrientC[]=`orientConstraint -w 1 $myTempWristNull $myIkWristCtrl`;
+    
+    string $nameSpaceParts[];
+    tokenize ($myIkFkCtrl,":",$nameSpaceParts);
+    int $n = `size($nameSpaceParts)`-1;
+    string $ikFkToken = $nameSpaceParts[$n];
+
+    string $parts[];
+    tokenize ($ikFkToken,"_",$parts);
+    print $parts[0];
+     if($parts[0] == "right")
+        {
+        setAttr ($myOrientC[0]+".offsetX") 180;
+        
+        }
+    
+    setKeyframe ($myIkWristCtrl+".rotate");
+    delete $myOrientC;
+    delete $myTempWristNull;
+    
+    string $myTempWristNull = `group -em -n "temp_null_ik_fk_switching"`;
+    string $myPointC[]=`pointConstraint -w 1 $myWristJnt $myTempWristNull`;
+    delete $myPointC;
+    string $myPointC[]=`pointConstraint -w 1 $myTempWristNull $myIkWristCtrl`;
+    setKeyframe ($myIkWristCtrl+".translate");
+    delete $myPointC;
+    delete $myTempWristNull;
+    
+    string $myPointC[]=`pointConstraint -w 1 $myFkPoleVector  $myIKPoleVector`;
+    setKeyframe ($myIKPoleVector+".translate");
+    delete $myPointC;
+    
+
+    setAttr ($myIkFkCtrl+"."+$myIKFKAttrName) 1;
+    setKeyframe ($myIkFkCtrl+"."+$myIKFKAttrName);
+    
+}
+//switch to fk and match to ik pos
+global proc vk_matchFkToIk(string $myShoulderJnt , string $myElbowJnt, string $myWristJnt, string $myFkShoulderCtrl, string $myFkElbowCtrl, string $myFkWristCtrl, string $myIkFkCtrl,string $myIKFKAttrName)
+{
+    float $myShoulderRotX=`getAttr ($myShoulderJnt+".rx")`;
+    float $myShoulderRotY=`getAttr ($myShoulderJnt+".ry")`;
+    float $myShoulderRotZ=`getAttr ($myShoulderJnt+".rz")`;
+    
+    print ($myShoulderRotX+"\n");
+    
+    float $myElbowRotX=`getAttr ($myElbowJnt+".rx")`;
+    float $myElbowRotY=`getAttr ($myElbowJnt+".ry")`;
+    float $myElbowRotZ=`getAttr ($myElbowJnt+".rz")`;
+    
+    float $myWristRotX=`getAttr ($myWristJnt+".rx")`;
+    float $myWristRotY=`getAttr ($myWristJnt+".ry")`;
+    float $myWristRotZ=`getAttr ($myWristJnt+".rz")`;
+    
+    setAttr ($myFkShoulderCtrl+".rx") $myShoulderRotX;
+    setAttr ($myFkShoulderCtrl+".ry") $myShoulderRotY;
+    setAttr ($myFkShoulderCtrl+".rz") $myShoulderRotZ;
+
+    setAttr ($myFkElbowCtrl+".rx") $myElbowRotX;
+    setAttr ($myFkElbowCtrl+".ry") $myElbowRotY;
+    setAttr ($myFkElbowCtrl+".rz") $myElbowRotZ;
+    
+    setAttr ($myFkWristCtrl+".rx") $myWristRotX;
+    setAttr ($myFkWristCtrl+".ry") $myWristRotY;
+    setAttr ($myFkWristCtrl+".rz") $myWristRotZ;
+
+    setAttr ($myIkFkCtrl+"."+$myIKFKAttrName) 0;
+    
+    setKeyframe ($myFkShoulderCtrl+".rotate");
+    setKeyframe ($myFkElbowCtrl+".rotate");
+    setKeyframe ($myFkWristCtrl+".rotate");
+    setKeyframe ($myIkFkCtrl+"."+$myIKFKAttrName);
+}
+
+//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+global proc IKFK()
+{
+//select ctrl with ikFk attribute
+string $mySel[]=`ls -sl`;
+string $myNameSpace="";
+int $mySelSize= size($mySel);
+int $myState;
+if ($mySelSize == 1)
+{
+    //check for namespace
+    string $myBuffer[];
+    $myTokens = `tokenize $mySel[0] ":" $myBuffer`;
+    if (`attributeExists "shoulderJoint" $mySel[0]`) 
+    {
+        
+        if ($myBuffer[0] != $mySel[0])
+        {
+            //print $myBuffer[0];
+            int $myBufferSize = size($myBuffer);
+            //print $myBufferSize;
+            
+            if ($myBufferSize == 2)
+                $myNameSpace=($myBuffer[0]+":");
+            if ($myBufferSize == 3)
+                $myNameSpace=($myBuffer[0]+":"+$myBuffer[1]+":");
+            if ($myBufferSize == 4)
+                $myNameSpace=($myBuffer[0]+":"+$myBuffer[1]+":"+$myBuffer[2]+":");
+         
+         }
+        
+        ////////////////GET INFO FROM ATTRIBUTES////////////
+        ////////////////////////////////////////////////
+        string $myShoulderJnt=($myNameSpace+(`getAttr ($mySel[0]+".shoulderJoint")`)); //// shoulder joint name
+        string $myElbowJnt=($myNameSpace+(`getAttr ($mySel[0]+".elbowJoint")`)); //// elbow joint name 
+        string $myWristJnt=($myNameSpace+(`getAttr ($mySel[0]+".wristJoint")`)); //// wrist jonit name
+
+        string $myFkShoulderCtrl=($myNameSpace+(`getAttr ($mySel[0]+".fkShoulderControl")`)); //// fk shoulder ctrl name 
+        string $myFkElbowCtrl=($myNameSpace+(`getAttr ($mySel[0]+".fkElbowControl")`)); //// fk elbow ctrl name 
+        string $myFkWristCtrl=($myNameSpace+(`getAttr ($mySel[0]+".fkWristControl")`)); //// fk wrist ctrl name 
+
+        string $myIkWristCtrl = ($myNameSpace+(`getAttr ($mySel[0]+".ikWristControl")`)); //// ik control
+
+        string $myFkPoleVector=($myNameSpace+(`getAttr ($mySel[0]+".fkPoleVector")`));  //// name of pole vector reference object that is parented under fk shoulder should match pole vector pos
+        string $myIKPoleVector = ($myNameSpace+(`getAttr ($mySel[0]+".ikPoleVector")`)); /// ik pole vector ctrl
+
+        string $myIkFkCtrl = $mySel[0]; //// ctrl with attribute ikFk , ik is 1 , fk is 0
+        string $myIKFKAttrName = ((`getAttr ($mySel[0]+".ikFkAttrName")`));
+
+        //switch
+        //check state
+        $myState = `getAttr ($myIkFkCtrl + "."+$myIKFKAttrName)`;
+        
+        if ($myState == 1)
+            vk_matchFkToIk($myShoulderJnt,$myElbowJnt,$myWristJnt,$myFkShoulderCtrl,$myFkElbowCtrl,$myFkWristCtrl,$myIkFkCtrl,$myIKFKAttrName);
+
+        
+        if ($myState == 0)
+            vk_matchIkToFk($myWristJnt,$myIkWristCtrl,$myIkFkCtrl,$myFkPoleVector,  $myIKPoleVector,$myIKFKAttrName);
+
+        ////////////////////////////////////////////////
+        ///////////////////////////////////////////////
+        select -r $myIkFkCtrl;
+    }
+    else
+        print ">>>>>>Select ik fk control";
+}
+else
+    print ">>>>>>Select ik fk control";
+}

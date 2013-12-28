@@ -1,0 +1,53 @@
+// snapWireRigToCurve
+// Created by: adambu
+// Date: 2011/12/06 18:33:52
+
+global proc snapWireRigToCurve(){
+
+	$sel = `ls -sl`;
+	if (size($sel) != 2){
+		error ("Please select the curve and then referenced WIRE:ROOT node");
+		return;
+	}
+	string $wireRigNamespace = $sel[1];
+	string $curveName = $sel[0];
+	//if (objType($sel[1]) == "transform"){
+		string $tokenBuffer[];
+		tokenize $wireRigNamespace ":" $tokenBuffer;
+		$wireRigNamespace = $tokenBuffer[0];
+	//}
+	
+	for ($i=1;$i<16;$i++){
+		float $curveMaxParam = `getAttr ($curveName+".max")`;
+		float $param = 0;
+		float $spacing = $curveMaxParam / 12;
+		
+		if ($i == 1){
+			$param = 0;
+		}
+		else if ($i == 15){
+			$param = $curveMaxParam;
+		}
+		else if ($i == 2){
+			$param = ($spacing*.25);
+		}
+		else if ($i == 14){
+			$param = $curveMaxParam - ($spacing*.25);
+		}
+		else {
+			$param = ($i-2)*$spacing;
+		}
+		$ctrlName = ($wireRigNamespace+":pathCtrl"+$i);
+		float $piv[] = `xform -q -piv $ctrlName`;
+		float $pos[] = `pointOnCurve -pr $param -p $curveName`;
+		float $finalPos[];
+		$finalPos[0] = $pos[0] - $piv[0];
+		$finalPos[1] = $pos[1] - $piv[1];
+		$finalPos[2] = $pos[2] - $piv[2];
+		print ("Moving to param "+$param+"\n");
+		evalEcho("xform -ws -a -t "+$finalPos[0]+" "+$finalPos[1]+" "+$finalPos[2]+" "+$ctrlName);
+	
+	
+	}
+	
+}

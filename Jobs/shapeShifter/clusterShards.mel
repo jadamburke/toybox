@@ -1,0 +1,44 @@
+// clusterShards
+global proc clusterShards() {
+
+$sel = `ls -sl`;
+
+for ($each in $sel){
+	
+	float $pivPos[] = `xform -q -a -ws -rp $each`;
+	string $newLoc[] = `spaceLocator -a -p $pivPos[0] $pivPos[1] $pivPos[2]`;
+	xform -cp $newLoc[0];
+	addAttr -ln "skinWeight"  -at double  -min 0 -max 1 -dv 1 $newLoc[0];
+	setAttr -e-keyable true ($newLoc[0]+".skinWeight");
+	rename $newLoc[0] ($each+"_loc");
+	$newLoc[0] = ($each+"_loc");
+
+	string $skinDeformer = findRelatedSkinCluster($each);
+
+	connectAttr -f ($newLoc[0]+".skinWeight") ($skinDeformer+".envelope");
+
+	cluster -wn $newLoc[0] $newLoc[0] -rel $each;
+	
+	//newCluster " -relative -envelope 1";
+
+}
+
+}
+
+
+
+
+/*
+{
+for ($i=1;$i<175;$i++){
+	//parentConstraint ("shards"+$i+"GoalLoc") ("shard"+$i+"ClusterLoc");
+	$reverseNode = `createNode reverse`;
+	rename $reverseNode ("shard"+$i+"Reverse");
+	$reverseNode = ("shard"+$i+"Reverse");
+	connectAttr -f ("shard"+$i+"_loc.clusterInvCnst") ("shard"+$i+"Reverse.ix");
+	connectAttr -f ("shard"+$i+"Reverse.ox") ("shard"+$i+"ClusterLoc_parentConstraint1.shard"+$i+"_locW0");
+	connectAttr -f ("shard"+$i+"_loc.clusterInvCnst") ("shards"+$i+"ClusterLoc_parentConstraint1.shards"+$i+"GoalLocW1");
+
+}
+}
+*/

@@ -1,0 +1,583 @@
+global proc abxTangents(){
+	
+	string $parent = `window -w 200 -h 300 -t abxTangents -tlb true abxTangents`;
+	$panelName = "abxTangents";
+	setParent $parent;
+	$panelName = `formLayout $panelName`;
+	//if (`objectTypeUI $parent` == "tabLayout")
+	//	tabLayout -e -tabLabel $panelName "Tangents" $parent;
+	
+	columnLayout -rs 1 -cal "center" -cat "both" 0 -adj true abxTanColLyt;
+	
+	frameLayout -label "Weight" -cll true -borderStyle "etchedIn";
+	columnLayout -rs 1 -cal "center" -cat "both" 4 -adj true;
+
+	rowLayout -nc 2 -adj 1 -cw2 60 40 -co2 0 0 -ct2 "both" "both";
+	text -label "Nudge Amount";
+	floatField -minValue 0 -maxValue 1 -precision 3 -step .01 -value 0.5 abxWeightAmt;
+	setParent ..;
+
+	rowLayout -nc 3 -adj 2 -co3 0 3 3 -cw3 30 60 30 -ct3 "both" "both" "both" -cl3 "center" "center" "center";
+		button -label "<----" -h 20 -w 30 -c "abxTangentsCmd(\"weightMore\",\"in\")";
+		button -label "Weight +" -h 20 -w 60 -c "abxTangentsCmd(\"weightMore\",\"both\")";
+		button -label "---->" -h 20 -w 30 -c "abxTangentsCmd(\"weightMore\",\"out\")";
+		setParent ..;
+	rowLayout -nc 3 -adj 2 -co3 0 3 3 -cw3 30 60 30 -ct3 "both" "both" "both" -cl3 "center" "center" "center";
+		button -label " >---" -h 20 -w 30 -c "abxTangentsCmd(\"weightLess\",\"in\")";
+		button -label "Weight -" -h 20 -w 60 -c "abxTangentsCmd(\"weightLess\",\"both\")";
+		button -label "---< " -h 20 -w 30 -c "abxTangentsCmd(\"weightLess\",\"out\")";
+		setParent ..;
+	separator -height 8 -style "in";
+	rowLayout -nc 3 -adj 2 -co3 0 3 3 -cw3 30 60 30 -ct3 "both" "both" "both" -cl3 "center" "center" "center";
+		button -label "o----" -h 20 -w 30 -c "abxTangentsCmd(\"weightDefault\",\"in\")";
+		button -label "Default" -h 20 -w 60 -c "abxTangentsCmd(\"weightDefault\",\"both\")";
+		button -label "----o" -h 20 -w 30 -c "abxTangentsCmd(\"weightDefault\",\"out\")";
+		setParent ..;
+	rowLayout -nc 3 -adj 2 -co3 0 3 3 -cw3 30 60 30 -ct3 "both" "both" "both" -cl3 "center" "center" "center";
+		button -label "o----" -h 20 -w 30 -c "abxTangentsCmd(\"weightEqual\",\"in\")";
+		button -label "Equalize" -h 20 -w 60 -c "abxTangentsCmd(\"weightEqual\",\"both\")";
+		button -label "----o" -h 20 -w 30 -c "abxTangentsCmd(\"weightEqual\",\"out\")";
+		setParent ..;
+	separator -height 8 -style "in";
+	//rowLayout -nc 4 -adj 1 -co4 0 3 3 3 -cw4 30 30 45 30 -ct4  "both" "both" "both" "both" -cl4 "right" "center" "center" "center";
+		//text "Set";
+		//floatField;
+		//floatField;
+		//floatField;
+		//setParent..;
+	
+	setParent ..;
+	setParent ..;
+	
+	frameLayout -label "Angle/Type" -cll true -borderStyle "etchedIn";
+	columnLayout -rs 1 -cal "center" -cat "both" 4 -adj true;
+	
+	rowLayout -nc 2 -adj 1 -cw2 60 40 -co2 0 0 -ct2 "both" "both";
+	text -label "Nudge Amount";
+	floatField -minValue 0 -maxValue 1 -precision 3 -step .01 -value 0.5 abxTangentAngleVal;
+	setParent ..;
+	//setParent ..;
+	//separator -height 10 -style "in";
+
+	rowLayout -nc 3 -adj 2 -co3 0 3 3 -cw3 30 60 30 -ct3 "both" "both" "both" -cl3 "center" "center" "center";
+		button -label "o----" -h 20 -w 30 -c "abxTangentsCmd(\"flatAngle\",\"in\")";
+		button -label "Flat" -h 20 -w 60 -c "abxTangentsCmd(\"flatAngle\",\"both\")";
+		button -label "----o" -h 20 -w 30 -c "abxTangentsCmd(\"flatAngle\",\"out\")";
+		setParent ..;
+	rowLayout -nc 3 -adj 2 -co3 0 3 3 -cw3 30 60 30 -ct3 "both" "both" "both" -cl3 "center" "center" "center";
+		button -label "o----" -h 20 -w 30 -c "abxTangentsCmd(\"linearAngle\",\"in\")";
+		button -label "Linear" -h 20 -w 60 -c "abxTangentsCmd(\"linearAngle\",\"both\")";
+		button -label "----o" -h 20 -w 30 -c "abxTangentsCmd(\"linearAngle\",\"out\")";
+		setParent ..;
+	rowLayout -nc 3 -adj 2 -co3 0 3 3 -cw3 30 60 30 -ct3 "both" "both" "both" -cl3 "center" "center" "center";
+		button -label "o----" -h 20 -w 30 -c "abxTangentsCmd(\"splineAngle\",\"in\")";
+		button -label "Spline" -h 20 -w 60 -c "abxTangentsCmd(\"splineAngle\",\"both\")";
+		button -label "----o" -h 20 -w 30 -c "abxTangentsCmd(\"splineAngle\",\"out\")";
+		setParent ..;
+	separator -height 10 -style "in";
+	
+	rowLayout -nc 3 -adj 2 -co3 0 3 3 -cw3 30 60 30 -ct3 "both" "both" "both" -cl3 "center" "center" "center";
+		button -label "o----" -h 20 -w 30 -c "abxTangentsCmd(\"straightenAngle\",\"in\")";
+		button -label "Straighten" -h 20 -w 60 -c "abxTangentsCmd(\"straightenAngle\",\"both\")";
+		button -label "----o" -h 20 -w 30 -c "abxTangentsCmd(\"straightenAngle\",\"out\")";
+		setParent ..;
+	separator -height 10 -style "in";
+	rowLayout -nc 3 -adj 2 -co3 0 3 3 -cw3 30 60 30 -ct3 "both" "both" "both" -cl3 "center" "center" "center";
+		button -label "o----" -h 20 -w 30 -c "abxTangentsCmd(\"rotAnglePlus\",\"in\")";
+		button -label "Rotate +" -h 20 -w 60 -c "abxTangentsCmd(\"rotAnglePlus\",\"both\")";
+		button -label "----o" -h 20 -w 30 -c "abxTangentsCmd(\"rotAnglePlus\",\"out\")";
+		setParent ..;
+	
+	rowLayout -nc 3 -adj 2 -co3 0 3 3 -cw3 30 60 30 -ct3 "both" "both" "both" -cl3 "center" "center" "center";
+		button -label "o----" -h 20 -w 30 -c "abxTangentsCmd(\"rotAngleMinus\",\"in\")";
+		button -label "Rotate -" -h 20 -w 60 -c "abxTangentsCmd(\"rotAngleMinus\",\"both\")";
+		button -label "----o" -h 20 -w 30 -c "abxTangentsCmd(\"rotAngleMinus\",\"out\")";
+		setParent ..;
+	
+	//rowLayout -nc 4 -adj 1 -co4 0 3 3 3 -cw4 30 30 45 30 -ct4  "both" "both" "both" "both" -cl4 "right" "center" "center" "center";
+		//text "Set";
+		//floatField;
+		//floatField;
+		//floatField;
+		//setParent..;
+	//columnLayout -e -cw (`scrollLayout -q -w $panelName`-18) abxTanColLyt;
+
+	setParent ..;
+	setParent ..;
+
+	frameLayout -label "Presets" -cll true -borderStyle "etchedIn";
+	columnLayout -rs 1 -cal "center" -cat "both" 4 -adj true;
+	button -label "Ease In Linear";
+	button -label "Ease Out Linear";
+	button -label "Smooth Spline";
+	button -label "No Overshoot";
+
+
+
+	showWindow $parent;
+}
+
+global proc abxTangentsCmd(string $op, string $tangentPart) {
+
+	string $timeFlag = "";
+	global string $gPlayBackSlider;
+	float $angleBuffer[];
+	float $nudgeAmt = (`floatField -q -value abxTangentAngleVal`-1)*-1;
+	float $weightAmt = `floatField -q -value abxWeightAmt`;
+	float $rotAngAmt = `floatField -q -value abxTangentAngleVal`;
+	
+	
+	// if no keys are selected in the graph editor use the timeline
+	float $selKeys[] = `keyframe -q -sl`;
+	if (size($selKeys) < 1)
+		$timeFlag = (" -t "+`timeControl -q -rng $gPlayBackSlider`);
+
+	switch ($op){
+	case "weightMore":
+		switch ($tangentPart){
+		case "in":
+			int $lockTan[] = `keyTangent -q -l`;
+			eval("keyTangent -r -l false -iw "+$weightAmt+$timeFlag);
+			keyTangent -e -l $lockTan[0];
+			break;
+		case "out":
+			int $lockTan[] = `keyTangent -q -l`;
+			eval("keyTangent -r -l false -ow "+$weightAmt+$timeFlag);
+			keyTangent -e -l $lockTan[0];
+			break;
+		case "both":
+			int $lockTan[] = `keyTangent -q -l`;
+			eval("keyTangent -r -l false -iw "+$weightAmt+" -ow "+$weightAmt+$timeFlag);
+			keyTangent -e -l $lockTan[0];
+			break;
+		}
+		break;
+			
+	case "weightLess":
+		switch ($tangentPart){
+		case "in":
+			int $lockTan[] = `keyTangent -q -l`;
+			eval("keyTangent -r -l false -iw -"+$weightAmt+$timeFlag);
+			keyTangent -e -l $lockTan[0];
+			break;
+		case "out":
+			int $lockTan[] = `keyTangent -q -l`;
+			eval("keyTangent -r -l false -ow -"+$weightAmt+$timeFlag);
+			keyTangent -e -l $lockTan[0];
+			break;
+		case "both":
+			int $lockTan[] = `keyTangent -q -l`;
+			eval("keyTangent -r -l false -iw -"+$weightAmt+" -ow -"+$weightAmt+$timeFlag);
+			keyTangent -e -l $lockTan[0];
+			break;
+		}
+		break;
+		
+	case "weightDefault":
+		switch ($tangentPart){
+		case "in":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("spline",0, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					keyTangent -e -a -l false -iw $keyVals[2] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+					if ($keyVals[3] == 1)
+						keyTangent -e -itt "spline" -t $every $each;
+				}
+			}
+			break;
+		case "out":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("spline",0, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					keyTangent -e -a -l false -ow $keyVals[3] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+					if ($keyVals[3] == 1 && $keyVals[4] == 1)
+						keyTangent -e -itt "spline" -ott "sline" -t $every $each;
+				}
+			}
+			break;
+		case "both":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("spline",0, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					keyTangent -e -a -l false -iw $keyVals[2] -ow $keyVals[3] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+					if ($keyVals[4] == 1)
+						keyTangent -e -ott "spline" -t $every $each;
+				}
+			}
+			break;
+		}
+		break;
+	case "weightEqual":
+		switch ($tangentPart){
+		case "out":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $weightBuffer[] = `keyTangent -t $every -q -iw $each`;
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					keyTangent -e -a -l false -wl true -ow $weightBuffer[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		case "both":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $weightBuffer[] = `keyTangent -t $every -q -iw $each`;
+					float $weightBuffer2[] = `keyTangent -t $every -q -ow $each`;
+					$weightBuffer[0] = ($weightBuffer[0] + $weightBuffer2[0])/2;
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					keyTangent -e -a -l false -wl true -ow $weightBuffer[0] -iw $weightBuffer[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			
+			break;
+		case "in":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $weightBuffer[] = `keyTangent -t $every -q -ow $each`;
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					keyTangent -e -a -l false -wl true -iw $weightBuffer[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}	
+			break;
+		}
+		break;
+	case "weightSetVal":
+		break;
+	case "flatAngle":
+		switch ($tangentPart){
+		case "in":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("flat",$nudgeAmt, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -ia $keyVals[0] -t $every $each;
+					else
+						keyTangent -e -a -l false -ia $keyVals[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		case "out":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("flat",$nudgeAmt, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -oa $keyVals[1] -t $every $each;
+					else
+						keyTangent -e -a -l false -oa $keyVals[1] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		case "both":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("flat",$nudgeAmt, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -ia $keyVals[0] -oa $keyVals[1] -t $every $each;
+					else
+						keyTangent -e -a -l false -ia $keyVals[0] -oa $keyVals[1] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		}
+		break;
+	case "splineAngle":
+			switch ($tangentPart){
+		case "in":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("spline",$nudgeAmt, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -ia $keyVals[0] -t $every $each;
+					else
+						keyTangent -e -a -l false -ia $keyVals[0] -t $every $each;
+
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		case "out":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("spline",$nudgeAmt, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -oa $keyVals[1] -t $every $each;
+					else
+						keyTangent -e -a -l false -oa $keyVals[1] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		case "both":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("spline",$nudgeAmt, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -ia $keyVals[0] -oa $keyVals[1] -t $every $each;
+					else
+						keyTangent -e -a -l false -ia $keyVals[0] -oa $keyVals[1] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		}
+		break;
+	case "linearAngle":
+		switch ($tangentPart){
+		case "in":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("linear",$nudgeAmt, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -ia $keyVals[0] -t $every $each;
+					else
+						keyTangent -e -a -l false -ia $keyVals[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		case "out":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("linear",$nudgeAmt, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -oa $keyVals[1] -t $every $each;
+					else
+						keyTangent -e -a -l false -oa $keyVals[1] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		case "both":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					float $keyVals[] = abxTangentTypeValues("linear",$nudgeAmt, $each, $every);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -ia $keyVals[0] -oa $keyVals[1] -t $every $each;
+					else
+						keyTangent -e -a -l false -ia $keyVals[0] -oa $keyVals[1] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		}
+		break;
+	case "straightenAngle":
+		switch ($tangentPart){
+		case "out":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					$angleBuffer = `keyTangent -t $every -q -ia $each`;
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -oa $angleBuffer[0] -t $every $each;
+					else
+						keyTangent -e -a -l false -oa $angleBuffer[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		case "both":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					$angleBuffer = `keyTangent -t $every -q -ia $each`;
+					float $angleBuffer2[] = `keyTangent -t $every -q -oa $each`;
+					$angleBuffer[0] = ($angleBuffer[0] + $angleBuffer2[0])/2;
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -oa $angleBuffer[0] -ia $angleBuffer[0] -t $every $each;
+					else
+						keyTangent -e -a -l false -oa $angleBuffer[0] -ia $angleBuffer[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			
+			break;
+		case "in":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					$angleBuffer = `keyTangent -t $every -q -oa $each`;
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -ia $angleBuffer[0] -t $every $each;
+					else
+						keyTangent -e -a -l false -ia $angleBuffer[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			
+			break;
+		}
+		break;
+	case "rotAngleMinus":
+		$rotAngAmt = $rotAngAmt * -1;
+	case "rotAnglePlus":
+		switch ($tangentPart){
+		case "out":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					$angleBuffer = `keyTangent -t $every -q -oa $each`;
+					$angleBuffer[0] = ($angleBuffer[0] + $rotAngAmt);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -oa $angleBuffer[0] -t $every $each;
+					else
+						keyTangent -e -a -l false -oa $angleBuffer[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			break;
+		case "both":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					$angleBuffer = `keyTangent -t $every -q -ia $each`;
+					$angleBuffer[0] = ($angleBuffer[0] + $rotAngAmt);
+					float $angleBuffer2[] = `keyTangent -t $every -q -oa $each`;
+					$angleBuffer2[0] = ($angleBuffer2[0] + $rotAngAmt);
+					//$angleBuffer[0] = ($angleBuffer[0] + $angleBuffer2[0])/2;
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -oa $angleBuffer2[0] -ia $angleBuffer[0] -t $every $each;
+					else
+						keyTangent -e -a -l false -oa $angleBuffer2[0] -ia $angleBuffer[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			
+			break;
+		case "in":
+			string $selectedCurves[] = `keyframe -q -name`;
+			for ($each in $selectedCurves){
+				float $selectedTimes[] = `keyframe -q -sl $each`;
+				for ($every in $selectedTimes){
+					$angleBuffer = `keyTangent -t $every -q -ia $each`;
+					$angleBuffer[0] = ($angleBuffer[0] + $rotAngAmt);
+					int $lockTan[] = `keyTangent -t $every -q -l $each`;
+					int $wt[] = `keyTangent -t $every -q -wt $each`;
+					if ($wt[0])
+						keyTangent -e -a -l false -wl true -ia $angleBuffer[0] -t $every $each;
+					else
+						keyTangent -e -a -l false -ia $angleBuffer[0] -t $every $each;
+					keyTangent -t $every -e -l $lockTan[0] $each;
+				}
+			}
+			
+			break;
+		}
+		break;
+	
+		
+	}
+	//eval("keyTangent -l true -wl true"+$timeFlag);
+
+}
+
+global proc float[] abxTangentTypeValues(string $type,float $nudgePercent, string $keyName, float $keyTime){
+
+	float $inAngle[] = `keyTangent -t $keyTime -q -ia $keyName`;
+	float $outAngle[] = `keyTangent -t $keyTime -q -oa $keyName`;
+	float $inWeight[] = `keyTangent -t $keyTime -q -iw $keyName`;
+	float $outWeight[] = `keyTangent -t $keyTime -q -ow $keyName`;
+	string $inType[] = `keyTangent -t $keyTime -q -itt $keyName`;
+	string $outType[] = `keyTangent -t $keyTime -q -ott $keyName`;
+	float $iTypeSet = 0;
+	float $oTypeSet = 0;
+	
+	keyTangent -e -t $keyTime -itt $type $keyName;
+	keyTangent -e -t $keyTime -ott $type $keyName;
+	
+	float $inAngle2[] = `keyTangent -t $keyTime -q -ia $keyName`;
+	float $outAngle2[] = `keyTangent -t $keyTime -q -oa $keyName`;
+	float $inWeight2[] = `keyTangent -t $keyTime -q -iw $keyName`;
+	float $outWeight2[] = `keyTangent -t $keyTime -q -ow $keyName`;
+	
+	if ($inAngle[0]==$inAngle2[0] && $outAngle[0]==$outAngle2[0] && $inWeight[0]==$inWeight2[0]&&$outWeight[0]==$outWeight2[0]){
+		$iTypeSet=1;
+		$oTypeSet=1;
+	}
+	
+	$inAngle2[0] = ($inAngle[0] - $inAngle2[0])*$nudgePercent+$inAngle2[0];
+	$outAngle2[0] = ($outAngle[0] - $outAngle2[0])*$nudgePercent+$outAngle2[0];
+	$inWeight2[0] = ($inWeight[0] - $inWeight2[0])*$nudgePercent+$inWeight2[0];
+	$outWeight2[0] = ($outWeight[0] - $outWeight2[0])*$nudgePercent+$outWeight2[0];
+	
+	
+	keyTangent -e -a -t $keyTime -itt $inType[0] -ott $outType[0] -ia $inAngle[0] -oa $outAngle[0] -iw $inWeight[0] -ow $outWeight[0] $keyName;
+	//print ("keyTangent -e -a -t "+$keyTime+" -itt "+$inType[0]+" -ott "+$outType[0]+" -ia "+$inAngle[0]+" -oa "+$outAngle[0]+" -iw "+$inWeight[0]+" -ow "+$outWeight[0]+" "+$keyName+"\n");
+	return {$inAngle2[0],$outAngle2[0],$inWeight2[0],$outWeight2[0],$iTypeSet,$oTypeSet};
+
+}

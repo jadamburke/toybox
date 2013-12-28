@@ -1,0 +1,26 @@
+global proc vk_reset()
+{
+    string $mySel[]=`ls -sl`;
+    for ($obj in $mySel)
+    {
+        if (`getAttr -k ($obj+".tx")`)
+            setAttr ($obj+".tx") 0;
+        if (`getAttr -k ($obj+".ty")`)
+            setAttr ($obj+".ty") 0;
+        if (`getAttr -k ($obj+".tz")`)
+            setAttr ($obj+".tz") 0;
+        if (`getAttr -k ($obj+".rx")`)
+            setAttr ($obj+".rx") 0;
+        if (`getAttr -k ($obj+".ry")`)
+            setAttr ($obj+".ry") 0;
+        if (`getAttr -k ($obj+".rz")`)
+            setAttr ($obj+".rz") 0;
+        if (`getAttr -k ($obj+".sx")`)
+            setAttr ($obj+".sx") 1;
+        if (`getAttr -k ($obj+".sy")`)
+            setAttr ($obj+".sy") 1;
+        if (`getAttr -k ($obj+".sz")`)
+            setAttr ($obj+".sz") 1;
+    }
+}
+vk_reset();

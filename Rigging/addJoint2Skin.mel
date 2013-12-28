@@ -1,0 +1,73 @@
+
+string $winName = "addJoint";
+if (`window -exists $winName`)
+	{
+	deleteUI $winName;
+	}
+window -title "Add Joint" $winName;
+
+rowColumnLayout 
+	-numberOfColumns 2 
+	-columnAttach 1 "right" 0
+	-columnWidth 1 100 
+	-columnWidth 2 150;	
+
+
+button  -l "Skin Cluster" -command "getSkin;" ;
+textField -w 150 skinText;
+
+button  -l "Joint" -command "getJoint;" ;
+textField -w 150 jointText;
+
+button  -l "Do it!" -command "doProcedure;" ;
+
+global proc getSkin(){
+string $thisSkin[] = `ls -sl`;
+if (size($thisSkin) == 0){
+	warning "Choose your skin cluster, dammit!"; 
+	}
+textField -e -tx $thisSkin[0] skinText;
+}
+
+global proc getJoint(){
+string $thisJoint[] = `ls -sl`;
+if (size($thisJoint) == 0){
+	warning "Choose your joint"; 
+	}
+textField -e -tx $thisJoint[0] jointText;
+}
+
+
+global proc doProcedure()
+
+{
+
+string $skinCluster = `textField -q -text skinText` ;
+string $joint = `textField -q -text jointText` ;
+
+//	add the selected joint to skinCluster
+	skinCluster -e -dr 10 -ai $joint $skinCluster;
+
+//	set the value of the lockInfluenceWeights attribute to 0
+	setAttr ($joint + ".liw") 0;
+   
+
+}
+
+showWindow $winName;
+
+
+//OLD script
+//string $skinCluster[] = `ls -sl`;
+
+//if (size($skinCluster) ~= 0){
+//string $selectedItems[] = `ls -sl`;
+
+//	add the selected joint to skinCluster
+//	skinCluster -e -dr 10 -ai $selectedItems[0] $selectedItems[1];
+
+//	set the value of the lockInfluenceWeights attribute to 0
+//	setAttr ($selectedItems[0] + ".liw") 0;
+	
+//}
+

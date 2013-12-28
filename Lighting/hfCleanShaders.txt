@@ -1,0 +1,4 @@
+Merges Shaders that have same name but different namespace. (Cleans duplicate shaders) 
+ 
+ 
+ 

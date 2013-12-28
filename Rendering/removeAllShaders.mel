@@ -1,0 +1,27 @@
+// removeAllShaders
+
+global proc removeAllShaders () {
+	$sel = `ls -type mesh -type nurbsSurface`;
+	for ($each in $sel){
+		sets -e -forceElement  initialShadingGroup $each;
+
+	}
+
+	$sel = `ls -type mesh -type nurbsSurface -intermediateObjects`;
+	for ($each in $sel){
+		setAttr ($each +".intermediateObject") 0;
+		sets -e -forceElement initialShadingGroup $each ;
+		setAttr ($each + ".intermediateObject") 1;
+
+	}
+
+
+	$sel = `ls -type shadingEngine`;
+	for ($each in $sel){
+		if ($each != "initialShadingGroup" && $each != "initialParticleSE"){
+			lockNode -lock 0 $each;
+			catch (`delete $each`);
+		}
+	}
+	MLdeleteUnused;
+}

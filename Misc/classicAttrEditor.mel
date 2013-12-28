@@ -1,0 +1,138 @@
+// classicAttrEditor
+
+// this modifies key procedure definitions in memory so that the attribute editor doesn't always have to be a dock control.
+
+global proc classicAttrEditor () {
+	
+	
+	global string $gUIComponentDockControlArray[];
+
+	if ($gUIComponentDockControlArray[7] != ""){
+		deleteUI $gUIComponentDockControlArray[7];
+		$gUIComponentDockControlArray[7] = "";
+	}
+
+}
+
+global proc setAttributeEditorVisible(int $visible)
+{
+	global string $gAttributeEditorWindowName;
+
+
+	string $component = getUIComponentDockControl("Attribute Editor", false);
+	if ($component != ""){
+		int $currentlyVisible = isUIComponentVisible("Attribute Editor");
+
+		if ($visible && !$currentlyVisible || !$visible && $currentlyVisible) {
+			toggleUIComponentVisibility "Attribute Editor";
+		}
+	}
+	else {
+		if (`window -exists $gAttributeEditorWindowName`){
+			showWindow $gAttributeEditorWindowName;
+		}
+		else {
+			createAEWindow( "", "auto" );
+			editSelected;
+		}
+
+	}
+}
+
+global proc raiseAttributeEditor()
+//
+//	Description:
+//		Raise the Attribute Editor to the top of its dock
+//		widget area if it is visible and not floating (if
+//		floating, will set it to have focus)
+//
+{
+	global string $gAttributeEditorWindowName;
+
+
+	string $component = getUIComponentDockControl("Attribute Editor", false);
+	if ($component != ""){
+		dockControl -edit -raise $component;
+	}
+	else {
+		if (`window -exists $gAttributeEditorWindowName`){
+			showWindow $gAttributeEditorWindowName;
+		}
+		else {
+			createAEWindow( "", "auto" );
+			editSelected;
+		}
+	}
+}
+
+global proc int isAttributeEditorRaised()
+//
+//	Description:
+//		Returns whether or not the Attribute Editor is
+//		visible and either floating or at the top of its
+//		dock widget area.
+//
+{
+	global string $gAttributeEditorWindowName;
+
+	string $component = getUIComponentDockControl("Attribute Editor", false);
+	if ($component != ""){
+		return `dockControl -q -raise $component`;
+	}
+	else {
+		if (`window -exists $gAttributeEditorWindowName`){
+			return `window -q -visible  $gAttributeEditorWindowName`;
+		}
+		else {
+			return 0;
+		}
+	}
+}
+
+global proc string getUIComponent(string $name)
+//
+//	Description:
+//		Return the layout corresponding to the given component name.
+//
+//		May return an empty string if the argument name does not refer
+//		to a valid component. In this case this procedure will
+//		generate an error.
+//
+//	Arguments:
+//		name - The component name.
+//
+//	Returns:
+//		The name of the component layout.
+//
+{
+	global string $gUIComponentBarComponentArray[];
+
+	global int    $kNameIndex;
+	global int    $kParentIndex;
+	global int    $kComponentElementSize;
+
+	string $component = "";
+	int    $index, $count;
+	
+	if ("" == $name) {
+		error -showLineNumber true (uiRes("m_UIComponents.kArgError"));
+		return $component;
+	}
+
+	//	Search the component array.
+	//
+	$count = size($gUIComponentBarComponentArray);
+	for ($index = 0; $index < $count; $index += $kComponentElementSize) {
+		if ($name == $gUIComponentBarComponentArray[$index + $kNameIndex]) {
+			$component = $gUIComponentBarComponentArray[$index + $kParentIndex];
+			break;
+		}
+	}
+
+	if ("" == $component) {
+		//string $error = uiRes("m_UIComponents.kComponentError");
+		//error -showLineNumber true (`format -s $name $error`);
+	}
+
+	return $component;
+}

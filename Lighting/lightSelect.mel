@@ -1,0 +1,20 @@
+// lightSelect.mel
+// Created by: raphe
+// Date: 2013/04/16 12:16:47
+
+global proc lightSelect(){
+	string $lights[] = `ls -sl`;
+	string $light;
+	for ($light in $lights){
+		vrayAddRenderElement LightSelectElement;
+		string $elementName[] = `ls -sl`;
+		setAttr ($elementName[0] + ".vray_type_lightselect") 1;
+		string $lightB = substitute(":",$light,"_");
+		rename $elementName[0] ("lightSelect_" + $lightB);
+		string $newName[] = `ls -sl`;
+		$newNameB = $newName[0];
+		string $newNameC = substitute("lightSelect_",$newNameB,"");
+		setAttr -type "string" ($newNameB + ".vray_name_lightselect") $newNameC;
+		sets -edit -forceElement ($newNameB) $light;
+	}
+}

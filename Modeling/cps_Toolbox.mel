@@ -1,0 +1,1 @@
+if( `window -q -exists cpst_ui` ){if( `window -q -iconify cpst_ui` )window -e -iconify 0 cpst_ui;else if( !`window -q -visible cpst_ui` )window -e -visible 1 cpst_ui;else deleteUI cpst_ui;}else cpsToolbox;

@@ -1,0 +1,45 @@
+// deleteAllLayers
+
+
+global proc deleteAllLayers
+() {
+
+	deleteAllDisplayLayers ;
+	deleteAllRenderLayers ;
+
+}
+
+
+
+global proc deleteAllDisplayLayers () {
+	string $displayLayers[] = `ls -type displayLayer`;
+
+	for ($each in $displayLayers){
+		if (!`gmatch $each "*defaultLayer*"`){
+			layerEditorDeleteLayer $each;
+			//delete $each;
+			//updateEditorLayer DisplayLayerTab;
+			print ("Deleting Display Layer "+$each+"\n");
+		}
+	}
+
+}
+
+global proc deleteAllRenderLayers () {
+	string $renderLayers[] = `ls -type renderLayer`;
+
+	string $renderLayers[] = `ls -type renderLayer`;
+
+	for ($each in $renderLayers){
+		if (!`gmatch $each "*defaultRenderLayer*"`){
+			renderLayerEditorDeleteLayer RenderLayerTab $each;
+			//delete $each;
+			updateEditorRenderLayer RenderLayerTab;
+			print ("Deleting Render Layer "+$each+"\n");
+		}
+	}
+
+
+
+
+}

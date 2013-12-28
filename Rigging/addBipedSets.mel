@@ -1,0 +1,80 @@
+// addBipedSets
+// Created by: adam
+// Date: 2012/03/23 10:41:19
+
+// adds the sets used for standard bipeds at pandapanther
+global proc addBipedSets(){
+	
+	if (!`objExists SETS`)
+		sets -name SETS;
+		if (!`objExists KEYABLE`){
+			sets -name KEYABLE;	
+			sets -add SETS KEYABLE;
+		}
+			if (!`objExists ALLBODY`){
+				sets -name ALLBODY;
+				sets -add KEYABLE ALLBODY;
+			}
+			if (!`objExists FACE`){	
+				sets -name FACE;
+				sets -add KEYABLE FACE;
+			}
+				if (!`objExists BROWS`){
+					sets -name BROWS;
+					sets -add FACE BROWS;
+				}
+				if (!`objExists EYES`){
+					sets -name EYES;
+					sets -add FACE EYES;
+				}	
+				if (!`objExists MOUTH`){
+					sets -name MOUTH;
+					sets -add FACE MOUTH;
+				}				
+			if (!`objExists L_FINGERS`){
+					sets -name L_FINGERS;
+					sets -add KEYABLE L_FINGERS;
+			}
+			if (!`objExists R_FINGERS`){
+					sets -name R_FINGERS;
+					sets -add KEYABLE R_FINGERS;			
+			}
+		if (!`objExists RES`){
+			sets -name RES;	
+			sets -add SETS RES;
+		}	
+			if (!`objExists UBER`){
+				sets -name UBER;	
+				sets -add RES UBER;
+			}		
+			if (!`objExists HIGH`){
+				sets -name HIGH;	
+				sets -add RES HIGH;
+			}	
+			if (!`objExists MED`){
+				sets -name MED;	
+				sets -add RES MED;
+			}		
+			if (!`objExists LOW`){
+				sets -name LOW;	
+				sets -add RES LOW;
+			}				
+		if (!`objExists SETUP`){
+			sets -name SETUP;	
+			sets -add SETS SETUP;
+		}	
+		if (!`objExists BND_JNTS`){
+			sets -name BND_JNTS;	
+			sets -add SETUP BND_JNTS;
+		}			
+// make available to quick select sets
+setAttr -type "string" "KEYABLE.an" "gCharacterSet";
+setAttr -type "string" "ALLBODY.an" "gCharacterSet";
+setAttr -type "string" "FACE.an" "gCharacterSet";
+setAttr -type "string" "BROWS.an" "gCharacterSet";
+setAttr -type "string" "EYES.an" "gCharacterSet";
+setAttr -type "string" "MOUTH.an" "gCharacterSet";
+setAttr -type "string" "L_FINGERS.an" "gCharacterSet";
+setAttr -type "string" "R_FINGERS.an" "gCharacterSet";
+
+}

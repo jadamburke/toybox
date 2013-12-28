@@ -1,0 +1,17 @@
+global proc greenScreen()
+{
+string $sphereNamer[] = `polySphere -r 1 -sx 20 -sy 20 -ax 0 1 0 -cuv 2 -ch 0`;
+scale -r 1000 1000 1000;
+string $currentPanel = `getPanel -withFocus`;
+string $cameraName = `modelPanel -q -cam $currentPanel`;
+select $cameraName;
+float $tran[] = `xform -q -ws -t`;
+select $sphereNamer;
+xform -t $tran[0] $tran[1] $tran[2];
+string $shaderGroup = `sets -name greenMaterialGroup -renderable true -empty`;
+string $shader = `shadingNode -name greenShader -asShader surfaceShader`;
+setAttr -type double3 ($shader + ".outColor") 0 1 0;
+surfaceShaderList -add $shaderGroup $shader;
+sets -e -forceElement $shaderGroup $sphereNamer[0];
+rename $sphereNamer "greenScreen1";
+}

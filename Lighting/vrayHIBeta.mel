@@ -1,0 +1,57 @@
+// vrayHIBeta
+// Created by: raphe
+// Date: 2012/03/09 11:17:18
+
+global proc vrayHIBeta(){
+
+	if(! `pluginInfo -q -l "vrayformaya"`){
+		loadPlugin "vrayformaya";
+	}
+	
+	setCurrentRenderer vray;
+	evalDeferred("unifiedRenderGlobalsWindow;");
+	
+	evalDeferred("applyPresetToNode \"vraySettings\" \"\" \"\" \"//monkey/resources/maya/2012-x64/presets/attrPresets/VRaySettingsNode/HI.mel\" 1");
+	evalDeferred("applyPresetToNode \"defaultRenderGlobals\" \"\" \"\" \"//monkey/resources/maya/2012-x64/presets/attrPresets/renderGlobals/HI.mel\" 1");
+	//evalDeferred("deleteUI -window unifiedRenderGlobalsWindow");
+
+	$cmd = "";
+	
+	string $scenePath = `file -q -sn`;
+	string $scenePath = `workspace -pp $scenePath`;
+	string $tokenBuffer[];
+	tokenize $scenePath "/" $tokenBuffer;
+	
+	string $shotsFolder = $tokenBuffer[1];
+	string $seq = $tokenBuffer[2];
+	string $shotName = $tokenBuffer[3];
+	string $deptName = $tokenBuffer[4];
+
+	string $jobFolder = `workspace -q -rd`;
+	string $buffer[];
+	tokenize $jobFolder "/" $buffer;
+
+	string $filePath = (`workspace -q -rd`+"scenes/"+$shotsFolder+$buffer[3]+"_defaults.txt");
+
+	if (`filetest -r $filePath`){
+		$fileId = `fopen $filePath "r"` ;
+		string $nextLine = `fgetline $fileId` ;
+		while (size($nextLine) > 0) { 
+			string $cleanLine = strip($nextLine) ; 
+			string $buffer[] ;
+			tokenize $cleanLine "=" $buffer ;
+			string $value = $buffer[1];
+			if(`gmatch $cleanLine "width*"`){
+				$cmd += ("setAttr \"vraySettings.width\" "+$value+";");
+			}
+			if(`gmatch $cleanLine "height*"`){
+				$cmd += ("setAttr \"vraySettings.height\" "+$value+";");
+			}
+			$nextLine = `fgetline $fileId` ; 
+		}
+		print ($cmd);
+		evalDeferred($cmd);
+	}else{
+		print ("Warning: could not find job defaults. Looked here: "+$filePath+"\n");
+	}
+}

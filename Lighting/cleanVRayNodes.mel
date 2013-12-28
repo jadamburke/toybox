@@ -1,0 +1,16 @@
+// cleanVRayNodes
+global proc cleanVRayNodes () {
+
+select `ls -r 1 -type "transform" -type unknown -type unknownDag "vray*"`;
+if (`pluginInfo -q -loaded vrayformaya`){
+	select -add `ls -r 1 -type "VRayEnvironmentPreview" "vray*"`;
+}
+select -d "|vrayEnvironmentPreviewTm";
+select -d "|vrayEnvironmentPreviewTm|vrayEnvironmentPreview";
+
+
+int $numDeleted = size(`ls -sl`);
+delete -hi `ls -sl`;
+print ("Removed "+$numDeleted+" vray preview nodes\n");
+
+}

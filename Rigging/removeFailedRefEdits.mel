@@ -1,0 +1,9 @@
+// removeFailedRefEdits
+
+global proc removeFailedRefEdits () {
+	global string $gReferenceEditorPanel;
+	string $selRef[] = `sceneEditor -q -si $gReferenceEditorPanel`;
+	for ($each in $selRef){
+		referenceEdit -failedEdits true -successfulEdits false -removeEdits $each;
+	}
+}

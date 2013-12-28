@@ -1,0 +1,24 @@
+// scaleKeysMulti
+// Created by: freelanceny18
+// Date: 2013/12/18 12:20:23
+
+// scales the keys at the specified key index
+// good for scaling lots of curves from a variable pivot point
+
+global proc scaleKeysMulti(){
+
+	int $pivotKeyIndex = 0;
+	float $keyScaleAmount = 2;
+	string $animCurves[] = `keyframe -q -name`;
+
+	for ($each in $animCurves){
+
+		float $pivotFrame[] = `keyframe -index $pivotKeyIndex -q $each`;
+		scaleKey  -timeScale $keyScaleAmount -timePivot $pivotFrame[0] $each ;
+	}
+}
+
+// table for 2 at per se
+// 01/19/2013 10:00
+// callback number for adjustments
+// 877-825-9335

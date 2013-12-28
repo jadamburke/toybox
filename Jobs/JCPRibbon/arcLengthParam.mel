@@ -1,0 +1,50 @@
+global proc arcLengthParam() {
+$sel = `ls -sl`;
+$shapeNode = `listRelatives -shapes $sel[0]`;
+$spans = `getAttr ($shapeNode[0]+".spans")`;
+$degree = `getAttr ($shapeNode[0]+".degree")`;
+$spans = $spans+$degree;
+
+float $arcLength;
+vector $cvPos[];
+string $curveReplaceCmd;
+
+
+// rebuild curve to have parameterization 1 to # of knots
+rebuildCurve -ch 0 -rpo 1 -rt 5 -end 1 -kr 2 -kcp 1 -kep 1 -kt 1 -d 3 -tol 0.01 $sel[0];
+
+// attach arcLen dimension
+$arcLenDim = `arcLengthDimension ($sel[0]+".u[0]") `;
+
+for ($i = 0;$i<$spans;$i++){
+	if ($i == 0 )
+		setAttr ($arcLenDim+".uParamValue") $i;
+	if ($i == $spans-1)
+		setAttr ($arcLenDim+".uParamValue") ($i-2);
+	else 
+		setAttr ($arcLenDim+".uParamValue") ($i-1);
+		
+	$arcLength = `getAttr ($arcLenDim+".arcLength")`*.1;
+	float $ppos[] = `pointPosition ($sel[0]+".cv["+$i+"]")`;
+	if ($i == 0){
+		$curveReplaceCmd = ("curve -d 3 -p "+$ppos[0]+" "+$ppos[1]+" "+$ppos[2]+" -k 0 -k 0");
+	}
+	
+	else if ($i == ($spans -1)){
+		$curveReplaceCmd = ($curveReplaceCmd +" -p "+$ppos[0]+" "+$ppos[1]+" "+$ppos[2]+" -k "+$arcLength+" -k "+$arcLength+" "+$sel[0]);
+	}
+	else {
+		$curveReplaceCmd = ($curveReplaceCmd + " -p "+$ppos[0]+" "+$ppos[1]+" "+$ppos[2]+" -k "+$arcLength);
+	}
+}
+print ($curveReplaceCmd+"\n");
+
+eval($curveReplaceCmd);
+
+//select -r curveShape2->arcLengthDimension1 ;
+
+}
+
+
+
+

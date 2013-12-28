@@ -1,0 +1,23 @@
+//   makes a curve from the selected objects rotate pivots
+//   stephenkmann@yahoo.com
+//   07.26.04
+//
+// select points and this will make a curve out of them
+global proc makeCurveVTX ()
+{
+string $sel[] = `ls -sl -fl`;
+//$sel = `sort$sel`;
+if (`size$sel` <= 1)
+	error "you gotta select more stuff\n";
+string $name = ($sel[0] + "curve");
+for ($each in $sel)
+	{
+	float $pnt[] = `pointPosition $each`;
+
+	if ($each == $sel[0])
+		curve -n tempNewCurve -d 3 -p $pnt[0] $pnt[1] $pnt[2];
+	else
+		curve -os -a -p $pnt[0] $pnt[1] $pnt[2] tempNewCurve;
+	}
+rename tempNewCurve $name;
+}

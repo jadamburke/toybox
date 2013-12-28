@@ -1,0 +1,45 @@
+// outlinerDock
+global proc outlinerDock () {
+
+
+if (!`dockControl -q -ex outlinerDock`){
+	string $myWindow = `window`;
+	string $buttonForm = `formLayout -parent $myWindow`;
+	string $panel = `outlinerPanel`;
+	string $outliner = `outlinerPanel -query -outlinerEditor $panel`;
+	outlinerEditor -edit
+	    -mainListConnection "worldList"
+	    -selectionConnection "modelList"
+ 	   -showShapes false
+ 	   -showAttributes false
+ 	   -showConnected false
+	    -showAnimCurvesOnly false
+	    -autoExpand false
+	    -showDagOnly true
+	    -ignoreDagHierarchy false
+	    -expandConnections false
+	    -showCompounds true
+	    -showNumericAttrsOnly false
+	    -highlightActive true
+	    -autoSelectNewObjects false
+	    -doNotSelectNewObjects false
+	    -transmitFilters false
+	    -showSetMembers true
+	    -setFilter defaultSetFilter
+	    $outliner;
+
+
+
+   	 formLayout -e -af $outliner "top" 0 -af $outliner  "bottom" 0 -af $outliner  "left" 0 -af  $outliner "right" 0 $buttonForm;    
+    
+
+
+	dockControl -label "Outliner" -area "left" -fl false -epo true
+	        -content $myWindow
+	        -allowedArea "left"
+	        -allowedArea "right" outlinerDock;
+
+}
+
+
+}

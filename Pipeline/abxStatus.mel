@@ -1,0 +1,66 @@
+// abxAssetsStatusWindow
+// Created by: adam
+// Date: 2012/03/21 16:24:19
+
+global proc abxStatus(){
+
+	abxAssetsStatusWindowShowUI "assets/test/kaosVrayTest" "GEO";
+	
+
+}
+
+global proc abxAssetsStatusWindowShowUI (string $assetPath, string $deptName){
+
+	if (`window -ex abxAssetsStatusWindowWindow` != true)
+	{
+		window -w 210 -h 110 -t ($assetPath+" Status") -in "StatusMan" -menuBar true -s true -tb true abxAssetsStatusWindowWindow;
+		formLayout ppScaleFixFrmLyt;
+		frameLayout -lv 1 -label ($deptName+" Status") -borderStyle "out" ppScaleFixtFrmeLyt;
+		columnLayout  ppScaleFixCL;
+		
+			rowLayout -numberOfColumns 2;
+				separator -vis 0 -w 38;
+				intSlider -w 457 -h 30 -min -2 -max 4 -value 0 -step 1 abxAssetsStatusWindowSlider;
+				setParent ..;
+			rowLayout -cw 1 75 -cw 2 75 -cw 3 75 -cw 4 75 -cw 5 75 -cw 6 75 -cw 7 75 -numberOfColumns 7;
+				button -w 75 -label "Dead" -ann "Dead" -bgc .15 .15 .15 -c "intSlider -e -value -2 abxAssetsStatusWindowSlider;";
+				button -w 75 -label "Hold" -ann "On Hold" -bgc .2 .4 .7 -c "intSlider -e -value -1 abxAssetsStatusWindowSlider;";
+				button -w 75 -label "Not Started" -ann "Not Started" -c "intSlider -e -value 0 abxAssetsStatusWindowSlider;";;
+				button -w 75 -label "In Progress" -ann "Work In Progress" -bgc .7 .5 .3 -c "intSlider -e -value 1 abxAssetsStatusWindowSlider;";; // ORANGE
+				button -w 75 -label "Review" -ann "Review Needed" -bgc .7 .3 .6 -c "intSlider -e -value 2 abxAssetsStatusWindowSlider;";;
+				button -w 75 -label "Approved" -ann "Approved" -bgc .3 .7 .4 -c "intSlider -e -value 3 abxAssetsStatusWindowSlider;";; // GREEN
+				button -w 75 -label "Revise" -ann "Revision Needed" -bgc .7 .3 .3 -c "intSlider -e -value 4 abxAssetsStatusWindowSlider;";; // RED
+			
+		setParent ppScaleFixFrmLyt;
+		rowLayout -numberOfColumns 3 -columnWidth3 177 177 177 -columnAttach 1 "both" 0 -columnAttach 2 "both" 0 -columnAttach 3 "both" 0 ppScaleFixRL;
+		button -label ("Set "+$deptName+" Status")  -c ("abxAssetsStatusWindowSetStatus \""+$assetPath+"\" \""+$deptName+"\";window -e -vis 0 abxAssetsStatusWindowWindow");
+		button -label "Apply" -c ("abxAssetsStatusWindowSetStatus \""+$assetPath+"\" \""+$deptName+"\"");
+		button -label "Cancel" -c "window -e -vis 0 abxAssetsStatusWindowWindow" ;
+		
+		formLayout -e 
+			-af ppScaleFixtFrmeLyt "left" 3
+			-af ppScaleFixtFrmeLyt "top" 3
+			-af ppScaleFixtFrmeLyt "bottom" 35
+			-af ppScaleFixtFrmeLyt "right" 3
+
+			-af ppScaleFixRL "left" 0
+			-ac ppScaleFixRL  "top" 0 ppScaleFixtFrmeLyt
+			-af ppScaleFixRL "bottom" 3
+			-af ppScaleFixRL "right" 3
+			ppScaleFixFrmLyt;
+
+		window -e -w 210 -h 110 abxAssetsStatusWindowWindow;
+		showWindow abxAssetsStatusWindowWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 210 -h 110 abxAssetsStatusWindowWindow;
+		showWindow abxAssetsStatusWindowWindow;
+    	}
+}
+
+
+global proc abxAssetsStatusWindowSetStatus (string $assetPath, string $deptName){
+
+	// get the UI value and set the details
+}

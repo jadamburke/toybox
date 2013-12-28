@@ -1,0 +1,56 @@
+// outputOpenGLIndices
+global proc outputOpenGLIndices() {
+
+
+	// create an array to store the vertex positions
+	float $vertexList[];
+	float $vertexNormalList[];
+	
+
+	// get selected poly shapes
+	$sel = `ls -sl`;
+	for ($each in $sel){
+
+		//duplicate
+		$triPoly = `duplicate $each`;
+
+		// triangulate
+		polyTriangulate -ch 0 $triPoly;
+		
+		// total number of vertices
+		int $vtxCount = `polyEvaluate -v $triPoly`;
+		int $normalsCount = $vtxCount;
+
+
+		for ($v=0;$v<$vtxCount;$v++){
+		// for each vertex in poly shape. (.vrts .vt)
+			float $vtxCoord[] = `pointPosition -l ($triPoly+".vtx["+$v+"]")`;
+			float $normalCoord[] = `polyNormalPerVertex -q -xyz ($triPoly+".vtx["+$v+"]")`;
+
+
+			// add vertex and normal xyz to arrays
+
+			for ($n=0;$n<3;$n++){
+				$vertexList[size($vertexList)] = $vtxCoord[$n];
+				$vertexNormalList[size($vertexNormalList)] = $normalCoord[$n];
+			}
+			
+			
+			
+		
+		}
+
+
+
+		// for each vertex normal in polyShape polyNormalPerVertex -q -xyz
+			// add normals xyz to an array
+
+		// for each triangle in poly shape (.fc)
+			// get the vertices in order to draw the face
+
+		
+	}
+	
+
+
+}

@@ -1,0 +1,74 @@
+// mayaSW_HI
+// Created by: raphe
+// Date: 2012/03/09 11:17:18
+
+global proc mayaSW_HI(){
+	
+	// source the original maya scripts for the render globals window
+	eval("source \""+`getenv MAYA_LOCATION`+"/scripts/others/createMayaSoftwareCommonGlobalsTab.mel\"");
+	eval("source \""+`getenv MAYA_LOCATION`+"/scripts/others/shouldAppearInNodeCreateUI.mel\"");
+	eval("source \""+`getenv MAYA_LOCATION`+"/scripts/others/unifiedRenderGlobalsWindow.mel\"");
+
+	string $renderPresetFound = attributeExists("renderPreset","defaultRenderGlobals");
+	if ($renderPresetFound == 0){
+	    addAttr -ln "renderPreset" -dt "string" defaultRenderGlobals;
+	}
+	
+	setAttr -type "string" defaultRenderGlobals.renderPreset "HI";
+
+	evalDeferred("setCurrentRenderer mayaSoftware;");
+	evalDeferred("unifiedRenderGlobalsWindow;");
+	
+	select -r defaultResolution ;
+	applyPresetToNode "defaultResolution" "" "" (`getenv MAYA_PPTOOLS`+"/presets/attrPresets/resolution/mayaSW_defaults.mel") 1;
+
+	select -r defaultRenderQuality ;
+	applyPresetToNode "defaultRenderQuality" "" "" (`getenv MAYA_PPTOOLS`+"/presets/attrPresets/renderQuality/mayaSW_defaults.mel") 1;
+	applyPresetToNode "defaultRenderQuality" "" "" (`getenv MAYA_PPTOOLS`+"/presets/attrPresets/renderQuality/mayaSW_HI.mel") 1;
+
+	select -r defaultRenderGlobals ;
+	applyPresetToNode "defaultRenderGlobals" "" "" (`getenv MAYA_PPTOOLS`+"/presets/attrPresets/renderGlobals/mayaSW_defaults.mel") 1;
+	applyPresetToNode "defaultRenderGlobals" "" "" (`getenv MAYA_PPTOOLS`+"/presets/attrPresets/renderGlobals/mayaSW_HI.mel") 1;
+
+	$cmd = "";
+	
+	string $scenePath = `file -q -sn`;
+	string $scenePath = `workspace -pp $scenePath`;
+	string $tokenBuffer[];
+	tokenize $scenePath "/" $tokenBuffer;
+	
+	string $shotsFolder = $tokenBuffer[1];
+	string $seq = $tokenBuffer[2];
+	string $shotName = $tokenBuffer[3];
+	string $deptName = $tokenBuffer[4];
+
+	string $jobFolder = `workspace -q -rd`;
+	string $buffer[];
+	tokenize $jobFolder "/" $buffer;
+
+	string $filePath = (`workspace -q -rd`+"scenes/"+$buffer[3]+"_defaults.txt");
+
+	if (`filetest -r $filePath`){
+		$fileId = `fopen $filePath "r"` ;
+		string $nextLine = `fgetline $fileId` ;
+		while (size($nextLine) > 0) { 
+			string $cleanLine = strip($nextLine) ; 
+			string $buffer[] ;
+			tokenize $cleanLine "=" $buffer ;
+			string $value = $buffer[1];
+			if(`gmatch $cleanLine "renderWidth*"`){
+				$cmd += ("setAttr \"defaultResolution.width\" "+$value+";");
+			}
+			if(`gmatch $cleanLine "renderHeight*"`){
+				$cmd += ("setAttr \"defaultResolution.height\" "+$value+";");
+			}
+			$nextLine = `fgetline $fileId` ; 
+		}
+		$cmd += ("setAttr defaultViewColorManager.imageColorProfile 2;");
+		print ($cmd);
+		evalDeferred($cmd);
+	}else{
+		print ("Warning: could not find job defaults. Looked here: "+$filePath+"\n");
+	}
+
+}

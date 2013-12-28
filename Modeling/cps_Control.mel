@@ -1,0 +1,1 @@
+if( `window -q -exists cpsc_ui` ){if( `window -q -iconify cpsc_ui` )window -e -iconify 0 cpsc_ui;else if( !`window -q -visible cpsc_ui` )window -e -visible 1 cpsc_ui;else deleteUI cpsc_ui;}else cpsControl;

@@ -1,0 +1,7 @@
+// zbw_cleanKeys
+// Created by: ? (added by Raphe, sourced by Zeth)
+// Date: ?
+
+global proc zbw_cleanKeys(){
+	python("import zbw_cleanKeys as ck;ck.cleanKeys()");
+}

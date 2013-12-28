@@ -1,0 +1,19 @@
+// clusterWire
+// Created by: adambu
+// Date: 2011/12/04 23:11:12
+
+global proc clusterWire(){
+
+for ($i=1;$i<64;$i++){
+    int $index = $i - 1;
+    float $pos[] = `pointPosition -w ("masterPathLow.cv["+$index+"]")`;
+    xform -t $pos[0] $pos[1] $pos[2] ("pathCtrl"+$i) ;
+    makeIdentity -apply true -t 1 -r 1 -s 1 -n 1 ("pathCtrl"+$i);
+
+    select ("masterPathLow.cv["+$index+"]");
+        
+    cluster -wn ("pathCtrl"+$i) ("pathCtrl"+$i) ;
+}
+
+
+}

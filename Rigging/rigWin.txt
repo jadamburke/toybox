@@ -1,0 +1,4 @@
+ 
+/Users/adam/Maya/Toybox2011/Rigging/source/smStartChar.mel 
+ 
+ 

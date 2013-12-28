@@ -1,0 +1,17 @@
+// combineMeshGroups
+global proc combineMeshGroups () {
+
+	string $groups[] = `ls -type transform -sl`;
+	for ($each in $groups){
+		//lockNode -l 1 $each;
+		string $children[] = `listRelatives -children $each`;
+		$newMesh = `polyUnite -n ($each+"_combined") -ch 0 $children`;
+		//lockNode -l 0 $each;
+		//string $remainingChildren[] = `listRelatives -children $each`;
+		//delete $remainingChildren;
+		//parent $newMesh $each;
+		
+	}	
+
+
+}

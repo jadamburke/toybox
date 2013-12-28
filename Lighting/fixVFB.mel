@@ -1,0 +1,9 @@
+// fixVFB.mel
+// Created by: raphe
+// Date: 2012/03/22 13:24:57
+
+global proc fixVFB(){
+
+	setAttr "vraySettings.vfbSettingsArr" -type Int32Array 0;
+
+}

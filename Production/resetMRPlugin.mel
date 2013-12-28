@@ -1,0 +1,9 @@
+// resetMRPlugin
+
+if (!`exists Mayatomr`){
+	loadPlugin Mayatomr;
+	pluginInfo -edit -autoload true "C:/Program Files/Autodesk/Maya2011/bin/plug-ins/Mayatomr.mll";
+}
+SavePreferences;
+print ("Did it!\n");
+
