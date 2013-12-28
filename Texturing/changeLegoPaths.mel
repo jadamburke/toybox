@@ -1,0 +1,20 @@
+// makeTexturesOnMDrive
+
+global proc changeLegoPaths () {
+
+	string $mayaFiles[] = `ls -type file -type psdFileTex -type mentalrayTexture`;
+
+	for ($each in $mayaFiles){
+		string $texPath = `getAttr ($each+".ftn")`;
+		if ($texPath != ""){
+			 //                    A:/FRIENDS_LEGO_FTP/forNickelodeon/environment/textures/wallbigblocks2.png
+			if (`gmatch $texPath "A:/FRIENDS_LEGO_FTP/forNickelodeon/environment/*"`){
+				int $strSize = size($texPath);
+				string $newPath = ("M:/LegoFriends_PP10109/DROPBOX/CLIENT_IN/062613/"+`substring $texPath 48 $strSize`);
+				print ($newPath+"\n");	
+
+				setAttr -type "string" ($each+".ftn") $newPath;
+			}
+		}
+	}
+}

@@ -1,0 +1,21 @@
+global Proc poleVectorWorldSwitch()
+{
+
+string $son[] = `ls -sl`;
+string $poleVector = $son[0];
+string $masterControl = $son[1];
+string $footControl = $son[2];
+select $poleVector;
+pickWalk -d up;
+pickWalk -d up;
+string $poleVectorGroup[] = `ls -sl`;
+string $pCon[] = `parentConstraint -maintainOffset $masterControl $footControl $poleVectorGroup[0]`;
+
+addAttr -ln "world"  -at double  -min 0 -max 1 -dv 0 $poleVector;
+setAttr -e-keyable true ($poleVector+".world");
+
+string $revNode = `createNode reverse -n ($poleVector+"_world_REV")`;
+connectAttr ($poleVector+".world") ($pCon[0]+"."+$masterControl+"W0");
+connectAttr ($poleVector+".world") ($revNode+".inputX");
+connectAttr ($revNode+".outputX") ($pCon[0]+"."+$footControl+"W1");
+}

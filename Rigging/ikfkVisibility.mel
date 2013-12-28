@@ -1,0 +1,20 @@
+global proc ikfkVisibility()
+{
+//ikFK visibility 
+//select the fk shoulder control, then the pole vector and then the ik control then ikfk switch
+
+string $son[] = `ls -sl`;
+
+string $fkShoulder = $son[0];
+string $poleVector = $son[1];
+string $ikControl = $son[2];
+string $ikfkSwitch = $son[3];
+
+string $revNode = `createNode reverse -n "ikfk_visibility_REV"`;
+
+connectAttr ($ikfkSwitch+".IKFK") ($fkShoulder+".visibility");
+connectAttr ($ikfkSwitch+".IKFK") ($revNode+".inputX");
+connectAttr ($revNode+".outputX") ($poleVector+".visibility");
+connectAttr ($revNode+".outputX") ($ikControl+".visibility");
+
+}

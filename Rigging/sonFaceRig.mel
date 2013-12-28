@@ -1,0 +1,655 @@
+// sonFaceRig
+// Created by: jason
+// Date: 2012/07/13 19:03:55
+
+global proc faceRigWindow(){
+    
+    window -title "face rigging" FRWindow;
+    rowColumnLayout -numberOfColumns 2;
+    
+    button -c "makeTemplate" -label "makeTemplate";
+    
+   
+    checkBox
+         -label "symmetrical"
+         symmetryBox;
+         
+    checkBox
+         -label "jaw"
+         jawBox;
+       
+    checkBox
+         -label "brows"
+         browBox;
+           
+    checkBox
+         -label "nose"
+         noseBox;
+         
+    button -c "finalize" -label "make face";
+
+    
+    showWindow FRWindow;
+    
+}
+
+
+global proc makeTemplate()
+{
+    string $symmetryCheck = `checkBox -q -v symmetryBox`;
+    string $jawCheck = `checkBox -q -v jawBox`;
+    string $browCheck = `checkBox -q -v browBox`;
+    
+    
+    string $faceTemplateGroup = `group -em -n "face_template_GRP"`;
+    
+    string $upperTemp[] = `nurbsPlane -ch on -o on -po 0 -ax 0 0 1 -w 5 -lr .2 -u 3 -n "upper_lip_NRB"`;
+    setAttr ($upperTemp[0]+".ty") .6;
+    
+    string $lowerTemp[] = `nurbsPlane -ch on -o on -po 0 -ax 0 0 1 -w 5 -lr .2 -u 3 -n "lower_lip_NRB"`;
+    setAttr ($lowerTemp[0]+".ty") -.6;    
+    
+    string $tempGroup = `group -em -n "lip_nrb_GRP"`;
+    parent $upperTemp[0] $lowerTemp[0] $tempGroup;
+ 
+    string $mouthParts[] = {$upperTemp[0], $lowerTemp[0]};
+    for($parts in $mouthParts)
+    {
+        string $toCluster[] = {($parts+".cv[0][0:3]"),($parts+".cv[1][0:3]"), ($parts+".cv[2][0:3]"),($parts+".cv[3][0:3]"),($parts+".cv[4][0:3]"),($parts+".cv[5][0:3]")};
+        string $rootName = substitute("_NRB",$parts,"");
+        string $masterTempGroup = `group -em -n ($rootName+"_master_ctl_GRP")`;
+        string $masterControl =  `curve -d 1 -p 3 0 -1 -p -3 0 -1 -p -3 0 1 -p 3 0 1 -p 3 0 -1 -k 0 -k 1 -k 2 -k 3 -k 4 -n ($rootName+"_master_CTL")` ;
+        parent $masterControl $masterTempGroup;
+        parent $masterTempGroup $faceTemplateGroup;
+        string $masterTempConst[] = `parentConstraint $parts $masterTempGroup`;
+        delete $masterTempConst;
+        
+        string $mouthPartControl[];
+        string $mouthPartUse[];
+        string $multPart[];
+        int $x = 1;
+        for($tmp in $toCluster)
+        {
+            select $tmp;
+            string $tempCluster[] = `newCluster " -envelope 1"`;
+            string $nameCluster = `rename ($tempCluster[0]+"Handle")($rootName+"_"+$x+"_CLS")`;
+            string $tempControl = `curve -d 1 -p 0 .5 -.5 -p 0 -.5 -.5 -p 0 -.5 .5 -p 0 .5 .5 -p 0 .5 -.5 -k 0 -k 1 -k 2 -k 3 -k 4 -n ($rootName+"_"+$x+"_CTL")`;
+            string $tempUse = `group -em -n  ($rootName+"_"+$x+"_ctl_USE")`;
+            string $tempControlGroup = `group -em -n ($rootName+"_"+$x+"_ctl_use_GRP")`;
+            parent $tempControl $tempUse;
+            parent $tempUse $tempControlGroup;
+            parent $tempControlGroup $masterControl;
+            string $pConstOne[] = `parentConstraint $nameCluster $tempControlGroup`;
+            delete $pConstOne;
+            parent $nameCluster $tempControl;
+            string $multNode = `createNode multiplyDivide -n ($rootName+"_"+$x+"_MULT")`;
+            setAttr ($multNode+".input2X") -1;
+            setAttr ($multNode+".input2Y") -1;
+            setAttr ($multNode+".input2Z") -1;
+            
+            $mouthPartControl[$x-1] = $tempControl;
+            $mouthPartUse[$x-1] = $tempUse;
+            $multPart[$x-1] = $multNode;
+            $x = $x+1;
+        }
+        
+        if($symmetryCheck == 1)
+        {
+            int $c = 0;
+            while($c < 6)
+            {
+                print ($mouthPartControl[$c]+".translateX");
+                connectAttr ($mouthPartControl[$c]+".translateX") ($multPart[$c]+".input1X");
+                connectAttr ($multPart[$c]+".outputX") ($mouthPartUse[5-$c]+".tx") ;
+                connectAttr ($mouthPartControl[$c]+".translateY") ($mouthPartUse[5-$c]+".translateY");
+                connectAttr ($mouthPartControl[$c]+".translateZ") ($mouthPartUse[5-$c]+".translateZ");
+                
+                connectAttr ($mouthPartControl[$c]+".rotateX") ($mouthPartUse[5-$c]+".rotateX");
+                connectAttr ($mouthPartControl[$c]+".rotateY") ($multPart[$c]+".input1Y");
+                connectAttr ($multPart[$c]+".outputY") ($mouthPartUse[5-$c]+".rotateY");
+                connectAttr ($mouthPartControl[$c]+".rotateZ") ($multPart[$c]+".input1Z");
+                connectAttr ($multPart[$c]+".outputZ") ($mouthPartUse[5-$c]+".rotateZ");
+                
+                connectAttr ($mouthPartControl[$c]+".scaleY") ($mouthPartUse[5-$c]+".scaleY");
+                
+                $c = $c+1;
+            }
+        }
+    }
+    
+    if($jawCheck == 1)
+    {
+        
+        string $jawControlGroup = `group -em -n "jaw_ctl_GRP"`;
+        parent $jawControlGroup $faceTemplateGroup;
+        
+        string $jawOneControl =  `curve -d 1 -p 0.5 0.5 0.5 -p 0.5 0.5 -0.5 -p -0.5 0.5 -0.5 -p -0.5 -0.5 -0.5 -p 0.5 -0.5 -0.5 -p 0.5 0.5 -0.5 -p -0.5 0.5 -0.5 -p -0.5 0.5 0.5 -p 0.5 0.5 0.5 -p 0.5 -0.5 0.5 -p 0.5 -0.5 -0.5 -p -0.5 -0.5 -0.5 -p -0.5 -0.5 0.5 -p 0.5 -0.5 0.5 -p -0.5 -0.5 0.5 -p -0.5 0.5 0.5 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -n "jaw_01_CTL"`;
+        string $jawOneUse = `group -em -n "jaw_01_ctl_USE"`;
+        string $jawOneGroup = `group -em -n "jaw_01_ctl_use_GRP"`;
+        parent $jawOneControl $jawOneUse;
+        parent $jawOneUse $jawOneGroup;
+        
+        string $jawTwoControl =  `curve -d 1 -p 0.3 0.3 0.3 -p 0.3 0.3 -0.3 -p -0.3 0.3 -0.3 -p -0.3 -0.3 -0.3 -p 0.3 -0.3 -0.3 -p 0.3 0.3 -0.3 -p -0.3 0.3 -0.3 -p -0.3 0.3 0.3 -p 0.3 0.3 0.3 -p 0.3 -0.3 0.3 -p 0.3 -0.3 -0.3 -p -0.3 -0.3 -0.3 -p -0.3 -0.3 0.3 -p 0.3 -0.3 0.3 -p -0.3 -0.3 0.3 -p -0.3 0.3 0.3 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -n "jaw_02_CTL"`;
+        string $jawTwoUse = `group -em -n "jaw_02_ctl_USE"`;
+        string $jawTwoGroup = `group -em -n "jaw_02_ctl_use_GRP"`;   
+        parent $jawTwoControl $jawTwoUse;
+        parent $jawTwoUse $jawTwoGroup;
+        
+        parent $jawTwoGroup $jawOneGroup $jawControlGroup;
+           setAttr ($jawOneGroup+".translateZ") -5;
+        
+    }
+ 
+ 
+ 
+  //to make the eyebrows templace
+  if($browCheck ==1)
+  {
+       string $browParts[] = {"left_brow_03_loc", "left_brow_02_loc", "left_brow_01_loc", "mid_brow_loc", "right_brow_01_loc", "right_brow_02_loc", "right_brow_03_loc"};
+       string $browControlGroup = `group -em -n "brow_loc_ctl_GRP"`; 
+       parent $browControlGroup $faceTemplateGroup;
+       
+       string $browControlCount[];
+       string $browUseCount[];
+       int $w = 0;
+       float $q = 4.5;
+       for($tmp in $browParts)
+       {
+          string $control =  `curve -d 1 -p 0.3 0.3 0.3 -p 0.3 0.3 -0.3 -p -0.3 0.3 -0.3 -p -0.3 -0.3 -0.3 -p 0.3 -0.3 -0.3 -p 0.3 0.3 -0.3 -p -0.3 0.3 -0.3 -p -0.3 0.3 0.3 -p 0.3 0.3 0.3 -p 0.3 -0.3 0.3 -p 0.3 -0.3 -0.3 -p -0.3 -0.3 -0.3 -p -0.3 -0.3 0.3 -p 0.3 -0.3 0.3 -p -0.3 -0.3 0.3 -p -0.3 0.3 0.3 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -n ($tmp+"_CTL")`; 
+          string $use = `group -em -n ($tmp+"_ctl_USE")`;
+          string $group = `group -em -n ($tmp+"_ctl_use_GRP")`;
+
+          parent $control $use;
+          parent $use $group;
+          parent $group $browControlGroup;
+          
+          setAttr ($group+".translateX") $q;
+          $browControlCount[$w] = $control;
+          $browUseCount[$w] = $use;
+          
+          $q = $q-1.5;
+          $w = $w+1;
+       }
+        
+       setAttr ($browControlGroup+".ty") 8;
+       
+       if($symmetryCheck == 1)
+       {
+           
+           string $takeOut[] = {"mid_brow_loc_CTL", "mid_brow_loc_ctl_USE"};
+           string $browControls[] = stringArrayRemove ($takeOut,$browControlCount);
+           string $browUses[] = stringArrayRemove ($takeOut,$browUseCount);
+           print $browUseCount;
+           int $c = 0;
+            while($c < 6)
+            {
+                string $multPart = `createNode multiplyDivide -n ($browControls[$c]+"_MULT")`;
+                setAttr ($multPart+".input2X") -1;
+                setAttr ($multPart+".input2Y") -1;
+                setAttr ($multPart+".input2Z") -1;
+                
+                print ($browControls[$c]+".translateX");
+                connectAttr ($browControls[$c]+".translateX") ($multPart+".input1X");
+                connectAttr ($multPart+".outputX") ($browUses[5-$c]+".tx") ;
+                connectAttr ($browControls[$c]+".translateY") ($browUses[5-$c]+".translateY");
+                connectAttr ($browControls[$c]+".translateZ") ($browUses[5-$c]+".translateZ");
+                
+                connectAttr ($browControls[$c]+".rotateX") ($browUses[5-$c]+".rotateX");
+                connectAttr ($browControls[$c]+".rotateY") ($multPart+".input1Y");
+                connectAttr ($multPart+".outputY") ($browUses[5-$c]+".rotateY");
+                connectAttr ($browControls[$c]+".rotateZ") ($multPart+".input1Z");
+                connectAttr ($multPart+".outputZ") ($browUses[5-$c]+".rotateZ");
+                
+                
+                $c = $c+1;
+            } 
+       }
+  }
+    
+}
+
+
+
+
+global proc finalize()
+{
+    string $faceGroup = `group -em -n "face_GRP"`;
+    string $headWorldLoc = `createNode transform -n "head_world_LOC"`;
+    createNode locator -n "head_world_LOCShape" -parent $headWorldLoc;
+    string $orientFixGroup = `group -em -n "orient_fix_GRP"`;
+   
+    //rebuild and delete history of the nurbs
+    rebuildSurface -ch 1 -rpo 1 -rt 0 -end 1 -kr 0 -kcp 0 -kc 0 -su 4 -du 3 -sv 1 -dv 3 -tol 0.01 -fr 0  -dir 2 "upper_lip_NRB";
+    rebuildSurface -ch 1 -rpo 1 -rt 0 -end 1 -kr 0 -kcp 0 -kc 0 -su 4 -du 3 -sv 1 -dv 3 -tol 0.01 -fr 0  -dir 2 "lower_lip_NRB";
+    delete -constructionHistory "upper_lip_NRB";
+    delete "upper_lip_master_ctl_GRP";
+    delete -constructionHistory "lower_lip_NRB";
+    delete "lower_lip_master_ctl_GRP";
+    
+    //make an array of the nurbs and cluster them so we can place the nurbs curves
+   string $mouthParts[] = {"upper_lip_NRB", "lower_lip_NRB"};
+    string $clustersGroupGroup = `group -em -n "lip_nrb_cls_GRP"`;
+    string $theCount[];
+    int $j = 1;
+    for($parts in $mouthParts)
+    {
+        string $toCluster[] = {($parts+".cv[0:1][0:3]"), ($parts+".cv[3][0:3]"), ($parts+".cv[5:6][0:3]")};
+        string $rootName = substitute("_NRB",$parts,"");
+        
+        string $clustersGroup = `group -em -n ($rootName+"_cls_GRP")`;
+        parent $clustersGroup $clustersGroupGroup;
+        for($tmp in $toCluster)
+        {            
+            select $tmp;
+            string $cluster[] = `newCluster " -envelope 1"`;
+            string $nameCluster = `rename ($cluster[0]+"Handle")($rootName+"_"+$j+"_CLS")`;
+            $theCount[$j] = $nameCluster;
+            parent $nameCluster $clustersGroup;
+                        
+            $j = $j+1;
+        }               
+    }
+    
+    
+    
+    
+    //bind the nurbs to the joints
+    
+    
+    //make the controllers and pointConstraint them to the correct clusters
+
+
+    
+    string $rightLipClusters[] = {$theCount[1],$theCount[4]};
+    string $upperLipClusters[] = {$theCount[2]};
+    string $leftLipClusters[] = {$theCount[3],$theCount[6]};
+    string $lowerLipClusters[] = {$theCount[5]};
+    
+    //right lip controller
+    string $rightLipControl[] = `circle -ch on -o on -nr 0 1 0 -n ("right_lip_CTL")`;
+    string $rightLipControlUse = `group -em -n ("right_lip_ctl_USE")`;
+    string $rightLipControlFLP = `group -em -n ("right_lip_ctl_FLP")`;
+    string $rightLipControlGroup = `group -em -n ("right_lip_ctl_use_GRP")`;
+    parent $rightLipControl[0] $rightLipControlUse;
+    parent $rightLipControlUse $rightLipControlFLP;
+    parent $rightLipControlFLP $rightLipControlGroup;
+    
+    //setAttr ($rightLipControlFLP+".scaleX") -1;
+    
+    string $rightLipTempConst[] = `parentConstraint $rightLipClusters $rightLipControlGroup`;
+    delete $rightLipTempConst;
+    
+    
+   
+    //upper lip controller
+    string $upperLipControl[] = `circle -ch on -o on -nr 0 1 0 -n ("upper_lip_CTL")`;
+    string $upperLipControlUse = `group -em -n ("upper_lip_ctl_USE")`;
+    string $upperLipControlFLP = `group -em -n ("upper_lip_ctl_FLP")`;
+    string $upperLipControlGroup = `group -em -n ("upper_lip_ctl_use_GRP")`;
+    parent $upperLipControl[0] $upperLipControlUse;
+    parent $upperLipControlUse $upperLipControlFLP;
+    parent $upperLipControlFLP $upperLipControlGroup;
+    
+    string $upperLipTempConst[] = `parentConstraint $upperLipClusters $upperLipControlGroup`;
+    delete $upperLipTempConst;
+
+ 
+ 
+    //left lip controller
+    string $leftLipControl[] = `circle -ch on -o on -nr 0 1 0 -n ("left_lip_CTL")`;
+    string $leftLipControlUse = `group -em -n ("left_lip_ctl_USE")`;
+    string $leftLipControlFLP = `group -em -n ("left_lip_ctl_FLP")`;
+    string $leftLipControlGroup = `group -em -n ("left_lip_ctl_use_GRP")`;
+    parent $leftLipControl[0] $leftLipControlUse;
+    parent $leftLipControlUse $leftLipControlFLP;
+    parent $leftLipControlFLP $leftLipControlGroup;
+    
+    string $leftLipTempConst[] = `parentConstraint $leftLipClusters $leftLipControlGroup`;
+    delete $leftLipTempConst;
+    
+    
+    //lower lip controller
+    string $lowerLipControl[] = `circle -ch on -o on -nr 0 1 0 -n ("lower_lip_CTL")`;
+    string $lowerLipControlUse = `group -em -n ("lower_lip_ctl_USE")`;
+    string $lowerLipControlFLP = `group -em -n ("lower_lip_ctl_FLP")`;
+    string $lowerLipControlGroup = `group -em -n ("lower_lip_ctl_use_GRP")`;
+    parent $lowerLipControl[0] $lowerLipControlUse;
+    parent $lowerLipControlUse $lowerLipControlFLP;
+    parent $lowerLipControlFLP $lowerLipControlGroup;
+    
+    string $lowerLipTempConst[] = `parentConstraint $lowerLipClusters $lowerLipControlGroup`;
+    delete $lowerLipTempConst; 
+
+    string $loRezControlGroup = `group -em -n "lo_rez_lip_ctl_GRP"`;
+    parent $rightLipControlGroup $upperLipControlGroup $leftLipControlGroup $lowerLipControlGroup $loRezControlGroup;
+   
+    //delete the clusters
+    delete $rightLipClusters $leftLipClusters $upperLipClusters $lowerLipClusters;
+    
+    //make joints for the controllers
+    string $theControllers[] = {$lowerLipControl[0], $upperLipControl[0], $rightLipControl[0], $leftLipControl[0]};
+    string $nurbJointGroup = `group -em -n "nurb_jnt_GRP"`;
+
+    for($controls in $theControllers)
+    {
+        string $jointName = substitute("_CTL",$controls,"_JNT");
+        select -cl;
+        string $theJoint = `joint -n $jointName`;
+        select -cl;
+        parent $theJoint $nurbJointGroup;
+        parentConstraint $controls $theJoint;
+    }
+    
+    //bind the nurbs to the joints
+    skinCluster -mi 1 upper_lip_JNT left_lip_JNT right_lip_JNT upper_lip_NRB;
+    skinCluster -mi 1 lower_lip_JNT left_lip_JNT right_lip_JNT lower_lip_NRB;
+    
+    
+   //make the follicles with joints
+   //make the follicles for the upper lip
+   
+   string $folGroup = `group -em -n "lip_fcl_GRP"`;
+   string $upperFolGroup = `group -em -n "upper_lip_fcl_GRP"`;
+   string $upperFolTrans[];
+   string $upperFolPart[];
+   int $u = 1;
+   while($u < 8)
+   {
+        string $fol = `createNode follicle`;
+        string $folShapeName = `rename $fol("upper_lip_"+$u+"_FCLShape")`;
+        
+        string $folTrans = firstParentOf($folShapeName);
+        string $folTransName = `rename $folTrans("upper_lip_"+$u+"_FCL")`;
+        
+        connectAttr ("upper_lip_NRB.worldMatrix[0]") ($folShapeName+".inputWorldMatrix");
+        connectAttr ("upper_lip_NRB.local") ($folShapeName+".inputSurface");
+        
+        connectAttr ($folShapeName+".outTranslate") ($folTransName+".translate");
+        connectAttr ($folShapeName+".outRotate") ($folTransName+".rotate");
+        
+        parent $folTransName $upperFolGroup;        
+        $upperFolTrans[$u-1] = $folTransName;
+        $upperFolPart[$u-1] = $folShapeName;
+        $u = $u+1;
+        
+    }
+    
+    //make the follicles for the lower lip
+    string $lowerFolGroup = `group -em -n "lower_lip_fcl_GRP"`;
+    parent $upperFolGroup $lowerFolGroup $folGroup;
+    string $lowerFolTrans[];
+    string $lowerFolPart[];
+    int $g = 1;
+    while($g < 6)
+    {
+        string $fol = `createNode follicle`;
+        string $folShapeName = `rename $fol("lower_lip_"+$g+"_FCLShape")`;
+        
+        string $folTrans = firstParentOf($folShapeName);
+        string $folTransName = `rename $folTrans("lower_lip_"+$g+"_FCL")`;
+        
+        connectAttr ("lower_lip_NRB.worldMatrix[0]") ($folShapeName+".inputWorldMatrix");
+        connectAttr ("lower_lip_NRB.local") ($folShapeName+".inputSurface");
+        
+        connectAttr ($folShapeName+".outTranslate") ($folTransName+".translate");
+        connectAttr ($folShapeName+".outRotate") ($folTransName+".rotate");
+        
+        parent $folTransName $lowerFolGroup; 
+        $lowerFolTrans[$g-1] = $folTransName;
+        $lowerFolPart[$g-1] = $folShapeName;
+        $g = $g+1;
+        
+    }
+
+    
+    //place the follicles
+    setAttr ($upperFolPart[0]+".parameterU") .001;
+    setAttr ($upperFolPart[1]+".parameterU") .05;
+    setAttr ($upperFolPart[2]+".parameterU") .25;
+    setAttr ($upperFolPart[3]+".parameterU") .5;
+    setAttr ($upperFolPart[4]+".parameterU") .75;
+    setAttr ($upperFolPart[5]+".parameterU") .95;
+    setAttr ($upperFolPart[6]+".parameterU") .999;
+    
+    setAttr ($lowerFolPart[0]+".parameterU") .05;
+    setAttr ($lowerFolPart[1]+".parameterU") .25;
+    setAttr ($lowerFolPart[2]+".parameterU") .5;
+    setAttr ($lowerFolPart[3]+".parameterU") .75;
+    setAttr ($lowerFolPart[4]+".parameterU") .95;
+    
+    for($tmp in $upperFolPart)
+    {
+        setAttr ($tmp+".parameterV") .5;
+    }
+    
+    for($tmp in $lowerFolPart)
+    {
+        setAttr ($tmp+".parameterV") .5;
+    }
+    
+     //rename the follicles for scripts and stuff
+    string $upperLipOneFol = `rename $upperFolTrans[0]("right_lip_tweak_FCL")`;
+    string $upperLipTwoFol = `rename $upperFolTrans[1]("right_up_lip_tweak_01_FCL")`;
+    string $upperLipThreeFol = `rename $upperFolTrans[2]("right_up_lip_tweak_02_FCL")`;
+    string $upperLipFourFol = `rename $upperFolTrans[3]("up_lip_tweak_FCL")`;
+    string $upperLipFiveFol = `rename $upperFolTrans[4]("left_up_lip_tweak_02_FCL")`;
+    string $upperLipSixFol = `rename $upperFolTrans[5]("left_up_lip_tweak_01_FCL")`;
+    string $upperLipSevenFol = `rename $upperFolTrans[6]("left_lip_tweak_FCL")`;   
+
+    string $lowerLipOneFol = `rename $lowerFolTrans[0]("right_down_lip_tweak_01_FCL")`;
+    string $lowerLipTwoFol = `rename $lowerFolTrans[1]("right_down_lip_tweak_02_FCL")`;
+    string $lowerLipThreeFol = `rename $lowerFolTrans[2]("down_lip_tweak_FCL")`;
+    string $lowerLipFourFol = `rename $lowerFolTrans[3]("left_down_lip_tweak_02_FCL")`;
+    string $lowerLipFiveFol = `rename $lowerFolTrans[4]("left_down_lip_tweak_01_FCL")`;
+    
+    string $lipFollicles[] = {$upperLipOneFol, $upperLipTwoFol, $upperLipThreeFol, $upperLipFourFol, $upperLipFiveFol, $upperLipSixFol, $upperLipSevenFol, $lowerLipOneFol, $lowerLipTwoFol, $lowerLipThreeFol, $lowerLipFourFol, $lowerLipFiveFol};
+    
+    string $jointControlGroup = `group -em -n "lip_joint_ctl_GRP"`;
+    string $jointGroup = `group -em -n "lip_joint_GRP"`;
+    for($tmp in $lipFollicles)
+    {
+        string $rootName = substitute("_FCL",$tmp,"");
+        select -cl;
+        string $folJoint = `joint -n ($rootName+"_JNT")`;
+        select -cl;
+        parent $folJoint $jointGroup;
+        
+        string $folJointController[] = `circle -ch on -o on -nr 0 0 1 -r .3 -n ($rootName+"_CTL")`;
+        string $folJointUse = `group -em -n ($rootName+"_ctl_USE")`;
+        string $folJointFLP = `group -em -n ($rootName+"_ctl_FLP")`;
+        string $folJointGroup = `group -em -n ($rootName+"_ctl_use_GRP")`;
+        parent $folJointController[0] $folJointUse;
+        parent $folJointUse $folJointFLP;
+        parent $folJointFLP $folJointGroup;
+        parentConstraint $folJointController[0] $folJoint;
+        scaleConstraint $folJointController[0] $folJoint;
+        parent $folJointGroup $jointControlGroup;
+        
+        parentConstraint $tmp $folJointGroup;
+        
+        //setAttr ($folJointFLP+".scaleX") -1;
+        
+        
+    }
+    
+    //final organize
+    string $lipGroup = `group -em -n "lips_GRP"`;
+    string $lipScaleGroup = `group -em -n "lips_scale_GRP"`;
+    string $lipDoNotScaleGroup = `group -em -n "lips_do_not_scale_GRP"`;
+    
+    setAttr ($lipDoNotScaleGroup+".inheritsTransform") 0 ;
+    parent $lipScaleGroup $lipDoNotScaleGroup $lipGroup;
+    parent $jointControlGroup $jointGroup $clustersGroupGroup $loRezControlGroup $nurbJointGroup  $lipScaleGroup;
+    parent $folGroup "lip_nrb_GRP" $lipDoNotScaleGroup;
+    parent $lipGroup $faceGroup;
+    
+    
+    string $jawCheck = `checkBox -q -v jawBox`;
+    if($jawCheck == 1)
+    {
+        string $jawJointGroup = `group -em -n "jaw_jnt_GRP"`;
+        parent $jawJointGroup $faceGroup;
+        float $jawOnePos[] = `xform -q -worldSpace -translation "jaw_01_CTL"`;
+        float $jawTwoPos[] = `xform -q -worldSpace -translation "jaw_02_CTL"`;
+        delete "jaw_ctl_GRP";
+        
+        select -cl;
+        string $jawOneJoint = `joint -p $jawOnePos[0] $jawOnePos[1] $jawOnePos[2] -name ("jaw_01_JNT")`;
+        select -cl;
+        string $jawTwoJoint = `joint -p $jawTwoPos[0] $jawTwoPos[1] $jawTwoPos[2] -name ("jaw_02_JNT")`;
+        select -cl;
+        string $jawelJoint = `joint -p $jawOnePos[0] $jawOnePos[1] $jawOnePos[2] -rad 2 -name ("jawel_JNT")`;
+        select -cl;
+        
+        parent $jawTwoJoint $jawOneJoint;
+        parent $jawOneJoint $jawelJoint $jawJointGroup;
+        
+        string $jawController[] = `circle -ch on -o on -nr 0 0 1 -r 1 -n ("jaw_01_CTL")`;
+        string $jawUse = `group -em -n "jaw_01_ctl_USE"`;
+        string $jawGroup = `group -em -n "jaw_01_ctl_use_GRP"`;
+        parent $jawController[0] $jawUse;
+        parent $jawUse $jawGroup;
+        string $tempP[] = `parentConstraint $jawOneJoint $jawGroup`;
+        delete $tempP;
+        parentConstraint $jawController[0] $jawOneJoint;
+        
+        string $jawelController = `curve -d 1 -p -1.207536 0 0.0254483 -p -1.123549 -0.202763 0.0254483 -p -0.920786 -0.28675 0.0254483 -p -0.718023 -0.202763 0.0254483 -p -0.63504 -0.00242492 0.0254483 -p 0.634091 0 0.0254483 -p 0.718023 -0.202763 0.0254483 -p 0.920786 -0.28675 0.0254483 -p 1.123549 -0.202763 0.0254483 -p 1.207536 0 0.0254483 -p 1.123549 0.202763 0.0254483 -p 0.920786 0.28675 0.0254483 -p 0.718023 0.202763 0.0254483 -p 0.634091 0 0.0254483 -p -0.63504 -0.00242492 0.0254483 -p -0.718023 0.202763 0.0254483 -p -0.920786 0.28675 0.0254483 -p -1.123549 0.202763 0.0254483 -p -1.207536 0 0.0254483 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -k 17 -k 18 -n "jawel_CTL"`;
+        select -r ($jawelController+".cv[0:18]");
+        scale 8 8 8;
+        string $jawelUse = `group -em -n "jawel_ctl_USE"`;
+        string $jawelGroup = `group -em -n "jawel_ctl_use_GRP"`;
+        parent $jawelController $jawelUse;
+        parent $jawelUse $jawelGroup;
+        string $tempP[] = `parentConstraint $jawelJoint $jawelGroup`;
+        delete $tempP;
+        parentConstraint $jawelController $jawelJoint;
+        parent $jawGroup $jawelController;
+        parent $jawelGroup $faceGroup;
+        
+        string $sideLipGroup = `group -em -n "side_lip_GRP"`;
+        parent $sideLipGroup $loRezControlGroup;
+        string $sideP[] = `parentConstraint $jawController[0] $jawelController $sideLipGroup`;
+        string $lowerP[] = `parentConstraint -mo $jawController[0] $jawelController $lowerLipControlGroup`;
+        parent $leftLipControlGroup $rightLipControlGroup $sideLipGroup;
+        parent $loRezControlGroup $jawelController;
+        
+        //make the stickylips
+        addAttr -ln "lip_stick"  -at double  -min 0 -max 1 -dv 0 $jawController;
+        setAttr -e-keyable true ($jawController[0]+".lip_stick");
+        
+        string $stickyRev = `createNode reverse -n "sticky_lip_REV"`;
+        connectAttr ($jawController[0]+".lip_stick") ($lowerP[0]+"."+$jawelController+"W1");
+        connectAttr ($jawController[0]+".lip_stick") ($stickyRev+".inputX");
+        connectAttr ($stickyRev+".outputX") ($lowerP[0]+"."+$jawController[0]+"W0");
+        connectAttr ($stickyRev+".outputX") ($sideP[0]+"."+$jawController[0]+"W0");
+        
+    }
+    
+    
+    string $browCheck = `checkBox -q -v browBox`;
+    if($browCheck == 1)
+    {
+        string $browGroup = `group -em -n "brow_GRP"`;
+        string $browControlGroup = `group -em -n "brow_ctl_GRP"`;
+        string $browJointGroup = `group -em -n "brow_jnt_GRP"`;
+        parent $browJointGroup $browControlGroup $browGroup;
+        parent $browGroup $faceGroup;
+        
+        string $browLocs[] = {"right_brow_01_loc_CTL", "right_brow_02_loc_CTL", "right_brow_03_loc_CTL", "mid_brow_loc_CTL", "left_brow_01_loc_CTL", "left_brow_02_loc_CTL", "left_brow_03_loc_CTL"};
+        
+        //make the brow controls
+        string $leftBrowControl  = `curve -d 1 -p 1 0 -1 -p -1 0 -1 -p -1 0 1 -p 1 0 1 -p 1 0 -1 -k 0 -k 1 -k 2 -k 3 -k 4 -n "left_brow_CTL"`;
+        string $leftBrowUse = `group -em -n "left_brow_ctl_USE"`;
+        string $leftBrowGroup = `group -em -n "left_brow_ctl_use_GRP"`;
+        parent $leftBrowControl $leftBrowUse;
+        parent $leftBrowUse $leftBrowGroup;
+        parentConstraint "left_brow_02_loc_CTL" $leftBrowGroup;
+        
+        //make the brow controls
+        string $rightBrowControl  = `curve -d 1 -p 1 0 -1 -p -1 0 -1 -p -1 0 1 -p 1 0 1 -p 1 0 -1 -k 0 -k 1 -k 2 -k 3 -k 4 -n "right_brow_CTL"`;
+        string $rightBrowUse = `group -em -n "right_brow_ctl_USE"`;
+        string $rightBrowGroup = `group -em -n "right_brow_ctl_use_GRP"`;
+        parent $rightBrowControl $rightBrowUse;
+        parent $rightBrowUse $rightBrowGroup;
+        
+        parentConstraint "right_brow_02_loc_CTL" $rightBrowGroup;
+        setAttr ($rightBrowGroup+".scaleX") -1;
+        
+        
+        parent $rightBrowGroup $leftBrowGroup $browControlGroup;
+        
+        
+        int $n = 0;
+        
+        for($brows in $browLocs)
+        {
+            
+            string $rootName = substitute("_loc_CTL",$brows,"");
+            select -cl;
+            string $browJoint = `joint -n ($rootName+"_JNT")`;
+            select -cl;
+            parent $browJoint $browJointGroup;
+            
+            //create and name the controller
+            string $browController[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+            string $browControl = `rename $browController[0] ($rootName + "_CTL")`;
+            
+            //create the group used for automation
+            string $browControlUse = `group -empty -n ($rootName + "_ctl_USE")`;
+            parent $browControl $browControlUse;
+            
+            //create a group for the controller
+            string $browControlGrp = `group -empty -n ($rootName + "_ctl_use_GRP")`;
+            parent $browControlUse $browControlGrp;
+            
+            parentConstraint $browControl $browJoint;
+            
+            string $tpConst[] = `parentConstraint $brows $browControlGrp`;
+            print $tpConst;
+            
+
+            
+            
+            string $underControl = `group -em -n ($rootName+"_orient_FIX")`;
+            parent $underControl $orientFixGroup;
+            parentConstraint $browControl $underControl;
+            
+            
+            delete $brows;
+            delete ($rootName+"_loc_ctl_use_GRP");
+            int $n = $n +1;
+            if($n < 4)
+            {
+                setAttr ($browControlGrp+".scaleX") -1;
+                parent $browControlGrp $rightBrowControl;
+            }
+            
+            if($n > 4)
+            {
+                parent $browControlGrp $leftBrowControl;
+            }
+
+        }
+            
+            string $middleConst[] = `parentConstraint -maintainOffset $headWorldLoc "right_brow_01_orient_FIX" "left_brow_01_CTL" "mid_brow_CTL"`;
+            addAttr -ln "world"  -at double  -min 0 -max 1 -dv 0 "mid_brow_CTL";
+            setAttr -e-keyable true ("mid_brow_CTL.world");
+            string $browRev = `createNode reverse -n "middle_brow_REV"`;
+            
+            connectAttr ("mid_brow_CTL.world") ($middleConst[0]+"."+$headWorldLoc+"W0");
+            connectAttr ("mid_brow_CTL.world") ($browRev+".inputX");
+            connectAttr ($browRev+".outputX") ($middleConst[0]+".right_brow_01_orient_FIXW1");
+            connectAttr ($browRev+".outputX") ($middleConst[0]+"."+"left_brow_01_CTLW2");
+            parent "mid_brow_ctl_use_GRP" $browControlGroup;
+            
+    }
+    
+
+}
+
+
+
+
+global proc sonFaceRig(){faceRigWindow;
+
+}

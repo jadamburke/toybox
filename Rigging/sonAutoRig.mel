@@ -1,0 +1,3097 @@
+// sonAutoRig
+// Created by: jason
+// Date: 2012/07/13 11:12:56
+
+//hurdles
+//
+//only works on YZ axis
+//
+//to do
+// arm and leg pole vector lines need to be put in groups and organized 
+
+
+global proc auto ()
+{
+int $rightCheck;
+
+window -title "go for it" autoWindow;
+rowColumnLayout -numberOfColumns 2;
+
+textField bindJointSet;
+button -c "makeJointSet" -label "JNT Set";
+
+textField leftArmName;
+button -c "arm" -label "Arm";
+button -c "armJoints" -label "armJoints";
+checkBox
+     -label "Right?"
+     -value $rightCheck
+     rightBox ;
+          
+     
+textField backName;
+button -c "back" -label "Back";
+button -c "backJoints" -label "backJoints";
+ intSliderGrp -label "follicleNumber" -field true -fieldMinValue 1 -fieldMaxValue 20 -minValue 1 -maxValue 10 -value 1 numOfFols;
+
+
+textField legName;
+button -c "leg" -label "Leg";
+button -c "legJoints" -label "legJoints";
+textField headName;
+button -c "head" -label "head";
+button -c "headJoints" -label "headJoints";
+button -c "mirrorSetup" -label "mirror";
+button -c "finalizeBiped" -label "finalize biped";
+
+
+////face rig part
+frameLayout -collapsable true -label "face rig";
+button -c "makeFaceTemplate" -label "make template";
+button -c "makeFaceRig" -label "make face rig";
+
+//dynamic chain part
+frameLayout -collapsable true -label "dynamics";
+    textField chainName;
+    button -c "makeChainLoc" -label "make locator";
+    button -c "makeTheChain" -label "make the chain";
+
+
+
+
+
+showWindow autoWindow;
+}
+
+
+global proc makeJointSet()
+{
+string $setName = `textField -q -text bindJointSet`;
+string $bindJointSet = `sets -name ($setName+"bind_joint_SET")`;
+}
+
+
+
+global proc arm()
+{
+///////////////////////////////
+/////////////arm locators/////
+/////////////////////////////
+//query the stuff
+int $rightCheck = `checkBox -q -v rightBox`;
+string $name = `textField -q -text leftArmName`;
+
+
+//make the locators that will place the joints
+string $leftArmGroup = `group -empty -n ($name+"_arm_loc_GRP")`;
+
+string $leftClavicleLoc = `createNode transform -n ($name+"_clavicle_LOC")`;
+createNode locator -n ($name+"_clavicle_LOCShape") -parent $leftClavicleLoc;
+
+string $leftShoulderLoc = `createNode transform -n ($name+"_shoulder_LOC")`;
+createNode locator -n ($name+"_shoulder_LOCShape") -parent $leftShoulderLoc;
+
+string $leftElbowLoc = `createNode transform -n ($name+"_elbow_LOC")`;
+createNode locator -n ($name+"_elbow_LOCShape") -parent $leftElbowLoc;
+string $elbowLocGroup = `group -em -n ($name+"_elbow_aim_GRP")`;
+parent  $leftElbowLoc $elbowLocGroup;
+
+string $leftWristLoc = `createNode transform -n ($name+"_wrist_LOC")`;
+createNode locator -n ($name+"_wrist_LOCShape") -parent $leftWristLoc;
+
+string $leftHandLoc = `createNode transform -n ($name+"_hand_LOC")`;
+createNode locator -n ($name+"_hand_LOCShape") -parent $leftHandLoc;
+setAttr ($leftHandLoc+".localScaleX") 0.2;
+setAttr ($leftHandLoc+".localScaleY") 0.2;
+setAttr ($leftHandLoc+".localScaleZ") 0.2;
+
+string $poleVectorLoc = `createNode transform -n ($name+"_pole_LOC")`;
+createNode locator -n ($name+"_pole_LOCShape") -parent $poleVectorLoc;
+parent $poleVectorLoc $leftElbowLoc;
+setAttr -lock true ($poleVectorLoc+".tx");
+setAttr -lock true ($poleVectorLoc+".ty");
+
+//make the locators that will be upvectors for the aim constraints
+string $elbowUp = `curve -d 1 -p -.05 0 0 -p -.05 .1 0 -p -.15 .1 0 -p 0 .3 0 -p .15 .1 0 -p .05 .1 0 -p .05 0 0 -p -.05 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -n ($name+"_elbow_UP")`;
+parent $elbowUp $leftShoulderLoc;
+
+string $elbowWiggleUp = `curve -d 1 -p -.05 0 0 -p -.05 .1 0 -p -.15 .1 0 -p 0 .3 0 -p .15 .1 0 -p .05 .1 0 -p .05 0 0 -p -.05 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7-n ($name+"_elbow_wiggle_UP")`;
+parent $elbowWiggleUp $leftElbowLoc;
+
+string $aimElbowLoc = `curve -d 1 -p 0 0 0 -p 1 0 0 -p .5 0 .5 -p .5 0 -.5 -p 1 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -n ($name+"_elbow_AIM")` ;
+string $aimElbowLocGroup = `group -em -n ($name+"_elbow_wiggle_aim_GRP")`;
+
+parent $aimElbowLoc $aimElbowLocGroup;
+parent $aimElbowLocGroup $leftElbowLoc;
+setAttr ($aimElbowLocGroup+".translate") 0 0 0;
+
+//string $shoulderUp = `createNode transform -n ($name+"_wrist_UP")`;
+//createNode locator -n ($name+"_shoulder_UPShape") -parent $shoulderUp;
+
+parent $leftClavicleLoc $leftShoulderLoc $leftWristLoc $elbowLocGroup $leftArmGroup;
+ pointConstraint $leftShoulderLoc $leftWristLoc $elbowLocGroup;
+ aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $elbowUp $leftWristLoc $elbowLocGroup;
+ 
+if ($rightCheck == 0)
+    {
+    setAttr ($leftClavicleLoc+".translate") 0 0 0;
+    setAttr ($leftShoulderLoc+".translate") 2 2 0;
+    //setAttr ($leftElbowLoc+".translate") 4 2 0;
+    setAttr ($leftWristLoc+".translate") 6 2 0;
+    setAttr ($leftHandLoc+".translate") 6.3 2 0;
+    setAttr ($elbowWiggleUp+".translate") 0 1 0;
+    setAttr ($elbowUp+".translate") 0 3 0; 
+    setAttr ($poleVectorLoc+".tz") -3;   
+    
+    aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $elbowWiggleUp $leftWristLoc $aimElbowLocGroup;
+    }
+    
+if ($rightCheck == 1)
+    {
+    setAttr ($leftClavicleLoc+".translate") 0 0 0;
+    setAttr ($leftShoulderLoc+".translate") -2 2 0;
+    //setAttr ($leftElbowLoc+".translate") -4 2 0;
+    setAttr ($leftWristLoc+".translate") -6 2 0;
+    setAttr ($leftHandLoc+".translate") -6.3 2 0;
+    setAttr ($elbowWiggleUp+".translate") 0 1 0;
+    setAttr ($elbowUp+".translate") 0 3 0;
+    setAttr ($poleVectorLoc+".tz") 3;
+    
+    aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $elbowWiggleUp $leftWristLoc $aimElbowLocGroup;
+    }
+    
+    
+parent $leftHandLoc $leftWristLoc;
+
+
+
+////////////////////////////
+/////finger locators///////
+//////////////////////////
+
+string $thaFingers[];
+$thaFingers[0] = "_pinky";
+$thaFingers[1] = "_ring";
+$thaFingers[2] = "_middle";
+$thaFingers[3] = "_pointer";
+$thaFingers[4] = "_thumb";
+
+float $i = -.7;
+
+for($tmp in $thaFingers)
+{
+string $baseFingerLoc = `createNode transform -n ($name+$tmp+"_base_LOC")`;
+createNode locator -n ($name+$tmp+"_base_LOCShape") -parent $baseFingerLoc;
+
+string $baseFingerUpLoc = `curve -d 1 -p -.05 0 0 -p -.05 .1 0 -p -.15 .1 0 -p 0 .3 0 -p .15 .1 0 -p .05 .1 0 -p .05 0 0 -p -.05 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -n ($name+$tmp+"_base_UP")`;
+createNode locator -n ($name+$tmp+"_base_UPShape") -parent $baseFingerUpLoc;
+
+string $oneFingerLoc = `createNode transform -n ($name+$tmp+"_one_LOC")`;
+createNode locator -n ($name+$tmp+"_one_LOCShape") -parent $oneFingerLoc;
+
+string $twoFingerLoc = `createNode transform -n ($name+$tmp+"_two_LOC")`;
+createNode locator -n ($name+$tmp+"_two_LOCShape") -parent $twoFingerLoc;
+
+string $threeFingerLoc = `createNode transform -n ($name+$tmp+"_three_LOC")`;
+createNode locator -n ($name+$tmp+"_three_LOCShape") -parent $threeFingerLoc;
+
+string $fourFingerLoc = `createNode transform -n ($name+$tmp+"_four_LOC")`;
+createNode locator -n ($name+$tmp+"_four_LOCShape") -parent $fourFingerLoc;
+
+string $oneFingerUpLoc = `curve -d 1 -p -.05 0 0 -p -.05 .1 0 -p -.15 .1 0 -p 0 .3 0 -p .15 .1 0 -p .05 .1 0 -p .05 0 0 -p -.05 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7  -n ($name+$tmp+"_one_UP")`;
+
+string $twoFingerUpLoc = `curve -d 1 -p -.05 0 0 -p -.05 .1 0 -p -.15 .1 0 -p 0 .3 0 -p .15 .1 0 -p .05 .1 0 -p .05 0 0 -p -.05 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -n ($name+$tmp+"_two_UP")`;
+
+string $threeFingerUpLoc = `curve -d 1 -p -.05 0 0 -p -.05 .1 0 -p -.15 .1 0 -p 0 .3 0 -p .15 .1 0 -p .05 .1 0 -p .05 0 0 -p -.05 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -n ($name+$tmp+"_three_UP")`;
+
+
+parent $twoFingerLoc $threeFingerLoc $fourFingerLoc $oneFingerLoc $baseFingerUpLoc $baseFingerLoc;
+parent $oneFingerUpLoc $oneFingerLoc;
+parent $twoFingerUpLoc $twoFingerLoc;
+parent $threeFingerUpLoc $threeFingerLoc;
+parent $baseFingerLoc $leftHandLoc;
+
+if ($rightCheck == 0)
+{
+setAttr ($baseFingerLoc+".translate") 0 0 $i;
+setAttr ($oneFingerLoc+".translate") .3 0 0;
+setAttr ($twoFingerLoc+".translate") .6 0 0;
+setAttr ($threeFingerLoc+".translate") .9 0 0;
+setAttr ($fourFingerLoc+".translate") 1.2 0 0;
+setAttr ($baseFingerUpLoc+".translate") 0 1 0;
+setAttr ($oneFingerUpLoc+".translate") 0 1 0;
+setAttr ($twoFingerUpLoc+".translate") 0 1 0;
+setAttr ($threeFingerUpLoc+".translate") 0 1 0;
+}
+
+if ($rightCheck == 1)
+{
+setAttr ($baseFingerLoc+".translate") 0 0 $i;
+setAttr ($oneFingerLoc+".translate") -.3 0 0;
+setAttr ($twoFingerLoc+".translate") -.6 0 0;
+setAttr ($threeFingerLoc+".translate") -.9 0 0;
+setAttr ($fourFingerLoc+".translate") -1.2 0 0;
+setAttr ($baseFingerUpLoc+".translate") 0 1 0;
+setAttr ($oneFingerUpLoc+".translate") 0 1 0;
+setAttr ($twoFingerUpLoc+".translate") 0 1 0;
+setAttr ($threeFingerUpLoc+".translate") 0 1 0;
+}
+
+setAttr($baseFingerLoc+".localScaleX") 0.2;
+setAttr($baseFingerLoc+".localScaleY") 0.2;
+setAttr($baseFingerLoc+".localScaleZ") 0.2;
+
+setAttr($oneFingerLoc+".localScaleX") 0.2;
+setAttr($oneFingerLoc+".localScaleY") 0.2;
+setAttr($oneFingerLoc+".localScaleZ") 0.2;
+
+setAttr($twoFingerLoc+".localScaleX") 0.2;
+setAttr($twoFingerLoc+".localScaleY") 0.2;
+setAttr($twoFingerLoc+".localScaleZ") 0.2;
+
+setAttr($threeFingerLoc+".localScaleX") 0.2;
+setAttr($threeFingerLoc+".localScaleY") 0.2;
+setAttr($threeFingerLoc+".localScaleZ") 0.2;
+
+setAttr($fourFingerLoc+".localScaleX") 0.2;
+setAttr($fourFingerLoc+".localScaleY") 0.2;
+setAttr($fourFingerLoc+".localScaleZ") 0.2;
+
+setAttr($baseFingerUpLoc+".localScaleX") 0.2;
+setAttr($baseFingerUpLoc+".localScaleY") 0.2;
+setAttr($baseFingerUpLoc+".localScaleZ") 0.2;
+
+/*setAttr($oneFingerUpLoc+".localScaleX") 0.2;
+setAttr($oneFingerUpLoc+".localScaleY") 0.2;
+setAttr($oneFingerUpLoc+".localScaleZ") 0.2;
+
+setAttr($twoFingerUpLoc+".localScaleX") 0.2;
+setAttr($twoFingerUpLoc+".localScaleY") 0.2;
+setAttr($twoFingerUpLoc+".localScaleZ") 0.2;
+
+setAttr($threeFingerUpLoc+".localScaleX") 0.2;
+setAttr($threeFingerUpLoc+".localScaleY") 0.2;
+setAttr($threeFingerUpLoc+".localScaleZ") 0.2;*/
+
+$i = $i + .5;
+
+//thumb base joint exception
+if($tmp == "_thumb")
+{
+    parent $oneFingerLoc $leftHandLoc;
+    parent $twoFingerLoc $threeFingerLoc $fourFingerLoc $oneFingerLoc;
+    delete $baseFingerLoc;
+}
+}
+
+
+}
+
+
+
+///////////////////////////////////////
+///////////////Back Locators//////////
+/////////////////////////////////////
+
+global proc back()
+{
+string $backName = `textField -q -text backName`;
+
+string $chestLoc = `createNode transform -n ($backName+"chest_LOC")`;
+createNode locator -n ($backName+"chest_LOCShape") -parent $chestLoc;
+
+string $hipLoc = `createNode transform -n ($backName+"hip_LOC")`;
+createNode locator -n ($backName+"hip_LOCShape") -parent $hipLoc;
+
+string $backGroup = `curve -d 1 -p 1 2 0 -p 1 -2 0 -p -1 -2 0 -p -1 2 0 -p 1 2 0 -k 0 -k 1 -k 2 -k 3 -k 4 -n ($backName+"back_loc_GRP")`;
+parent $chestLoc $hipLoc $backGroup;
+
+setAttr ($chestLoc+".translateY") 1;
+setAttr ($hipLoc+".translateY") -1;
+}
+
+
+
+//////////////////////
+/////leg Locators/////
+/////////////////////
+global proc leg()
+{
+//query the name
+string $legName = `textField -q -text "legName"`;
+
+//make the group
+string $legLocGroup = `group -em -n ($legName+"_leg_loc_GRP")`;
+
+//make the locators for all the parts and place them.
+string $upLegLoc = `createNode transform -n ($legName+"_upleg_LOC")`;
+createNode locator -n ($legName+"_upleg_LOCShape") -parent $upLegLoc;
+
+string $downLegLocGroup = `group -em -n ($legName+"_downleg_loc_GRP")`;
+
+string $downLegLoc = `createNode transform -n ($legName+"_downleg_LOC")`;
+createNode locator -n ($legName+"_downleg_LOCShape") -parent $downLegLoc;
+parent $downLegLoc $downLegLocGroup;
+
+string $ankleLoc =  `createNode transform -n ($legName+"_ankle_LOC")`;
+createNode locator -n ($legName+"_ankle_LOCShape") -parent $ankleLoc;
+
+string $ballLoc =  `createNode transform -n ($legName+"_ball_LOC")`;
+createNode locator -n ($legName+"_ball_LOCShape") -parent $ballLoc;
+
+string $toeLoc =  `createNode transform -n ($legName+"_toe_LOC")`;
+createNode locator -n ($legName+"_toe_LOCShape") -parent $toeLoc;
+
+string $polLoc = `createNode transform -n ($legName+"_pol_LOC")`;
+createNode locator -n ($legName+"_pol_LOCShape") -parent $polLoc;
+setAttr -lock true ($polLoc+".tx");
+setAttr -lock true ($polLoc+".ty");
+parent $polLoc $downLegLoc;
+//make upvectors
+string $kneeUP =  `createNode transform -n ($legName+"_knee_UP")`;
+//createNode locator -n ($legName+"_knee_UPShape") -parent $kneeUP;
+
+string $kneeUPGroup = `group -em -n ($legName+"_knee_up_GRP")`;
+parent $kneeUP $kneeUPGroup;
+parent $kneeUPGroup $ankleLoc;
+//setAttr ($kneeUP+"Shape.localScale") .1 .1 .1;
+
+
+//position and constrain locators
+pointConstraint $upLegLoc $ankleLoc $downLegLocGroup;
+setAttr ($ankleLoc+".translate") 0 -3 0;
+setAttr ($ballLoc+".translate") 0 -3.5 1;
+setAttr ($toeLoc+".translate") 0 -3.5 2;
+setAttr ($polLoc+".translateZ") 3;
+setAttr ($kneeUP+".translate") 0 0 5;
+aimConstraint -offset 0 0 0 -weight 1 -aimVector 0 -1 0 -upVector 0 0 1 -worldUpType "object" -worldUpObject $kneeUP $ankleLoc $downLegLocGroup;
+
+parent $upLegLoc $downLegLocGroup $ankleLoc $legLocGroup;
+parent $ballLoc $ankleLoc;
+parent $toeLoc $ballLoc;
+
+//create upvectors for the joint orienting
+string $upLegUp = `createNode transform -n ($legName+"_upLeg_UP")`;
+//createNode locator -n ($legName+"_upLeg_UPShape") -parent $upLegUp;
+parent $upLegUp $upLegLoc;
+setAttr ($upLegUp+".translate") 0 0 2;
+//setAttr ($upLegUp+".localScale") .2 .2 .2;
+
+string $downLegUp = `createNode transform -n ($legName+"_downLeg_UP")`;
+//createNode locator -n ($legName+"_downLeg_UPShape") -parent $downLegUp;
+parent $downLegUp $downLegLoc;
+setAttr ($downLegUp+".translate") 0 0 2;
+//setAttr ($downLegUp+".localScale") .2 .2 .2;
+setAttr -lock true ($downLegUp+".tx");
+setAttr -lock true ($downLegUp+".ty");
+
+string $ankleUp = `createNode transform -n ($legName+"_ankle_UP")`;
+//createNode locator -n ($legName+"_ankle_UPShape") -parent $ankleUp;
+parent $ankleUp $ankleLoc;
+setAttr ($ankleUp+".translate") 0 0 2;
+//setAttr ($ankleUp+".localScale") .2 .2 .2;
+
+
+string $ankleAimLoc =  `createNode transform -n ($legName+"_ankle_AIM")`;
+//createNode locator -n ($legName+"_ankle_AIMShape") -parent $ankleAimLoc;
+parent $ankleAimLoc $ankleLoc;
+setAttr ($ankleAimLoc+".translate") 0 -2 0;
+//setAttr ($ankleAimLoc+"Shape.localScale") .2 .2 .2;
+
+}
+
+
+
+
+//////////////////////////////////////////////////
+////////////head locators////////////////////////
+////////////////////////////////////////////////
+
+global proc head(){
+    
+    
+    string $headName = `textField -q -text headName`;
+
+    string $neckOneLoc =  `createNode transform -n ($headName+"neck_01_LOC")`;
+    createNode locator -n ($headName+"_neck_01_LOCShape") -parent $neckOneLoc;
+    
+    string $neckTwoLoc =  `createNode transform -n ($headName+"neck_02_LOC")`;
+    createNode locator -n ($headName+"_neck_02_LOCShape") -parent $neckTwoLoc;
+    
+    
+    setAttr($neckTwoLoc+".translate") 0 .2 0;
+    
+    string $headLoc =  `createNode transform -n ($headName+"head_LOC")`;
+    createNode locator -n ($headName+"_head_LOCShape") -parent $headLoc;
+    
+    
+    setAttr($headLoc+".translate") 0 .4 0;
+    
+    string $headGroup = `group -em -n ($headName+"head_loc_GRP")`;
+    parent $neckOneLoc $neckTwoLoc $headLoc $headGroup;
+    
+}
+
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+global proc armJoints()
+{
+
+
+select -cl;
+
+//query info needed 
+string $name = `textField -q -text leftArmName`;
+int $rightCheck = `checkBox -q -v rightBox`;
+string $setName = `textField -q -text bindJointSet`;
+string $worldLoc = `createNode transform -n ($name+"_arm_world_LOC")`;
+setAttr ($worldLoc+".visibility") 0;
+createNode locator -n ($name+"_arm_world_LOCShape") -parent $worldLoc;
+
+//groups for oranization
+
+string $fingerControlGroup = `group -em -n ($name+"_finger_ctl_GRP")`;
+string $wiggleUPVGroup = `group -em -n ($name+"_wiggle_upv_GRP")`;
+string $wiggleCTLGroup = `group -em -n ($name+"_wiggle_ctl_GRP")`;
+string $wiggleJNTGroup = `group -em -n ($name+"_wiggle_jnt_GRP")`;
+string $wiggleGroup = `group -em -n ($name+"_wiggle_GRP")`;
+parent $wiggleUPVGroup $wiggleCTLGroup $wiggleJNTGroup $wiggleGroup;
+
+string $clav = ($name+"_clavicle_LOC");
+string $shoulder = ($name+"_shoulder_LOC");
+string $elbow = ($name+"_elbow_LOC");
+string $wrist = ($name+"_wrist_LOC");
+string $hand = ($name+"_hand_LOC");
+string $poleVector = ($name+"_pole_LOC");
+
+float $clavPosition[] = `xform -worldSpace -q -translation $clav`;
+//print $clavPosition;
+
+float $shoulderPosition[] = `xform -worldSpace -q -translation $shoulder`;
+//print $shoulderPosition;
+
+float $elbowPosition[] = `xform -worldSpace -q -translation $elbow`;
+//print $elbowPosition;
+
+float $wristPosition[] = `xform -worldSpace -q -translation $wrist`;
+//print $wristPosition;
+
+float $handPosition[] = `xform -worldSpace -q -translation $hand`;
+
+float $polePosition[] = `xform -worldSpace -q -translation $poleVector`;
+//make the bind joints
+select -cl;
+string $bindClavJnt = `joint -p $clavPosition[0] $clavPosition[1] $clavPosition[2] -name ("bind_"+$name+"_clavicle_JNT")`;
+string $bindShoulderJnt = `joint -p $shoulderPosition[0] $shoulderPosition[1] $shoulderPosition[2] -name ("bind_"+$name+"_shoulder_JNT")`;
+string $bindElbowJnt = `joint -p $elbowPosition[0] $elbowPosition[1] $elbowPosition[2] -name ("bind_"+$name+"_elbow_JNT")`;
+string $bindWristJnt = `joint -p $wristPosition[0] $wristPosition[1] $wristPosition[2] -name ("bind_"+$name+"_wrist_JNT")`;
+string $bindHandJnt = `joint -p $handPosition[0] $handPosition[1] $handPosition[2] -name ("bind_"+$name+"_hand_JNT")`;
+
+if ($rightCheck == 0)
+    {
+    joint -e -zso -oj xyz -sao yup $bindShoulderJnt;
+    joint -e -zso -oj xyz -sao yup $bindElbowJnt;
+    joint -e -zso -oj xyz -sao yup $bindWristJnt;
+    }
+    
+if ($rightCheck == 1)
+    {
+    joint -e -zso -oj xyz -sao ydown $bindShoulderJnt;
+    joint -e -zso -oj xyz -sao ydown $bindElbowJnt;
+    joint -e -zso -oj xyz -sao ydown $bindWristJnt;
+    
+    rotate -r -os 180 0 0 ($bindClavJnt+".rotateAxis");
+    rotate -r -os 0 -180 0 ($bindShoulderJnt+".rotateAxis");
+    rotate -r -os 0 -180 0 ($bindElbowJnt+".rotateAxis");
+    rotate -r -os 0 -180 0 ($bindWristJnt+".rotateAxis");
+    }
+    
+setAttr ($bindClavJnt+".radius") 1;
+setAttr ($bindShoulderJnt+".radius") 1;
+setAttr ($bindElbowJnt+".radius") 1;
+setAttr ($bindWristJnt+".radius") 1;
+select -cl;
+
+sets  -add ($setName+"bind_joint_SET") $bindWristJnt;
+//make fk joints and rig
+string $fkClavJnt = `joint -p $clavPosition[0] $clavPosition[1] $clavPosition[2] -name ("fk_"+$name+"_clavicle_JNT")`;
+string $fkShoulderJnt = `joint -p $shoulderPosition[0] $shoulderPosition[1] $shoulderPosition[2] -name ("fk_"+$name+"_shoulder_JNT")`;
+string $fkElbowJnt = `joint -p $elbowPosition[0] $elbowPosition[1] $elbowPosition[2] -name ("fk_"+$name+"_elbow_JNT")`;
+string $fkWristJnt = `joint -p $wristPosition[0] $wristPosition[1] $wristPosition[2] -name ("fk_"+$name+"_wrist_JNT")`;
+string $fkHandJnt = `joint -p $handPosition[0] $handPosition[1] $handPosition[2] -name ("fk_"+$name+"_hand_JNT")`;
+
+if ($rightCheck == 0)
+    {
+    joint -e -zso -oj xyz -sao yup $fkShoulderJnt;
+    joint -e -zso -oj xyz -sao yup $fkElbowJnt;
+    joint -e -zso -oj xyz -sao yup $fkWristJnt;
+    }
+    
+if ($rightCheck == 1)
+    {
+    joint -e -zso -oj xyz -sao ydown $fkShoulderJnt;
+    joint -e -zso -oj xyz -sao ydown $fkElbowJnt;
+    joint -e -zso -oj xyz -sao ydown $fkWristJnt;
+    
+    rotate -r -os 180 0 0 ($fkClavJnt+".rotateAxis");
+    rotate -r -os 0 -180 0 ($fkShoulderJnt+".rotateAxis");
+    rotate -r -os 0 -180 0 ($fkElbowJnt+".rotateAxis");
+    rotate -r -os 0 -180 0 ($fkWristJnt+".rotateAxis");
+    }
+    
+
+setAttr ($fkClavJnt+".radius") .5;
+setAttr ($fkShoulderJnt+".radius") .5;
+setAttr ($fkElbowJnt+".radius") .5;
+setAttr ($fkWristJnt+".radius") .5;
+
+string $fkJoints[];
+$fkJoints[0] = $fkClavJnt;
+$fkJoints[1] = $fkShoulderJnt;
+$fkJoints[2] = $fkElbowJnt;
+$fkJoints[3] = $fkWristJnt;
+
+print $fkJoints;
+string $fkCurve[];
+string $fkGroup[];
+int $fkNumber = 0;
+for($tmp in $fkJoints)
+{
+string $rootishName = substitute("fk_",$tmp,"");
+string $rootName = substitute("_JNT",$rootishName,"");
+//create and name the controller
+string $controller[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+string $control = `rename $controller[0] ($rootName + "_CTRL")`;
+
+//create the group used for automation
+string $controlUse = `group -empty -n ($rootName + "_ctl_USE")`;
+parent $control $controlUse;
+
+//create a group for the controller
+string $controlGrp = `group -empty -n ($rootName + "_ctl_use_GRP")`;
+parent $controlUse $controlGrp;
+
+//change curvepoint placement
+select -r ($control+".cv[0:7]") ;
+rotate -r -ocp -os 0 0 90 ;
+
+//get the controller over to the joint
+string $tempConstraint[] = `parentConstraint $tmp $controlGrp`;
+delete $tempConstraint [0];
+parentConstraint $control $tmp;
+
+$fkCurve[$fkNumber] = $control;
+$fkGroup[$fkNumber] = $controlGrp;
+$fkNumber = $fkNumber+1;
+print ($fkNumber+"\n");
+}
+print $fkCurve;
+parent $fkGroup[1] $fkCurve[0];
+parent $fkGroup[2] $fkCurve[1];
+parent $fkGroup[3] $fkCurve[2];
+
+
+/////////////////////////////////////
+//make the ik joints and rig/////////
+///////////////////////////////////
+select -cl;
+//string $ikClavJnt = `joint -p $clavPosition[0] $clavPosition[1] $clavPosition[2] -name ("ik_"+$name+"_clavicle_JNT")`;
+string $ikShoulderJnt = `joint -p $shoulderPosition[0] $shoulderPosition[1] $shoulderPosition[2] -name ("ik_"+$name+"_shoulder_JNT")`;
+string $ikElbowJnt = `joint -p $elbowPosition[0] $elbowPosition[1] $elbowPosition[2] -name ("ik_"+$name+"_elbow_JNT")`;
+string $ikWristJnt = `joint -p $wristPosition[0] $wristPosition[1] $wristPosition[2] -name ("ik_"+$name+"_wrist_JNT")`;
+string $ikHandJnt = `joint -p $handPosition[0] $handPosition[1] $handPosition[2] -name ("ik_"+$name+"_hand_JNT")`;
+
+if ($rightCheck == 0)
+    {
+    joint -e -zso -oj xyz -sao yup $ikShoulderJnt;
+    joint -e -zso -oj xyz -sao yup $ikElbowJnt;
+    joint -e -zso -oj xyz -sao yup $ikWristJnt;
+    }
+    
+if ($rightCheck == 1)
+    {
+    joint -e -zso -oj xyz -sao ydown $ikShoulderJnt;
+    joint -e -zso -oj xyz -sao ydown $ikElbowJnt;
+    joint -e -zso -oj xyz -sao ydown $ikWristJnt;
+    
+   
+    rotate -r -os 0 -180 0 ($ikShoulderJnt+".rotateAxis");
+    rotate -r -os 0 -180 0 ($ikElbowJnt+".rotateAxis");
+    rotate -r -os 0 -180 0 ($ikWristJnt+".rotateAxis");
+    }
+    
+
+//setAttr ($ikClavJnt+".radius") .3;
+//setAttr ($ikShoulderJnt+".radius") .3;
+setAttr ($ikElbowJnt+".radius") .3;
+setAttr ($ikWristJnt+".radius") .3;
+
+setAttr ($ikElbowJnt+".preferredAngleY") -5;
+string $IK[] = `ikHandle -sj $ikShoulderJnt -ee $ikWristJnt -sol ikRPsolver -n ($name+"_ikHandle")`;
+string $IKName = ($name+"_ikHandle");
+//make pol vector
+string $poleVector = `curve -d 1 -p -0.866649 0.580842 0 -p -0.0235721 0.946514 0 -p 0.900765 0.377691 0 -p 0.270997 -0.69901 0 -p -0.61271 -0.424756 0 -p -0.450189 0.398006 0 -p 0.189737 0.489424 0 -p 0.535093 -0.0692418 0 -p -0.125148 -0.404441 0 -p -0.0642023 0.0526489 0 -p 0.250682 0.0323338 0 -p 0.0576884 -0.0793993 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -n ($name+"_ikArmPV_CTRL")` ;
+string $polGrp = `group -empty -n ($name + "_elbow_pol_GRP")`;
+parent $poleVector $polGrp;
+string $pointConst[] = `pointConstraint $ikElbowJnt $polGrp`;
+delete $pointConst[0]; 
+setAttr ($polGrp+".translate") $polePosition[0]  $polePosition[1] $polePosition[2];
+poleVectorConstraint -weight 1 $poleVector $IK[0];
+
+//space switching for the pole vector
+string $polPC[] = `parentConstraint -maintainOffset $fkGroup[0] $worldLoc $polGrp`;
+addAttr -ln "world"  -at double  -min 0 -max 1 -dv 0 $poleVector;
+setAttr -e-keyable true ($poleVector+".world");
+string $polRevNode = `createNode reverse -n ($name+"_pol_REV")`;
+
+//make pole vector line
+string $linePre = `curve -d 1 -p 0 0 0 -p 0 1 0 -n ($name+"_arm_polVector_line_CRV")`;
+string $line = `rename $linePre($name+"_arm_polVector_line_CRV")`;
+setAttr ($line+".overrideEnabled") 1;
+setAttr ($line+".overrideDisplayType") 2;
+select ($line+".cv[0]");
+cluster -n ($name+"_arm_polVector_line_01_CLS");
+select ($line+".cv[1]");
+cluster -n ($name+"_arm_polVector_line_02_CLS");
+setAttr ($name+"_arm_polVector_line_01_CLSHandle.visibility") 0;
+setAttr ($name+"_arm_polVector_line_02_CLSHandle.visibility") 0;
+
+parentConstraint $poleVector ($name+"_arm_polVector_line_01_CLSHandle");
+parentConstraint $ikElbowJnt ($name+"_arm_polVector_line_02_CLSHandle");
+
+connectAttr ($poleVector+".world") ($polPC[0]+"."+$worldLoc+"W1");
+connectAttr ($poleVector+".world") ($polRevNode+".inputX");
+connectAttr ($polRevNode+".outputX") ($polPC[0]+"."+$fkGroup[0]+"W0");
+
+string $polLineGroup = `group -em -n ($name+"_arm_polVector_line_GRP")`;
+parent ($name+"_arm_polVector_line_01_CLSHandle") ($name+"_arm_polVector_line_02_CLSHandle") $line $polLineGroup;
+
+//make the wrist controller and shoulder controller
+string $ikControl = `curve -d 1 -p -0.0435891 0.5 -0.856864 -p -0.0435891 0.5 0.856864 -p 1.764201 0.5 0.856864 -p 1.764201 0.5 -0.856864 -p -0.0435891 0.5 -0.856864 -p -0.0435891 -0.5 -0.856864 -p -0.0435891 -0.5 0.856864 -p -0.0435891 0.5 0.856864 -p 1.764201 0.5 0.856864 -p 1.764201 -0.5 0.856864 -p -0.0435891 -0.5 0.856864 -p -0.0435891 -0.5 -0.856864 -p 1.764201 -0.5 -0.856864 -p 1.764201 0.5 -0.856864 -p 1.764201 0.5 0.856864 -p 1.764201 -0.5 0.856864 -p 1.764201 -0.5 -0.856864 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -n ($name+"_ikArm_CTRL")`;
+
+string $ikControlUse = `group -empty -n ("ik_" + $name + "_ctl_USE")`;
+parent $ikControl $ikControlUse;
+
+string $ikControlGrp = `group -empty -n ("ik_" + $name + "_ctl_use_GRP")`;
+parent $ikControlUse $ikControlGrp;
+
+string $ikCtlPConst[] = `parentConstraint $ikWristJnt $ikControlGrp`;
+if($rightCheck == 1)
+    {
+        setAttr ($ikCtlPConst[0]+".target[0].targetOffsetRotateX") 180;
+        select -r ($ikControl+".cv[0:16]");
+        move -r -os -wd -1.7713 0 0 ;
+    }
+
+delete $ikCtlPConst[0];
+
+orientConstraint -maintainOffset $ikControl $ikWristJnt;
+parentConstraint -mo $ikControl $IKName;
+parent $IKName $ikControl;
+
+string $ikShoulderNull = `group -empty -n ("ik_" + $name + "_shoulder_GRP")`;
+string $ikShoulderPConst[] = `parentConstraint $ikShoulderJnt $ikShoulderNull`;
+delete $ikShoulderPConst[0];
+pointConstraint $ikShoulderNull $ikShoulderJnt;
+parentConstraint -mo $fkCurve[0] $ikShoulderNull;
+
+////////////////////////////////////
+//make the ikfk switching//////////
+//////////////////////////////////
+
+string $handAttr = `curve -d 1 -p 0.555246 0.164324 0 -p 0.885357 0.546953 0 -p 0.795327 1.409742 0 -p 0.472719 1.49227 0 -p 0.517734 0.959591 0 -p 0.375186 0.937083 0 -p 0.315166 1.61231 0 -p -0.0974727 1.604808 0 -p -0.0899701 0.922078 0 -p -0.24002 0.907073 0 -p -0.262528 1.447255 0 -p -0.622649 1.417245 0 -p -0.555126 0.847053 0 -p -0.517614 0.494435 0 -p -0.735187 0.62948 0 -p -0.727684 0.929581 0 -p -0.990272 0.907073 0 -p -0.990272 0.464425 0 -p -0.630151 0.00677123 0 -p 0.0675827 -0.218304 0 -p 0.397694 -0.173289 0 -p 0.502729 0.126812 0 -p 0.547744 0.156822 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -k 17 -k 18 -k 19 -k 20 -k 21 -k 22 -n ($name+"_hand_ATT")` ;
+setAttr ($handAttr+".translateZ") -1;
+
+string $handAttGrp = `group -empty -n ($name + "_hand_att_GRP")`;
+parent $handAttr $handAttGrp;
+string $tempHandAttrPConst[] = `pointConstraint $bindWristJnt $handAttGrp`;
+delete $tempHandAttrPConst;
+parentConstraint -mo $bindWristJnt $handAttGrp;
+
+addAttr -ln "IKFK"  -at double  -min 0 -max 1 -dv 0 $handAttr;
+setAttr -e-keyable true ($handAttr+".IKFK");
+
+addAttr -ln "IKstretch"  -at double  -min 0 -max 1 -dv 0 $handAttr;
+setAttr -e-keyable true ($handAttr+".IKstretch");
+
+addAttr -ln "bendy"  -at double  -min 0 -max 1 -dv 0 $handAttr;
+setAttr -e-keyable true ($handAttr+".bendy");
+
+
+string $IKFKRev = `createNode reverse -n ($name+"_arm_ikfk_REV")`;
+connectAttr ($handAttr+".IKFK") ($IKFKRev+".inputX");
+
+//IKFK visibility
+string $ikfkVisRev = `createNode reverse -n ($name+"_arm_IKFK_REV")`;
+
+connectAttr ($handAttr+".IKFK") ($fkCurve[1]+".visibility");
+connectAttr ($handAttr+".IKFK") ($ikfkVisRev+".inputX");
+connectAttr ($ikfkVisRev+".outputX") ($poleVector+".visibility");
+connectAttr ($ikfkVisRev+".outputX") ($ikControl+".visibility");
+
+string $bindJoints[];
+$bindJoints[0] = $bindShoulderJnt; 
+$bindJoints[1] = $bindElbowJnt;
+$bindJoints[2] = $bindWristJnt;
+
+for($tmp in $bindJoints)
+{
+string $theFk = substitute("bind",$tmp,"fk");
+string $theIk = substitute("bind",$tmp,"ik");
+string $constraint[] = `parentConstraint $theIk $theFk $tmp`;
+
+//connectAttr ($handAttr+".IKFK") ($IKFKRev+".inputX");
+connectAttr ($handAttr+".IKFK") ($constraint[0]+"."+$theFk+"W1");
+connectAttr ($IKFKRev+".outputX") ($constraint[0]+"."+$theIk+"W0");
+
+
+}
+
+parentConstraint $fkClavJnt $bindClavJnt;
+
+//add space switching features
+
+
+//shoulder space
+string $shoulderWorldRev = `createNode reverse -name ($name+"_shoulder_world_REV")`;
+
+string $shoulderControlGroupSwitch = substitute("_CTRL",$fkCurve[1],"_ctl_use_GRP");
+
+string $shoulderTransConstraint[] = `parentConstraint -mo -skipRotate x -skipRotate y -skipRotate z -weight 1 $fkCurve[0] $shoulderControlGroupSwitch`;
+string $shoulderRotConstraint[] = `parentConstraint -mo -skipTranslate x -skipTranslate y -skipTranslate z $worldLoc $fkCurve[0] $shoulderControlGroupSwitch`;
+
+addAttr -ln "world"  -at double  -min 0 -max 1 -dv 0 $fkCurve[0];
+setAttr -e-keyable true ($fkCurve[0]+".world");
+
+connectAttr ($fkCurve[0]+".world") ($shoulderRotConstraint[0]+"."+$worldLoc+"W0");
+connectAttr ($fkCurve[0]+".world") ($shoulderWorldRev+".inputX");
+connectAttr ($shoulderWorldRev+".outputX") ($shoulderRotConstraint[0]+"."+$fkCurve[0]+"W1");
+
+
+
+
+
+//////////////////////////////
+////bendy time////////////
+////////////////////////////
+string $masterBendy = `curve -d 1 -p 0 0 1 -p 0 0.5 0.866025 -p 0 0.866025 0.5 -p 0 1 0 -p 0 0.866025 -0.5 -p 0 0.5 -0.866025 -p 0 0 -1 -p 0 -0.5 -0.866025 -p 0 -0.866025 -0.5 -p 0 -1 0 -p 0 -0.866025 0.5 -p 0 -0.5 0.866025 -p 0 0 1 -p 0.707107 0 0.707107 -p 1 0 0 -p 0.707107 0 -0.707107 -p 0 0 -1 -p -0.707107 0 -0.707107 -p -1 0 0 -p -0.866025 0.5 0 -p -0.5 0.866025 0 -p 0 1 0 -p 0.5 0.866025 0 -p 0.866025 0.5 0 -p 1 0 0 -p 0.866025 -0.5 0 -p 0.5 -0.866025 0 -p 0 -1 0 -p -0.5 -0.866025 0 -p -0.866025 -0.5 0 -p -1 0 0 -p -0.707107 0 0.707107 -p 0 0 1 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -k 17 -k 18 -k 19 -k 20 -k 21 -k 22 -k 23 -k 24 -k 25 -k 26 -k 27 -k 28 -k 29 -k 30 -k 31 -k 32 -n ($name+"_arm_bendy_CTL")`;
+string $masterBendyGroup = `group -em -n ($name+"_arm_bendy_ctl_GRP")`;
+parent $masterBendy $masterBendyGroup;
+string $MBConst[] = `parentConstraint ($name+"_elbow_AIM") $masterBendyGroup`;
+delete $MBConst[0];
+parentConstraint -mo $bindElbowJnt $masterBendyGroup;
+parent $masterBendyGroup $wiggleCTLGroup;
+
+int $x = 0;
+string $armJoints[];
+$armJoints[0] = $bindShoulderJnt;
+$armJoints[1] = $bindElbowJnt;
+string $surName = "son";
+for($tmp in $armJoints)
+{
+
+    string $son[];
+
+    if ($x == 0)
+    {
+        $son[0] = $bindShoulderJnt;
+        $son[1] = $bindElbowJnt;
+        $surName = "shoulder";
+    }
+
+    else
+    {
+        $son[0] = $bindElbowJnt;
+        $son[1] = $bindWristJnt;
+        $surName = "elbow";
+    }
+
+    //make joint
+    //make two groups on for rotate one for translate
+    //make the upvector 
+    //attach the upvector to where it needs to be
+    //make the aim constraint 
+    //repeat all once more
+    select -cl;
+    string $baseJoint = `joint -p 0 0 0 -name ($name+"_"+$surName+"_base_wiggle_JNT")`;
+    select -cl;
+    string $baseRotGroup = `group -em -name ($name+"_"+$surName+"_base_wiggle_jnt_USE")`;
+    string $baseTransGroup = `group -em -name ($name+"_"+$surName+"_base_wiggle_jnt_use GRP")`;
+
+    parent $baseJoint $baseRotGroup;
+    parent $baseRotGroup $baseTransGroup;
+    parent $baseTransGroup $wiggleJNTGroup;
+
+    string $baseLocTrans =`createNode transform -n ($name+"_"+$surName+"_base_wiggle_UPV")`;
+    createNode locator -n ($baseLocTrans + "Shape") -p $baseLocTrans;
+    string $baseLocTransControl = `curve -d 1 -p -.05 0 0 -p -.05 1 0 -p -.15 1 0 -p 0 1.3 0 -p .15 1 0 -p .05 1 0 -p .05 0 0 -p -.05 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -n ($name+"_"+$surName+"_base_wiggle_upv_CTL")`;
+    string $baseLocTransControlGroup = `group -em -n ($name+"_"+$surName+"_base_wiggle_upv_ctl_GRP")`;
+    setAttr ($baseLocTrans+".ty") .2;
+
+    string $baseLocGroup = `group -em -name ($name+"_"+$surName+"_base_wiggle_upv_GRP")`;
+    parent $baseLocTrans $baseLocTransControl;
+    parent $baseLocTransControl $baseLocTransControlGroup;
+    parent $baseLocTransControlGroup $baseLocGroup;
+
+
+    parent $baseLocGroup $wiggleUPVGroup;
+    //second one
+
+    select -cl;
+    string $tipJoint = `joint -p 0 0 0 -name ($name+"_"+$surName+"_tip_wiggle_JNT")`;
+    select -cl;
+    string $tipRotGroup = `group -em -name ($name+"_"+$surName+"_tip_wiggle_jnt_USE")`;
+    string $tipTransGroup = `group -em -name ($name+"_"+$surName+"_tip_wiggle_jnt_use GRP")`;
+
+    parent $tipJoint $tipRotGroup;
+    parent $tipRotGroup $tipTransGroup;
+    parent $tipTransGroup $wiggleJNTGroup;
+
+
+    string $tipLocTrans =`createNode transform -n ($name+"_"+$surName+"_tip_wiggle_UPV")`;
+    createNode locator -n ($tipLocTrans + "Shape") -p $tipLocTrans;
+    string $tipLocTransControl = `curve -d 1 -p -.05 0 0 -p -.05 1 0 -p -.15 1 0 -p 0 1.3 0 -p .15 1 0 -p .05 1 0 -p .05 0 0 -p -.05 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -n ($name+"_"+$surName+"_tip_wiggle_upv_CTL")`;
+    string $tipLocTransControlGroup = `group -em -n ($name+"_"+$surName+"_tip_wiggle_upv_ctl_GRP")`;
+    setAttr ($tipLocTrans+".ty") .2;
+
+    string $tipLocGroup = `group -em -name ($name+"_"+$surName+"_tip_wiggle_upv_GRP")`;
+    parent $tipLocTrans $tipLocTransControl;
+    parent $tipLocTransControl $tipLocTransControlGroup;
+    parent $tipLocTransControlGroup $tipLocGroup;
+
+    parent $tipLocGroup $wiggleUPVGroup;
+
+    //make the middle thingy
+
+    string $bendyControl = `joint -p 0 0 0 -name ($name+"_"+$surName+"_wiggle_CTL")`;
+    string $bendyRot = `group -em -name ($name+"_"+$surName+"_wiggle_ctl_USE")`;
+    string $bendyTrans = `group -em -name ($name+"_"+$surName+"_wiggle_ctl_use_GRP")`;
+
+    string $wiggleCurve[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1 -n ($name+"_"+$surName+"_Curve")`;
+    select -r ($wiggleCurve[0]+".cv[0:7]") ;
+    rotate -r -ocp -os 0 0 90 ;
+    parent -r -s ($name+"_"+$surName+"_CurveShape") $bendyControl;
+    delete $wiggleCurve[0];
+
+    parent $bendyControl $bendyRot;
+    parent $bendyRot $bendyTrans;
+    parent $bendyTrans $wiggleCTLGroup;
+
+    string $bendyLocTrans =`createNode transform -n ($bendyControl+"_UPV")`;
+    createNode locator -n ($bendyLocTrans + "Shape") -p $bendyLocTrans;
+    setAttr ($bendyLocTrans+".ty") .2;
+
+    string $bendyLocGroup = `group -em -name ($bendyControl+"_upv_GRP")`;
+    parent $bendyLocTrans $bendyLocGroup;
+
+    parent $bendyLocGroup $wiggleUPVGroup;
+    //everything is in place. time for the aim constraints!
+
+
+    aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $baseLocTrans $bendyControl $baseRotGroup;
+    aimConstraint  -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $tipLocTrans $bendyControl $tipRotGroup;
+
+    if($x == 0)
+        {
+            parentConstraint $masterBendy $bendyLocGroup;
+            pointConstraint $son[0] $baseTransGroup;
+            parentConstraint $son[0] $baseLocGroup;
+            pointConstraint $masterBendy $tipTransGroup;
+            parentConstraint $masterBendy $tipLocGroup;
+            pointConstraint $son[0] $masterBendy $bendyTrans;
+            aimConstraint  -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $bendyLocTrans $masterBendy $bendyRot;
+        }
+
+    else
+        {
+            string $upvTempConst[] = `parentConstraint $son[1] $bendyLocGroup`;
+            setAttr ($bendyLocGroup+".rotate") 0 0 0;
+            parentConstraint -mo $son[1] $bendyLocGroup;
+            pointConstraint $masterBendy $baseTransGroup;
+            parentConstraint $masterBendy $baseLocGroup;
+            pointConstraint $son[1] $tipTransGroup;
+            parentConstraint $son[1] $tipLocGroup;
+            pointConstraint $son[1] $masterBendy $bendyTrans;
+            aimConstraint  -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $bendyLocTrans $son[1] $bendyRot;
+        }
+        
+    sets  -add ($setName+"bind_joint_SET") $bendyControl $tipJoint $baseJoint;
+
+    $x = $x+1;
+}
+
+/////////////////////////////////////////////
+///////////Stretchy time////////////////////
+///////////////////////////////////////////
+
+string $longIKLoc1[] = `spaceLocator -p 0 0 0 -n ($name+"_stretchy_ik_1_LOC")`;
+string $longIKLoc2[] = `spaceLocator -p 0 0 0 -n ($name+"stretchy_ik_2_LOC")`;
+string $grp = `group -em`;
+string $grpName = `rename $grp($name+"stretchy_ik_loc_GRP")`;
+parent $longIKLoc1[0] $grpName;
+parent $longIKLoc2[0] $grpName;
+
+
+pointConstraint $ikShoulderNull $longIKLoc1[0];
+pointConstraint $ikControl $longIKLoc2[0];
+
+
+
+string $ikStretchyDist = `createNode distanceBetween -n ($name+"_stretchy_ik_DIST")`;
+
+string $ikStretchyMult = `createNode multiplyDivide -n ($name+"_stretchy_ik_MULT")`;
+
+string $ikStretchyClmp = `createNode clamp -n ($name+"_stretchy_ik_CLMP")`;
+
+string $ikStretchyBlnd = `createNode blendColors -n ($name+"_stretchy_ik_BLND")`;
+
+
+connectAttr -f ($longIKLoc1[0]+".translate") ($ikStretchyDist+".point1");
+connectAttr -f ($longIKLoc2[0]+".translate") ($ikStretchyDist+".point2");
+
+
+
+connectAttr -f ($ikStretchyDist+".distance") ($ikStretchyMult+".input1X");
+
+setAttr ($ikStretchyMult+".operation") 2;
+float $origDist = `getAttr ($ikStretchyDist+".distance")`;
+setAttr ($ikStretchyMult+".input2X") $origDist;
+print $origDist;
+
+
+
+connectAttr -f ($ikStretchyMult+".outputX") ($ikStretchyClmp+".inputR");
+
+setAttr ($ikStretchyClmp+".minR") 1;
+setAttr ($ikStretchyClmp+".maxR") 20;
+
+connectAttr -f ($ikStretchyClmp+".outputR") ($ikStretchyBlnd+".color1R");
+
+setAttr ($ikStretchyBlnd+".color2R") 1;
+
+connectAttr -f ($ikStretchyBlnd+".outputR") ($ikShoulderJnt+".scaleX");
+connectAttr -f ($ikStretchyBlnd+".outputR") ($ikElbowJnt+".scaleX");
+
+connectAttr -f ($handAttr+".IKstretch") ($ikStretchyBlnd+".blender");
+
+
+
+
+//////////////////////////////////////////
+////////////fingers//////////////////////
+////////////////////////////////////////
+
+string $thaFingers[];
+$thaFingers[0] = "_thumb";
+$thaFingers[1] = "_ring";
+$thaFingers[2] = "_middle";
+$thaFingers[3] = "_pointer";
+$thaFingers[4] = "_pinky";
+
+//add finger attributes to the hand ATT controller
+addAttr -ln "pointer_one_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".pointer_one_curl");
+
+addAttr -ln "pointer_two_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".pointer_two_curl");
+
+addAttr -ln "pointer_three_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".pointer_three_curl");
+
+addAttr -ln "middle_one_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".middle_one_curl");
+
+addAttr -ln "middle_two_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".middle_two_curl");
+
+addAttr -ln "middle_three_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".middle_three_curl");
+
+addAttr -ln "ring_one_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".ring_one_curl");
+
+addAttr -ln "ring_two_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".ring_two_curl");
+
+addAttr -ln "ring_three_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".ring_three_curl");
+
+addAttr -ln "pinky_one_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".pinky_one_curl");
+
+addAttr -ln "pinky_two_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".pinky_two_curl");
+
+addAttr -ln "pinky_three_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".pinky_three_curl");
+
+addAttr -ln "thumb_one_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".thumb_one_curl");
+
+addAttr -ln "thumb_two_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".thumb_two_curl");
+
+addAttr -ln "thumb_three_curl"  -at double  $handAttr;
+setAttr -e-keyable true ($handAttr+".thumb_three_curl");
+
+for($tmp in $thaFingers)
+{
+    //strings for the base stuff
+    string $fingerBase;
+    float $fingerBasePosition[];
+    string $fingerBaseJoint;
+    if($tmp != "_thumb")
+    {
+      $fingerBase = ($name+$tmp+"_base_LOC");  
+    }
+    string $fingerOne = ($name+$tmp+"_one_LOC");
+    string $fingerTwo = ($name+$tmp+"_two_LOC");
+    string $fingerThree = ($name+$tmp+"_three_LOC");
+    string $fingerFour = ($name+$tmp+"_four_LOC");
+    string $fingerBaseUp = ($name+$tmp+"_base_UP");
+    string $fingerOneUp = ($name+$tmp+"_one_UP");
+    string $fingerTwoUp = ($name+$tmp+"_two_UP");
+    string $fingerThreeUp = ($name+$tmp+"_three_UP");
+    
+    if($tmp != "_thumb")
+    {
+        $fingerBasePosition = `xform -worldSpace -q -translation $fingerBase`;
+    }
+    float $fingerOnePosition[] = `xform -worldSpace -q -translation $fingerOne`;
+    float $fingerTwoPosition[] = `xform -worldSpace -q -translation $fingerTwo`;
+    float $fingerThreePosition[] = `xform -worldSpace -q -translation $fingerThree`;
+    float $fingerFourPosition[] = `xform -worldSpace -q -translation $fingerFour`;
+    
+    select -cl;
+    if($tmp != "_thumb")
+    {
+        $fingerBaseJoint = `joint -p $fingerBasePosition[0] $fingerBasePosition[1] $fingerBasePosition[2] -name ($name+$tmp+"_base_JNT")`;
+    } 
+    string $fingerOneJoint = `joint -p $fingerOnePosition[0] $fingerOnePosition[1] $fingerOnePosition[2] -name ($name+$tmp+"_one_JNT")`;
+    
+    string $fingerTwoJoint = `joint -p $fingerTwoPosition[0] $fingerTwoPosition[1] $fingerTwoPosition[2] -name ($name+$tmp+"_two_JNT")`;
+    
+    string $fingerThreeJoint = `joint -p $fingerThreePosition[0] $fingerThreePosition[1] $fingerThreePosition[2] -name ($name+$tmp+"_three_JNT")`;
+    
+    string $fingerFourJoint = `joint -p $fingerFourPosition[0] $fingerFourPosition[1] $fingerFourPosition[2] -name ($name+$tmp+"_four_JNT")`;
+    
+    parent -w $fingerFourJoint $fingerThreeJoint $fingerTwoJoint;
+
+    if($tmp != "_thumb")
+    {
+         parent -w $fingerOneJoint;
+        sets -add ($setName+"bind_joint_SET") $fingerBaseJoint;
+    } 
+    sets  -add ($setName+"bind_joint_SET") $fingerOneJoint $fingerTwoJoint $fingerThreeJoint;
+    
+    
+    if ($rightCheck == 0)
+    {
+        if($tmp != "_thumb")
+        {
+        string $fingerBaseAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $fingerBaseUp $fingerOneJoint $fingerBaseJoint`;
+        delete $fingerBaseAim;
+        }
+        string $fingerOneAim[] = `aimConstraint  -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $fingerOneUp $fingerTwoJoint $fingerOneJoint`;
+        string $fingerTwoAim[] = `aimConstraint  -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $fingerTwoUp $fingerThreeJoint $fingerTwoJoint`;
+        string $fingerThreeAim[] = `aimConstraint  -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject $fingerThreeUp $fingerFourJoint $fingerThreeJoint`;
+        delete $fingerOneAim[0] $fingerTwoAim[0] $fingerThreeAim[0];
+    
+    
+    }
+    
+    if ($rightCheck == 1)
+    {
+        if($tmp != "_thumb")
+        {
+        string $fingerBaseAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 -1 0 -worldUpType "object" -worldUpObject $fingerBaseUp $fingerOneJoint $fingerBaseJoint`;
+        delete $fingerBaseAim;
+        }
+        string $fingerOneAim[] = `aimConstraint  -weight 1 -aimVector -1 0 0 -upVector 0 -1 0 -worldUpType "object" -worldUpObject $fingerOneUp $fingerTwoJoint $fingerOneJoint `;
+        string $fingerTwoAim[] = `aimConstraint  -weight 1 -aimVector -1 0 0 -upVector 0 -1 0 -worldUpType "object" -worldUpObject $fingerTwoUp $fingerThreeJoint $fingerTwoJoint `;
+        string $fingerThreeAim[] = `aimConstraint  -weight 1 -aimVector -1 0 0 -upVector 0 -1 0 -worldUpType "object" -worldUpObject $fingerThreeUp $fingerFourJoint $fingerThreeJoint`;
+        delete $fingerOneAim[0] $fingerTwoAim[0] $fingerThreeAim[0];
+        
+    }
+    
+    parent $fingerFourJoint $fingerThreeJoint;
+    parent $fingerThreeJoint $fingerTwoJoint;
+    parent $fingerTwoJoint $fingerOneJoint;
+    parent $fingerOneJoint $bindHandJnt;
+    if($tmp != "_thumb")
+    {
+    parent $fingerOneJoint $fingerBaseJoint;
+    parent $fingerBaseJoint $bindHandJnt;
+    }
+    
+    
+    string $fingerControllies[];
+    if($tmp != "_thumb")
+    {
+        $fingerControllies[0] = $fingerBaseJoint;
+        $fingerControllies[1] = $fingerOneJoint;
+        $fingerControllies[2] = $fingerTwoJoint;
+        $fingerControllies[3] = $fingerThreeJoint;
+        print "happenin\n";
+    }
+    
+    if($tmp == "_thumb")
+    {       
+
+        $fingerControllies[0] = $fingerOneJoint;
+        $fingerControllies[1] = $fingerTwoJoint;
+        $fingerControllies[2] = $fingerThreeJoint;
+        print ("dude"+$fingerControllies[3]+"\n");
+    }
+    
+    string $jointyController[];
+    string $jointyGroup[];
+    
+    int $p = 0;
+    
+    for ($jointy in $fingerControllies)
+    {
+        print ("son_"+$p+"\n");
+        string $fingerJointName = substitute("_JNT",$jointy,"");
+        
+        //create and name the controller
+        string $fingerController[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+        string $fingerControl = `rename $fingerController[0] ($fingerJointName+"_CTL")`;
+        
+        select -r ($fingerControl+".cv[0:7]");
+        rotate -r -ocp -os 0 0 -90 ;
+        scale -r -ocp 0.4 0.4 0.4 ;
+        
+        //create the group used for automation
+        string $fingerControlUse = `group -empty -n ($fingerJointName+"_ctl_USE")`;
+        //print ("son_"+$fingerControl+"___"+$fingerControlUse+"\n");
+        parent $fingerControl $fingerControlUse;
+        
+        //create a group for the controller
+        string $fingerControlGrp = `group -empty -n ($fingerJointName+"_ctl_use_GRP")`;
+        parent $fingerControlUse $fingerControlGrp;
+        
+        string $fingerParentConst[] = `parentConstraint $jointy $fingerControlGrp`;
+        delete $fingerParentConst[0];
+        parentConstraint $fingerControl $jointy;
+        
+        $jointyController[$p] = $fingerControl;
+        $jointyGroup[$p] = $fingerControlGrp;
+        if($jointy != $fingerBaseJoint)
+        {
+            //connect the ctl_USE to the correct finger attribute
+            string $fingerPartRootName1 = substitute($name+"_",$fingerControl,"");
+            string $fingerPartRootName2 = substitute("_CTL",$fingerPartRootName1,"");
+            connectAttr ($handAttr+"."+$fingerPartRootName2+"_curl") ($fingerControlUse+".rz");
+        }
+        $p = $p+1;
+    }
+    
+    if($tmp != "_thumb")
+    {
+ //       print ("son_"+$jointyController[2]+"\n");
+        parent $jointyGroup[3] $jointyController[2];
+    }
+    parent $jointyGroup[2] $jointyController[1];
+    parent $jointyGroup[1] $jointyController[0];
+    parent $jointyGroup[0] $fingerControlGroup;
+    parentConstraint -mo $bindHandJnt $jointyGroup[0];
+}
+
+
+
+
+
+
+///////////////////////////////
+////make the fk pol vector for the ikfk snap
+//////////////////////////////
+
+string $fkPol= `createNode transform -n ($name+"_fk_POL")`;
+createNode locator -n ($name+"_fk_POLShape") -parent $fkPol;
+
+setAttr ($fkPol+".translate") $polePosition[0]  $polePosition[1] $polePosition[2];
+parentConstraint -maintainOffset ($name+"_shoulder_CTRL") $fkPol;
+setAttr ($fkPol+".visibility") 0;
+
+
+
+
+//LAST ORGANIZE!!!!!
+
+//grouping
+string $jointGroup = `group -em -n ($name+"_jnt_GRP")`;
+parent $bindClavJnt $fkClavJnt $ikShoulderJnt $jointGroup;
+
+string $ikControlGroup = `group -em -n ($name+"_ik_ctl_GRP")`;
+parent $ikControlGrp $ikShoulderNull $polGrp $ikControlGroup;
+
+string $controlGroup = `group -em -n ($name+"_ctl_GRP")`;
+parent $fkGroup[0] $ikControlGroup $handAttGrp $fingerControlGroup $controlGroup;
+
+string $locGroup = `group -em -n ($name+"_loc_GRP")`;
+parent $grpName $locGroup;
+
+string $forAnimScriptsGroup = `group -em -n ($name+"_anim_GRP")`;
+parent $fkPol $forAnimScriptsGroup;
+
+string $armScaleGroup = `group -em -n ($name+"_arm_scale_GRP")`;
+parent $jointGroup $controlGroup $worldLoc $wiggleGroup $locGroup $forAnimScriptsGroup $armScaleGroup;
+
+string $armDoNotScaleGroup = `group -em -n ($name+"_arm_do_not_scale_GRP")`;
+setAttr ($armDoNotScaleGroup+".inheritsTransform") 0;
+parent $polLineGroup $armDoNotScaleGroup;
+
+string $armGroup = `group -em -n ($name+"_arm_GRP")`;
+parent $armScaleGroup $armDoNotScaleGroup $armGroup;
+
+
+
+
+
+
+//visibility
+setAttr ($wiggleUPVGroup+".visibility") 0;
+setAttr ($grpName+".visibility") 0;
+
+connectAttr ($handAttr+".bendy") ($wiggleCTLGroup+".visibility");
+
+
+//add bind joints to joint set
+sets  -add ($setName+"bind_joint_SET") $bindClavJnt ;
+};
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/////////////////////
+////back rig////////
+///////////////////
+
+global proc backJoints()
+{
+
+string $setName = `textField -q -text bindJointSet`;
+string $backName = `textField -q -text backName`;
+string $fclGroup = `group -em -n ($backName+"back_fcl_GRP")`;
+string $backJointGroup = `group -em -n ($backName+"back_jnt_GRP")`;
+string $backControlGroup = `group -em -n ($backName+"back_ctl_GRP")`;
+string $backJointControlGroup = `group -em -n ($backName+"back_jnt_ctl_GRP")`;
+string $backClusterGroup = `group -em -n ($backName+"back_cls_GRP")`;
+string $backScaleGroup = `group -em -n ($backName+"back_scale_GRP")`;
+string $backDontScaleGroup = `group -em -n ($backName+"back_dont_scale_GRP")`;
+setAttr ($backDontScaleGroup+".inheritsTransform") 0;
+string $backGroup = `group -em -n ($backName+"back_GRP")`;
+parent $backClusterGroup $backControlGroup $backJointControlGroup $backJointGroup $backScaleGroup;
+parent $fclGroup $backDontScaleGroup;
+parent $backDontScaleGroup $backScaleGroup $backGroup;
+
+
+
+float $cP[] = `xform -worldSpace -q -translation ($backName+"chest_LOC")`;
+float $hP[] = `xform -worldSpace -q -translation ($backName+"hip_LOC")`;
+
+string $chestCurve = `curve -d 1 -p ($cP[0]-1) $cP[1] $cP[2] -p ($cP[0]+1) $cP[1] $cP[2] -k 0 -k 1`;
+string $hipCurve = `curve -d 1 -p ($hP[0]-1) $hP[1] $hP[2] -p ($hP[0]+1) $hP[1] $hP[2] -k 0 -k 1`;
+
+string $backNurb[] = `loft -ch 1 -u 1 -c 0 -ar 1 -d 3 -ss 1 -rn 0 -po 0 -rsn true -n ($backName+"back_NRB") $chestCurve $hipCurve`; 
+setAttr ($backNurb[0]+".visibility") 0;
+delete $chestCurve;
+delete $hipCurve;
+parent $backNurb[0] $backDontScaleGroup;
+
+select -cl;
+select -tgl ($backNurb[0]+".cv[0:1]") ($backNurb[0]+".cv[4:5]");
+string $chestCluster[] = `newCluster " -envelope 1"`;
+string $chestClusterName = `rename ($chestCluster[0]+"Handle")($backName+"chest_CLS")`;
+setAttr ($chestClusterName+".scalePivot") $cP[0] $cP[1] $cP[2];
+setAttr ($chestClusterName+".rotatePivot") $cP[0] $cP[1] $cP[2];
+parent $chestClusterName $backClusterGroup;
+
+select -cl;
+select -tgl ($backNurb[0]+".cv[2:3]") ($backNurb[0]+".cv[6:7]");
+string $hipCluster[] = `newCluster " -envelope 1"`;
+string $hipClusterName = `rename ($hipCluster[0]+"Handle")($backName+"hip_CLS")`;
+setAttr ($hipClusterName+".scalePivot") $hP[0] $hP[1] $hP[2];
+setAttr ($hipClusterName+".rotatePivot") $hP[0] $hP[1] $hP[2];
+parent $hipClusterName $backClusterGroup;
+
+string $chestControl = `curve -d 1 -p -1.063246 0.5 1.063246 -p 1.063246 0.5 1.063246 -p 1.063246 0.5 -1.063246 -p -1.063246 0.5 -1.063246 -p -1.063246 -0.5 -1.063246 -p 1.063246 -0.5 -1.063246 -p 1.063246 0.5 -1.063246 -p 1.063246 0.5 1.063246 -p 1.063246 -0.5 1.063246 -p -1.063246 -0.5 1.063246 -p -1.063246 0.5 1.063246 -p -1.063246 0.5 -1.063246 -p -1.063246 -0.5 -1.063246 -p -1.063246 -0.5 1.063246 -p 1.063246 -0.5 1.063246 -p 1.063246 -0.5 -1.063246 -p -1.063246 -0.5 -1.063246 -p -1.063246 -0.5 1.063246 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -k 17 -n ($backName+"chest_CTL")`;
+string $chestGroup = `group -em -n ($backName+"chest_ctl_GRP")`;
+parent $chestControl $chestGroup;
+setAttr ($chestGroup+".translate") $cP[0] $cP[1] $cP[2];
+parentConstraint -mo $chestControl $chestClusterName;
+parent $chestGroup $backControlGroup;
+
+string $hipControl = `curve -d 1 -p -1.063246 0.5 1.063246 -p 1.063246 0.5 1.063246 -p 1.063246 0.5 -1.063246 -p -1.063246 0.5 -1.063246 -p -1.063246 -0.5 -1.063246 -p 1.063246 -0.5 -1.063246 -p 1.063246 0.5 -1.063246 -p 1.063246 0.5 1.063246 -p 1.063246 -0.5 1.063246 -p -1.063246 -0.5 1.063246 -p -1.063246 0.5 1.063246 -p -1.063246 0.5 -1.063246 -p -1.063246 -0.5 -1.063246 -p -1.063246 -0.5 1.063246 -p 1.063246 -0.5 1.063246 -p 1.063246 -0.5 -1.063246 -p -1.063246 -0.5 -1.063246 -p -1.063246 -0.5 1.063246 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -k 17 -n ($backName+"hip_CTL")`;
+string $hipGroup = `group -em -n ($backName+"hip_ctl_GRP")`;
+parent $hipControl $hipGroup;
+setAttr ($hipGroup+".translate") $hP[0] $hP[1] $hP[2];
+parentConstraint -mo $hipControl $hipClusterName;
+
+
+
+string $cogControl = `curve -d 1 -p 0 0 -1.1025 -p -0.33 0 -0.6075 -p -0.165 0 -0.6075 -p -0.165 0 -0.165 -p -0.6075 0 -0.165 -p -0.6075 0 -0.33 -p -1.1025 0 0 -p -0.6075 0 0.33 -p -0.6075 0 0.165 -p -0.165 0 0.165 -p -0.165 0 0.6075 -p -0.33 0 0.6075 -p 0 0 1.1025 -p 0.33 0 0.6075 -p 0.165 0 0.6075 -p 0.165 0 0.165 -p 0.6075 0 0.165 -p 0.6075 0 0.33 -p 1.1025 0 0 -p 0.6075 0 -0.33 -p 0.6075 0 -0.165 -p 0.165 0 -0.165 -p 0.165 0 -0.6075 -p 0.33 0 -0.6075 -p 0 0 -1.1025 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -k 17 -k 18 -k 19 -k 20 -k 21 -k 22 -k 23 -k 24 -n ($backName+"cog_CTL")` ;
+string $cogGroup = `group -em -n ($backName+"hip_ctl_GRP")`;
+parent $cogControl $cogGroup;
+setAttr ($cogGroup+".translate") $hP[0] $hP[1] $hP[2];
+parent $chestGroup $hipGroup $cogControl;
+parent $cogGroup $backControlGroup;
+
+//////////////////////////////////////////////
+///////////add joints////////////////////////
+////////////////////////////////////////////
+
+//float for later
+float $u = 0;
+
+//query text
+int $value = `intSliderGrp -q -value numOfFols`;
+print ("input"+$value+"\n");
+
+int $value2= $value+1;
+string $backJoints[];
+
+
+for($i=1;$i<$value2;$i++)
+{
+    //get nrb shape
+    string $nrbName = $backNurb[0];
+    string $nrbShape = ($nrbName +"Shape");
+    
+    string $name = substitute("_NRB",$nrbName,"");
+    
+    
+    //make and connect the follicles son
+    string $fol = `createNode follicle`;
+    string $folShapeName = `rename $fol($name+"_"+$i+"_FCLShape")`;
+    
+    string $folTrans = firstParentOf($folShapeName);
+    string $folTransName = `rename $folTrans($name+"_"+$i+"_FCL")`;
+    parent $folTransName $fclGroup;
+    
+    connectAttr ($nrbShape+".worldMatrix[0]") ($folShapeName+".inputWorldMatrix");
+    connectAttr ($nrbShape+".local") ($folShapeName+".inputSurface");
+    
+    connectAttr ($folShapeName+".outTranslate") ($folTransName+".translate");
+    connectAttr ($folShapeName+".outRotate") ($folTransName+".rotate");
+    
+    
+    //put them in the right places son
+    float $z = 1;
+    float $y = $z/($value-1);
+    print ("i_=_"+$i+"_att_"+$y+"\n");
+    
+    
+    
+    
+    
+    
+    
+    if($i==1)
+    {
+    print "pass son";
+    setAttr ($folTransName+".parameterV") 0.001;
+    setAttr ($folTransName+".parameterU") 0.5;
+    }
+    
+    else if($i==$value)
+    {
+    setAttr ($folTransName+".parameterV") 0.999;
+    setAttr ($folTransName+".parameterU") 0.5;
+    }
+    
+    else
+    {
+    float $u = $u+$y; 
+    
+    setAttr ($folTransName+".parameterV") $u;
+    setAttr ($folTransName+".parameterU") 0.5;
+    }
+    print ("U="+$u+"\n");
+    
+    
+    //time to add joints
+    
+    string $theJNT = `joint -radius .2 -n ($name+"_"+$i+"_JNT")`;
+    parent -w;
+    $backJoints[$i-1] = $theJNT;
+    //MOVE THESE TWO LINES DOWN TO THE FK JOINTS
+    //string $setName = `textField -q -text bindJointSet`;
+    //sets  -add ($setName+"bind_joint_SET") $theJNT;
+    string $jointGRP;
+    
+    if(`objExists ($name+"_jnt_GRP")`)
+    {
+    $jointGRP = ($name+"_jnt_GRP");
+    parent $theJNT $backJointGroup;
+    }
+    
+    else
+    {
+    string $jointGRP = `group -n ($name+"_jnt_GRP")`;
+    }
+    
+    string $theCTL[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+    string $theCTLName = `rename $theCTL[0] ($name+"_"+$i+"_jnt_CTL")`;
+    
+    string $theGRP = `group -n ($name+"_"+$i+"_jnt_ctl_GRP")`;
+    parent $theGRP $backJointControlGroup;
+    
+    parentConstraint $theCTLName $theJNT;
+    //parent $theCTLName $theGRP;
+    parentConstraint $folTransName $theGRP;
+
+
+}
+
+/////make the fk back rig
+string $fkLocatorGroupNum[];
+string $backFKControlNum[];
+string $backFKGroupNum[];
+string $ikJointNum[];
+string $backFKGroup = `group -em -n ($backName+"fk_back_GRP")`;
+string $backFKJointGroup = `group -em -n ($backName+"fk_back_jnt_GRP")`;
+string $backFKControlMasterGroup = `group -em -n ($backName+"fk_back_ctl_GRP")`;
+string $backFKLocGroup = `group -em -n ($backName+"fk_back_loc_GRP")`;
+parent $backFKJointGroup $backFKControlMasterGroup $backFKLocGroup $backFKGroup;
+parent $backFKGroup $backGroup;
+
+int $f = 1;
+for($tmp in $backJoints)
+{
+    //make the joint, the locator and then the group for the locator and a controller for the joint
+    select -cl;
+    string $fkJoint = `joint -n ($backName+"fk_back_"+$f+"_JNT")`;
+    sets  -add ($setName+"bind_joint_SET") $fkJoint;
+    select -cl;
+    string $fkLocator = `group -em -n ($backName+"fk_back_"+$f+"_LOC")`;
+    string $fkLocatorGroup = `group -em -n ($backName+"fk_back_"+$f+"_loc_GRP")`;
+    parent $fkLocator $fkLocatorGroup;
+    parent $fkLocatorGroup $backFKLocGroup;
+    parent $fkJoint $backFKJointGroup;
+
+
+    //make fk controller for joint
+    string $backFKControlPre[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 0 `;
+    string $backFKControl = `rename $backFKControlPre($backName+"fk_back_"+$f+"_CTL")`;
+    string $backFKControlUse = `group -em -n ($backName+"fk_back_"+$f+"_ctl_USE")`;
+    string $backFKControlGroup = `group -em -n ($backName+"fk_back_"+$f+"_ctl_use_GRP")`;
+    parent $backFKControl $backFKControlUse;
+    parent $backFKControlUse $backFKControlGroup;
+    parent $backFKControlGroup $backFKControlMasterGroup;
+    parentConstraint $backFKControl $fkJoint;
+    //string $tempConst[] = `parentConstraint $tmp $backFKControlGroup`;
+    //delete $tempConst;
+
+    $fkLocatorGroupNum[$f] = $fkLocatorGroup;
+    $backFKControlNum[$f] = $backFKControl;
+    $backFKGroupNum[$f] = $backFKControlGroup;
+    $ikJointNum[$f] = $tmp;
+    //connect the nodes accordingly
+    
+    connectAttr ($fkLocator+".translate") ($backFKControlGroup+".translate");
+    connectAttr ($fkLocator+".rotate") ($backFKControlGroup+".rotate");
+    parentConstraint $tmp $fkLocator;
+    if($f > 1)
+    {
+        parent $backFKGroupNum[$f-1] $backFKControl;
+        parentConstraint $tmp $fkLocatorGroupNum[$f-1];
+
+    }
+    $f = $f+1;
+}
+
+//last organize
+setAttr ($backName+"back_loc_GRP.visibility") 0;
+
+setAttr ($backJointControlGroup+".visibility") 0;
+
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////
+///////leg joints//////
+//////////////////////
+global proc legJoints()
+{
+    //query needed strings and make groups
+    
+    string $legName = `textField -q -text "legName"`;
+    int $rightCheck = `checkBox -q -v rightBox`;
+    
+    string $bindLegJointGroup = `group -em -n ($legName+"_bind_leg_jnt_GRP")`;
+    string $legJointGroup = `group -em -n ($legName+"_leg_jnt_GRP")`;
+    string $legControlGroup = `group -em -n ($legName+"_leg_ctl_GRP")`;
+    string $legFKControlGroup = `group -em -n ($legName+"_leg_fk_ctl_GRP")`;
+    string $legIKControlGroup = `group -em -n ($legName+"_leg_ik_ctl_GRP")`;
+    string $legGroup = `group -em -n ($legName+"_leg_GRP")`;
+    string $legScaleGroup = `group -em -n ($legName+"_leg_scale_GRP")`;
+    string $legDoNotScaleGroup = `group -em -n ($legName+"_leg_do_not_scale_GRP")`;
+    setAttr ($legDoNotScaleGroup+".inheritsTransform") 0;
+    parent $legScaleGroup $legDoNotScaleGroup $legGroup;
+    parent $legIKControlGroup $legFKControlGroup $legControlGroup;
+    parent $legControlGroup $legJointGroup $legScaleGroup;
+    
+    parent $bindLegJointGroup $legJointGroup;
+    //query positions of locators
+    
+    string $upLeg = ($legName+"_upleg_LOC");
+    string $downLeg = ($legName+"_downleg_LOC");
+    string $ankle = ($legName+"_ankle_LOC");
+    string $ball = ($legName+"_ball_LOC");
+    string $toe = ($legName+"_toe_LOC");
+    string $upLegUpVector = ($legName+"_upLeg_UP");
+    string $downLegUpVector = ($legName+"_downLeg_UP");
+    string $ankleUpVector = ($legName+"_ankle_UP");
+    string $ankleAimVector = ($legName+"_ankle_AIM");
+    string $polVector = ($legName+"_pol_LOC");
+    
+    float $upLegPosition[] = `xform -worldSpace -q -translation $upLeg`;
+    float $downLegPosition[] = `xform -worldSpace -q -translation $downLeg`;
+    float $anklePosition[] = `xform -worldSpace -q -translation $ankle`;
+    float $ballPosition[] = `xform -worldSpace -q -translation $ball`;
+    float $toePosition[] = `xform -worldSpace -q -translation $toe`;
+    float $kneePolPosition[] = `xform -worldSpace -q -translation $downLegUpVector`;
+    float $polVectorPosition[] = `xform -worldSpace -q -translation $polVector`;
+    
+    
+    //////////////////////////////////////////////////////
+    //////////////bind feet!!!///////////////////////////
+    ////////////////////////////////////////////////////
+    
+    
+    //create  joints
+    select -cl;
+    
+    string $bindUpLegJnt = `joint -p $upLegPosition[0] $upLegPosition[1] $upLegPosition[2] -name ("bind_"+$legName+"_hip_JNT")`;
+    select -cl;
+    string $bindDownLegJnt = `joint -p $downLegPosition[0] $downLegPosition[1] $downLegPosition[2] -name ("bind_"+$legName+"_knee_JNT")`;
+    select -cl;
+    string $bindAnkleJnt = `joint -p $anklePosition[0] $anklePosition[1] $anklePosition[2] -name ("bind_"+$legName+"_ankle_JNT")`;
+    select -cl;
+    string $bindBallJnt = `joint -p $ballPosition[0] $ballPosition[1] $ballPosition[2] -name ("bind_"+$legName+"_ball_JNT")`;
+    select -cl;
+    string $bindToeJnt = `joint -p $toePosition[0] $toePosition[1] $toePosition[2] -name ("bind_"+$legName+"_toe_JNT")`;
+    select -cl;
+    
+    string $setName = `textField -q -text bindJointSet`;
+    sets  -add ($setName+"bind_joint_SET") $bindUpLegJnt $bindDownLegJnt $bindAnkleJnt $bindBallJnt;
+    
+    if($rightCheck == 0)
+    
+    {
+        string $bindUpLegAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "object" -worldUpObject $upLegUpVector $bindDownLegJnt $bindUpLegJnt`;
+        string $bindDownLegAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "object" -worldUpObject $downLegUpVector $bindAnkleJnt $bindDownLegJnt`;
+        string $bindAnkleAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "object" -worldUpObject $ankleUpVector $ankleAimVector $bindAnkleJnt`;
+        string $bindBallAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "vector" -worldUpVector 0 1 0 $bindToeJnt $bindBallJnt`;
+        delete $bindUpLegAim;
+        delete $bindDownLegAim;
+        delete $bindAnkleAim;
+        delete $bindBallAim;
+        
+        
+        string $OConstraint[] = `orientConstraint $bindBallJnt $bindToeJnt`;
+        delete $OConstraint[0];
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $bindUpLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $bindDownLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $bindAnkleJnt;   
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $bindBallJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $bindToeJnt;
+    }
+    
+    
+    if($rightCheck == 1)
+    
+    {
+        string $bindUpLegAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "object" -worldUpObject $upLegUpVector $bindDownLegJnt $bindUpLegJnt`;
+        string $bindDownLegAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "object" -worldUpObject $downLegUpVector $bindAnkleJnt $bindDownLegJnt`;
+        string $bindAnkleAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "object" -worldUpObject $ankleUpVector $ankleAimVector $bindAnkleJnt`;
+        string $bindBallAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "vector" -worldUpVector 0 1 0 $bindToeJnt $bindBallJnt`;
+        delete $bindUpLegAim;
+        delete $bindDownLegAim;
+        delete $bindAnkleAim;
+        delete $bindBallAim;
+        
+        
+        string $OConstraint[] = `orientConstraint $bindBallJnt $bindToeJnt`;
+        delete $OConstraint[0];
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $bindUpLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $bindDownLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $bindAnkleJnt;   
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $bindBallJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $bindToeJnt;
+    }
+    
+    parent $bindUpLegJnt $bindDownLegJnt $bindAnkleJnt $bindBallJnt $bindToeJnt $bindLegJointGroup;
+    
+    setAttr ($bindUpLegJnt+".radius") 1;
+    setAttr ($bindDownLegJnt+".radius") 1;
+    setAttr ($bindAnkleJnt+".radius") 1;
+    setAttr ($bindBallJnt+".radius") 1;
+    setAttr ($bindToeJnt+".radius") 1;
+    
+    
+    
+    
+    /////////////////////////////////////////////////////////
+    ////////fkFeet!/////////////////////////////////////////
+    ///////////////////////////////////////////////////////
+    
+    //create  joints
+    select -cl;
+    
+    string $fkUpLegJnt = `joint -p $upLegPosition[0] $upLegPosition[1] $upLegPosition[2] -name ("fk_"+$legName+"_hip_JNT")`;
+    select -cl;
+    string $fkDownLegJnt = `joint -p $downLegPosition[0] $downLegPosition[1] $downLegPosition[2] -name ("fk_"+$legName+"_knee_JNT")`;
+    select -cl;
+    string $fkAnkleJnt = `joint -p $anklePosition[0] $anklePosition[1] $anklePosition[2] -name ("fk_"+$legName+"_ankle_JNT")`;
+    select -cl;
+    string $fkBallJnt = `joint -p $ballPosition[0] $ballPosition[1] $ballPosition[2] -name ("fk_"+$legName+"_ball_JNT")`;
+    select -cl;
+    string $fkToeJnt = `joint -p $toePosition[0] $toePosition[1] $toePosition[2] -name ("fk_"+$legName+"_toe_JNT")`;
+    select -cl;
+    
+    
+    
+    if($rightCheck == 0)
+    
+    {
+        string $fkUpLegAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "object" -worldUpObject $upLegUpVector $fkDownLegJnt $fkUpLegJnt`;
+        string $fkDownLegAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "object" -worldUpObject $downLegUpVector $fkAnkleJnt $fkDownLegJnt`;
+        string $fkAnkleAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "object" -worldUpObject $ankleUpVector $ankleAimVector $fkAnkleJnt`;
+        string $fkBallAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "vector" -worldUpVector 0 1 0 $fkToeJnt $fkBallJnt`;
+        delete $fkUpLegAim;
+        delete $fkDownLegAim;
+        delete $fkAnkleAim;
+        delete $fkBallAim;
+        
+        
+        string $OConstraint[] = `orientConstraint $fkBallJnt $fkToeJnt`;
+        delete $OConstraint[0];
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $fkUpLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $fkDownLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $fkAnkleJnt;   
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $fkBallJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $fkToeJnt;
+    }
+    
+    
+    if($rightCheck == 1)
+    
+    {
+        string $fkUpLegAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "object" -worldUpObject $upLegUpVector $fkDownLegJnt $fkUpLegJnt`;
+        string $fkDownLegAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "object" -worldUpObject $downLegUpVector $fkAnkleJnt $fkDownLegJnt`;
+        string $fkAnkleAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "object" -worldUpObject $ankleUpVector $ankleAimVector $fkAnkleJnt`;
+        string $fkBallAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "vector" -worldUpVector 0 1 0 $fkToeJnt $fkBallJnt`;
+        delete $fkUpLegAim;
+        delete $fkDownLegAim;
+        delete $fkAnkleAim;
+        delete $fkBallAim;
+        
+        
+        string $OConstraint[] = `orientConstraint $fkBallJnt $fkToeJnt`;
+        delete $OConstraint[0];
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $fkUpLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $fkDownLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $fkAnkleJnt;   
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $fkBallJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $fkToeJnt;
+    }
+    
+    parent $fkDownLegJnt $fkUpLegJnt;
+    parent $fkAnkleJnt $fkDownLegJnt;
+    parent $fkBallJnt $fkAnkleJnt;
+    parent $fkToeJnt $fkBallJnt;
+    parent $fkUpLegJnt $legJointGroup;
+    
+    setAttr ($fkUpLegJnt+".radius") .5;
+    setAttr ($fkDownLegJnt+".radius") .5;
+    setAttr ($fkAnkleJnt+".radius") .5;
+    setAttr ($fkBallJnt+".radius") .5;
+    setAttr ($fkToeJnt+".radius") .5;
+    
+    
+    
+    ////////////////////////////////////////////////////lets make the controllers for the fk feet!!!
+    
+    
+    string $fkFeetJoints[];
+    $fkFeetJoints[0] = $fkUpLegJnt;
+    $fkFeetJoints[1] = $fkDownLegJnt;
+    $fkFeetJoints[2] = $fkAnkleJnt;
+    $fkFeetJoints[3] = $fkBallJnt;
+    
+    print $fkFeetJoints;
+    string $fkFootCurve[];
+    string $fkFootGroup[];
+    int $fkFootNumber = 0;
+    for($tmp in $fkFeetJoints)
+    {
+    string $beforeRoot = substitute("fk_",$tmp,"");
+    string $rootName = substitute("_JNT",$beforeRoot,"");
+    //create and name the controller
+    string $controller[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+    string $control = `rename $controller[0] ($rootName + "_CTRL")`;
+    
+    //create the group used for automation
+    string $controlUse = `group -empty -n ($rootName + "_ctl_USE")`;
+    parent $control $controlUse;
+    
+    //create a group for the controller
+    string $controlGrp = `group -empty -n ($rootName + "_ctl_use_GRP")`;
+    parent $controlUse $controlGrp;
+    
+    //change curvepoint placement
+    select -r ($control+".cv[0:7]") ;
+    rotate -r -ocp -os 0 0 90 ;
+    
+    //get the controller over to the joint
+    string $tempConstraint[] = `parentConstraint $tmp $controlGrp`;
+    delete $tempConstraint [0];
+    parentConstraint $control $tmp;
+    
+    $fkFootCurve[$fkFootNumber] = $control;
+    $fkFootGroup[$fkFootNumber] = $controlGrp;
+    $fkFootNumber = $fkFootNumber+1;
+    print ($fkFootNumber+"\n");
+    }
+    print $fkFootCurve;
+    parent $fkFootGroup[1] $fkFootCurve[0];
+    parent $fkFootGroup[2] $fkFootCurve[1];
+    parent $fkFootGroup[3] $fkFootCurve[2];
+    parent $fkFootGroup[0] $legFKControlGroup;
+    
+    
+    
+    
+    /////////////////////////////////////////////////////
+    //////////ikFeet!///////////////////////////////////
+    ///////////////////////////////////////////////////
+    
+    
+    
+    //create  joints
+    select -cl;
+    
+    string $ikUpLegJnt = `joint -p $upLegPosition[0] $upLegPosition[1] $upLegPosition[2] -name ("ik_"+$legName+"_hip_JNT")`;
+    select -cl;
+    string $ikDownLegJnt = `joint -p $downLegPosition[0] $downLegPosition[1] $downLegPosition[2] -name ("ik_"+$legName+"_knee_JNT")`;
+    select -cl;
+    string $ikAnkleJnt = `joint -p $anklePosition[0] $anklePosition[1] $anklePosition[2] -name ("ik_"+$legName+"_ankle_JNT")`;
+    select -cl;
+    string $ikBallJnt = `joint -p $ballPosition[0] $ballPosition[1] $ballPosition[2] -name ("ik_"+$legName+"_ball_JNT")`;
+    select -cl;
+    string $ikToeJnt = `joint -p $toePosition[0] $toePosition[1] $toePosition[2] -name ("ik_"+$legName+"_toe_JNT")`;
+    select -cl;
+
+    
+    if($rightCheck == 0)
+    
+    {
+       string $ikUpLegAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "object" -worldUpObject $upLegUpVector $ikDownLegJnt $ikUpLegJnt`;
+       string $ikDownLegAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "object" -worldUpObject $downLegUpVector $ikAnkleJnt $ikDownLegJnt`;
+       string $ikAnkleAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "object" -worldUpObject $ankleUpVector $ankleAimVector $ikAnkleJnt`;
+       string $ikBallAim[] = `aimConstraint -weight 1 -aimVector 1 0 0 -upVector 0 0 1 -worldUpType "vector" -worldUpVector 0 1 0 $ikToeJnt $ikBallJnt`;
+       delete $ikUpLegAim[0];
+       delete $ikDownLegAim[0];
+       delete $ikAnkleAim[0];
+       delete $ikBallAim[0];
+       
+      
+        
+        string $OConstraint[] = `orientConstraint $ikBallJnt $ikToeJnt`;
+        delete $OConstraint[0];
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $ikUpLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $ikDownLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $ikBallJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $ikToeJnt;
+        
+        
+    }
+    
+    if ($rightCheck == 1)
+    
+    {
+        string $upLegAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "object" -worldUpObject $upLegUpVector $ikDownLegJnt $ikUpLegJnt`;
+        string $downLegAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "object" -worldUpObject $downLegUpVector $ikAnkleJnt $ikDownLegJnt`;
+        string $ikAnkleAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "object" -worldUpObject $ankleUpVector $ankleAimVector $ikAnkleJnt`;    
+        string $ikBallAim[] = `aimConstraint -weight 1 -aimVector -1 0 0 -upVector 0 0 -1 -worldUpType "vector" -worldUpVector 0 1 0 $ikToeJnt $ikBallJnt`;
+        delete $upLegAim[0];
+        delete $downLegAim[0];
+        delete $ikAnkleAim[0];
+        delete $ikBallAim[0];
+       
+    
+        
+        string $OConstraint[] = `orientConstraint $ikBallJnt $ikToeJnt`;
+        delete $OConstraint[0];
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $ikUpLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $ikDownLegJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $ikBallJnt;
+        makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $ikToeJnt;
+        
+    }
+        
+    parent $ikAnkleJnt  $ikDownLegJnt;
+    parent $ikDownLegJnt $ikUpLegJnt; 
+    parent $ikBallJnt $ikAnkleJnt; 
+    parent $ikToeJnt $ikBallJnt;    
+    
+    parent $ikUpLegJnt $legJointGroup;   
+    
+    setAttr ($ikUpLegJnt+".radius") .3;
+    setAttr ($ikDownLegJnt+".radius") .3;
+    setAttr ($ikAnkleJnt+".radius") .3;
+    setAttr ($ikBallJnt+".radius") .3;
+    setAttr ($ikToeJnt+".radius") .3;
+    
+    
+    ////make controllers
+    string $ikJointArray[];
+    $ikJointArray[0] = $ikAnkleJnt;
+    $ikJointArray[1] = $ikBallJnt;
+    $ikJointArray[2] = $ikToeJnt;
+    
+    string $ikControlParenting[];
+    string $ikGroupParenting[];
+    int $q = 0;
+    
+    for ($tmp in $ikJointArray)
+    {
+    //Find the root name of each joint to name the controllers on
+    string $ikFootJointRootName = substitute("_JNT", $tmp, "");
+    
+    //create and name the controller
+    string $ikFootJointController[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+    string $ikFootJointControl = `rename $ikFootJointController[0] ($ikFootJointRootName + "_CTL")`;
+    
+    //create the group used for automation
+    string $ikFootJointControlUse = `group -empty -n ($ikFootJointRootName + "_ctl_USE")`;
+    parent $ikFootJointControl $ikFootJointControlUse;
+    
+    //create a group for the controller
+    string $ikFootJointControlGrp = `group -empty -n ($ikFootJointRootName + "_ctl_use_GRP")`;
+    parent $ikFootJointControlUse $ikFootJointControlGrp;
+    
+    print $tmp;
+    string $ikFootJointConst[] = `parentConstraint $tmp $ikFootJointControlGrp`;
+    delete $ikFootJointConst[0];
+    
+    $ikControlParenting[$q] = $ikFootJointControl;
+    $ikGroupParenting[$q] = $ikFootJointControlGrp;
+    
+    $q = $q+1;
+    
+    //create and name the controller
+    string $ikFootJointLiftController[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r .5 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+    string $ikFootJointLiftControl = `rename $ikFootJointLiftController[0] ($ikFootJointRootName + "_lift_CTL")`;
+    
+    //create the group used for automation
+    string $ikFootJointLiftControlUse = `group -empty -n ($ikFootJointRootName + "_lift_ctl_USE")`;
+    parent $ikFootJointLiftControl $ikFootJointLiftControlUse;
+    
+    //create a group for the controller
+    string $ikFootJointLiftControlGrp = `group -empty -n ($ikFootJointRootName + "_lift_ctl_use_GRP")`;
+    parent $ikFootJointLiftControlUse $ikFootJointLiftControlGrp;
+    
+    string $ikFootJointLiftConst[] = `parentConstraint $tmp $ikFootJointLiftControlGrp`;
+    delete $ikFootJointLiftConst[0];
+    
+    $ikControlParenting[$q] = $ikFootJointLiftControl;
+    $ikGroupParenting[$q] = $ikFootJointLiftControlGrp;
+    
+    $q = $q+1;
+    }
+    
+    //parent the feetControllers for reverse IK
+    parent $ikGroupParenting[1] $ikControlParenting[2];
+    parent $ikGroupParenting[2] $ikControlParenting[4];
+    parent $ikGroupParenting[4] $ikControlParenting[0];
+    parent $ikGroupParenting[5] $ikControlParenting[3];
+    parent $ikGroupParenting[3] $ikControlParenting[4];
+    
+    string $ikFootControl = `curve -d 1 -p 0.5 0.5 0.5 -p 0.5 0.5 -0.5 -p -0.5 0.5 -0.5 -p -0.5 0.5 0.5 -p 0.5 0.5 0.5 -p 0.5 -0.5 0.5 -p 0.5 -0.5 -0.5 -p 0.5 0.5 -0.5 -p 0.5 -0.5 -0.5 -p -0.5 -0.5 -0.5 -p -0.5 0.5 -0.5 -p -0.5 -0.5 -0.5 -p -0.5 -0.5 0.5 -p -0.5 0.5 0.5 -p -0.5 -0.5 0.5 -p 0.5 -0.5 0.5 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -n ($legName+"_ikLeg_CTRL")`;
+    
+    string $ikFootUse01 = `group -em -n("ik_"+$legName+"_foot_ctl_USE01")`;
+    string $ikFootUse02 = `group -em -n("ik_"+$legName+"_foot_ctl_USE02")`;
+    string $ikFootGroup = `group -em -n("ik_"+$legName+"_foot_ctl_use_GRP")`;
+    
+    parent $ikFootControl $ikFootUse01;
+    parent $ikFootUse01 $ikFootUse02;
+    parent $ikFootUse02 $ikFootGroup;
+    
+    string $ikFootControllerConstraint[] = `pointConstraint $ikAnkleJnt $ikFootGroup`;
+    delete $ikFootControllerConstraint[0];
+    
+    
+    //make the ik handles
+    parent $ikGroupParenting[0] $ikFootControl;
+    
+    setAttr ($ikDownLegJnt+".preferredAngleY") 5;
+    
+    string $legIK[] = `ikHandle -sj $ikUpLegJnt -ee $ikAnkleJnt -sol ikRPsolver -n ($legName+"_leg_ikHandle")`;
+    string $ballIK[] = `ikHandle -sj $ikAnkleJnt -ee $ikBallJnt -n ($legName+"_ball_ikHandle")`;
+    string $toeIK[] = `ikHandle -sj $ikBallJnt -ee $ikToeJnt -sol ikRPsolver -n ($legName+"_leg_ikHandle")`;
+    
+    setAttr($legIK[0]+".visibility") 0;
+    setAttr($ballIK[0]+".visibility") 0;
+    setAttr($toeIK[0]+".visibility") 0;
+    
+    
+    parent $legIK[0] $ikControlParenting[1];
+    parent $ballIK[0] $ikControlParenting[2];
+    parent $toeIK[0] $ikControlParenting[5];
+    
+    //make the pole vectors
+    string $legPoleVector = `curve -d 1 -p -0.866649 0.580842 0 -p -0.0235721 0.946514 0 -p 0.900765 0.377691 0 -p 0.270997 -0.69901 0 -p -0.61271 -0.424756 0 -p -0.450189 0.398006 0 -p 0.189737 0.489424 0 -p 0.535093 -0.0692418 0 -p -0.125148 -0.404441 0 -p -0.0642023 0.0526489 0 -p 0.250682 0.0323338 0 -p 0.0576884 -0.0793993 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -n ($legName+"_ikLegPV_CTRL")` ;
+    string $legPolUse = `group -empty -n ($legName + "_knee_pol_USE")`;
+    string $legPolGrp = `group -empty -n ($legName + "_knee_pol_use_GRP")`;
+    parent $legPoleVector $legPolUse;
+    parent $legPolUse $legPolGrp;
+    
+    //make the pole vector line
+    string $linePre = `curve -d 1 -p 0 0 0 -p 0 1 0`;
+    string $line = `rename $linePre($legName+"_leg_polVector_line_CRV")`;
+    select ($line+".cv[0]");
+    setAttr ($line+".overrideEnabled") 1;
+    setAttr ($line+".overrideDisplayType") 2;
+    cluster -n ($legName+"_leg_polVector_line_01_CLS");
+    select ($line+".cv[1]");
+    cluster -n ($legName+"_leg_polVector_line_02_CLS");
+    setAttr ($legName+"_leg_polVector_line_01_CLSHandle.visibility") 0;
+    setAttr ($legName+"_leg_polVector_line_02_CLSHandle.visibility") 0;
+
+    parentConstraint $legPoleVector ($legName+"_leg_polVector_line_01_CLSHandle");
+    parentConstraint $ikDownLegJnt ($legName+"_leg_polVector_line_02_CLSHandle");
+        
+    string $polLineGroup = `group -em -n ($legName+"_leg_polVector_line_GRP")`;
+    parent ($legName+"_leg_polVector_line_01_CLSHandle") ($legName+"_leg_polVector_line_02_CLSHandle") $line $polLineGroup;
+    parent $polLineGroup $legDoNotScaleGroup;
+
+    string $legPolPointConstraint[] = `pointConstraint $ikDownLegJnt $legPolGrp`;
+    delete $legPolPointConstraint[0];
+    
+    setAttr ($legPolGrp+".translate") $polVectorPosition[0] $polVectorPosition[1] $polVectorPosition[2] ;
+    parent $legPolGrp $ikFootControl;
+    
+    string $legWorldLoc = `createNode transform -n ($legName+"_leg_world_LOC")`;
+    createNode locator -n ($legName+"world_LOCShape") -parent $legWorldLoc;
+    parent $legWorldLoc $legGroup;
+    setAttr($legWorldLoc+".visibility") 0;
+    
+    string $legPolParentConst[] = `parentConstraint -mo $legWorldLoc $ikFootControl $legPolGrp`;
+    
+    addAttr -ln "world"  -min 0 -max 1 -at double  $legPoleVector;
+    setAttr -e-keyable true ($legPoleVector+".world");
+    
+    string $legPolRev = `createNode reverse -n ($legName+"_pol_REV")`;
+    
+    connectAttr ($legPoleVector+".world") ($legPolParentConst[0]+"."+$legWorldLoc+"W0");
+    connectAttr ($legPolRev+".outputX") ($legPolParentConst[0]+"."+$ikFootControl+"W1");
+    connectAttr ($legPoleVector+".world") ($legPolRev+".inputX");
+    
+    poleVectorConstraint -w 1 $legPoleVector $legIK[0];
+         
+    //make a controller for the upleg
+    string $ikUpLegRootName = substitute("_JNT",$ikUpLegJnt,"");
+    //create and name the controller
+    string $ikUpLegController[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r .5 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+    string $ikUpLegControl = `rename $ikUpLegController[0] ($ikUpLegRootName + "ilft_CTL")`;
+    setAttr ($ikUpLegControl+".visibility") 0;
+    
+    //create the group used for automation
+    string $ikUpLegControlUse = `group -empty -n ($ikUpLegRootName + "_lift_ctl_USE")`;
+    parent $ikUpLegControl $ikUpLegControlUse;
+    
+    //create a group for the controller
+    string $ikUpLegControlGrp = `group -empty -n ($ikUpLegRootName + "_lift_ctl_use_GRP")`;
+    parent $ikUpLegControlUse $ikUpLegControlGrp;
+    
+    string $ikUpLegConst[] = `parentConstraint $ikUpLegJnt $ikUpLegControlGrp`;
+    delete $ikUpLegConst[0];
+    
+    parentConstraint $ikUpLegControl $ikUpLegJnt;
+    
+         
+    //time to organize!
+    parent $ikFootGroup $ikUpLegControlGrp $legIKControlGroup;
+         
+      
+    //////////////////////////////
+    //make the IK stretchy///////
+    ////////////////////////////
+    
+    string $ikLongLoc1[] = `spaceLocator -p 0 0 0 -n ("ik_"+$legName+"_long_01_LOC")`;
+    string $ikLongLoc2[] = `spaceLocator -p 0 0 0 -n ("ik_"+$legName+"_long_02_LOC")`;
+    string $ikLongLocGrp = `group -em -n ("ik_"+$legName+"_long_loc_GRP") `;
+    parent $ikLongLoc1[0] $ikLongLoc2[0] $ikLongLocGrp;
+    parent $ikLongLocGrp $legGroup;
+    setAttr ($ikLongLocGrp+".visibility") 0;
+    
+    
+    pointConstraint $ikControlParenting[1] $ikLongLoc1[0];
+    pointConstraint $ikUpLegJnt $ikLongLoc2[0];
+    
+    
+    
+    string $ikLongDist = `createNode distanceBetween -n ($legName+"ik_long_DIST")`;
+    
+    string $ikLongMult = `createNode multiplyDivide -n ($legName+"ik_long_MULT")`;
+    
+    string $ikLongClmp = `createNode clamp -n ($legName+"ik_long_CLMP")`;
+    
+    string $ikLongBlnd = `createNode blendColors -n ($legName+"ik_long_BLND")`;
+    
+    
+    connectAttr -f ($ikLongLoc1[0]+".translate") ($ikLongDist+".point1");
+    connectAttr -f ($ikLongLoc2[0]+".translate") ($ikLongDist+".point2");
+    
+    
+    
+    connectAttr -f ($ikLongDist+".distance") ($ikLongMult+".input1X");
+    
+    setAttr ($ikLongMult+".operation") 2;
+    print ($ikUpLegJnt+".translateX");
+    
+    float $upLegTrans[] = `xform -worldSpace -q -translation $ikUpLegJnt`;
+    float $downLegTrans[] = `xform -worldSpace -q -translation $ikDownLegJnt`;
+    float $ankleTrans[] = `xform -worldSpace -q -translation $ikAnkleJnt`;
+    float $upLegTX = $upLegTrans[0];
+    float $upLegTY = $upLegTrans[1];
+    float $upLegTZ = $upLegTrans[2];
+    
+    float $downLegTX = $downLegTrans[0];
+    float $downLegTY = $downLegTrans[1];
+    float $downLegTZ = $downLegTrans[2];
+    
+    float $ankleTX = $ankleTrans[0];
+    float $ankleTY = $ankleTrans[1];
+    float $ankleTZ = $ankleTrans[2];
+    
+    float $firstDist = 
+    sqrt(
+         (($upLegTX - $downLegTX)*($upLegTX - $downLegTX))
+         +
+         (($upLegTY - $downLegTY)*($upLegTY - $downLegTY))
+         +
+         (($upLegTZ - $downLegTZ)*($upLegTZ - $downLegTZ))
+        );
+        
+    float $secondDist = 
+    sqrt(
+         (($downLegTX - $ankleTX)*($downLegTX - $ankleTX))
+         +
+         (($downLegTY - $ankleTY)*($downLegTY - $ankleTY))
+         +
+         (($downLegTZ - $ankleTZ)*($downLegTZ - $ankleTZ))
+        );
+    float $originalDist = $firstDist + $secondDist;
+    setAttr ($ikLongMult+".input2X") $originalDist;
+    print ($firstDist+"SON");
+    print $secondDist;
+    print $originalDist;
+    
+    
+    
+    connectAttr -f ($ikLongMult+".outputX") ($ikLongClmp+".inputR");
+    
+    setAttr ($ikLongClmp+".minR") 1;
+    setAttr ($ikLongClmp+".maxR") 20;
+    
+    connectAttr -f ($ikLongClmp+".outputR") ($ikLongBlnd+".color1R");
+    
+    setAttr ($ikLongBlnd+".color2R") 1;
+    
+    connectAttr -f ($ikLongBlnd+".outputR") ($ikUpLegJnt+".scaleX");
+    connectAttr -f ($ikLongBlnd+".outputR") ($ikDownLegJnt+".scaleX");
+    
+    
+    addAttr -ln "stretchy"  -at double -min 0 -max 1 $ikFootControl;
+    setAttr -e-keyable true ($ikFootControl+".stretchy");
+    string $ikLegLongRev = `createNode reverse -n ($legName+"_ik_leg_long_REV")`;
+    connectAttr -f ($ikFootControl+".stretchy") ($ikLongBlnd+".blender");
+    
+    
+    //////////////////////make the IKFK switch
+    
+    
+    string $footAtt = `curve -d 3 -p 0.394033 -0.0671391 0 -p 0.443291 -0.0461502 0 -p 0.541807 -0.00417229 0 -p 0.696111 0.499738 0 -p 0.675436 0.802932 0 -p 0.678264 1.021458 0 -p 0.538763 1.035061 0 -p 0.572922 0.687691 0 -p 0.575787 1.021529 0 -p 0.381303 1.001155 0 -p 0.486492 0.674382 0 -p 0.409083 1.034243 0 -p 0.315806 1.038041 0 -p 0.319734 0.588555 0 -p 0.322866 1.042936 0 -p 0.157548 1.014662 0 -p 0.220239 0.598946 0 -p 0.209226 1.173615 0 -p -0.0327088 1.002575 0 -p 0.0528679 0.739911 0 -p -0.0475038 0.324117 0 -p 0.119544 0.240312 0 -p -0.15055 -0.0507114 0 -p 0.0928948 -0.291439 0 -p 0.318464 -0.150176 0 -p 0.431249 -0.0795443 0 -k 0 -k 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -k 17 -k 18 -k 19 -k 20 -k 21 -k 22 -k 23 -k 23 -k 23 -n ($legName+"_leg_ATT")`;
+    string $footAttGroup = `group -em -n ($legName+"_leg_att_GRP")`;
+    addAttr -ln "IKFK"  -at double -min 0 -max 1  $footAtt;
+    setAttr -e-keyable true ($footAtt+".IKFK");
+    if($rightCheck == 0)
+    {
+        setAttr ($footAtt+".tx") 2;
+    }
+    if($rightCheck == 1)
+    {
+        setAttr ($footAtt+".tx") -2;
+    }
+    parent $footAtt $footAttGroup;
+    parent $footAttGroup $legControlGroup;
+    pointConstraint $bindAnkleJnt $footAttGroup;
+    
+    string $legRev = `createNode reverse -n ($legName+"_leg_bind_jnt_REV")`;
+    
+    string $legBindJoints[];
+    $legBindJoints[0] = $bindUpLegJnt; 
+    $legBindJoints[1] = $bindDownLegJnt;
+    $legBindJoints[2] = $bindAnkleJnt;
+    $legBindJoints[3] = $bindBallJnt;
+    
+    connectAttr ($footAtt+".IKFK") ($legRev+".inputX");
+
+    for($tmp in $legBindJoints)
+    {
+        string $theFk = substitute("bind",$tmp,"fk");
+        string $theIk = substitute("bind",$tmp,"ik");
+        string $constraint[] = `parentConstraint $theIk $theFk $tmp`;
+    
+        
+        connectAttr ($footAtt+".IKFK") ($constraint[0]+"."+$theFk+"W1");
+        connectAttr ($legRev+".outputX") ($constraint[0]+"."+$theIk+"W0");
+
+        
+    
+    }
+    
+    //make ikfk visibility
+    string $legIKFKRev = `createNode reverse -n ($legName+"_leg_IKFK_REV")`;
+    connectAttr ($footAtt+".IKFK") ($fkFootCurve[0]+".visibility");
+    connectAttr ($footAtt+".IKFK") ($legIKFKRev+".inputX");
+    connectAttr ($legIKFKRev+".outputX") ($legPoleVector+".visibility");
+    connectAttr ($legIKFKRev+".outputX") ($ikFootControl+".visibility");
+
+    
+}
+
+////////////////////////////////////////////
+//////////head joints//////////////////////
+//////////////////////////////////////////
+ 
+global proc headJoints(){
+    
+    string $setName = `textField -q -text bindJointSet`;
+    string $headName = `textField -q -text headName`;
+    string $headGroup = `group -em -n ($headName+"head_GRP")`;
+    string $jointsGroup = `group -em -n ($headName+"head_jnt_GRP")`;
+    string $controlsGroup = `group -em -n ($headName+"head_ctl_GRP")`;
+    parent $controlsGroup $jointsGroup $headGroup;
+    
+    string $neckOne = ($headName+"neck_01_LOC");
+    string $neckTwo = ($headName+"neck_02_LOC");
+    string $head = ($headName+"head_LOC");
+    
+    float $neckOnePosition[] = `xform -q -worldSpace -translation $neckOne`;
+    float $neckTwoPosition[] = `xform -q -worldSpace -translation $neckTwo`;
+    float $headPosition[] = `xform -q -worldSpace -translation $head`;
+    
+    
+    //make joints
+    select -cl;
+    string $neckOneJoint = `joint -p $neckOnePosition[0] $neckOnePosition[1] $neckOnePosition[2] -n ($headName+"neck_01_JNT")`;
+    select -cl;
+    string $neckTwoJoint = `joint -p $neckTwoPosition[0] $neckTwoPosition[1] $neckTwoPosition[2] -n ($headName+"neck_02_JNT")`;
+    select -cl;
+    string $headJoint = `joint -p $headPosition[0] $headPosition[1] $headPosition[2] -n ($headName+"head_01_JNT")`;
+    select -cl;
+    string $headTipJoint = `joint -p  $headPosition[0] ($headPosition[1]+.5) $headPosition[2] -n ($headName+"head_02_JNT")`;
+    select -cl;
+    parent $headTipJoint $headJoint;
+    parent $headJoint $neckTwoJoint;
+    parent $neckTwoJoint $neckOneJoint;
+    parent $neckOneJoint $jointsGroup;
+    
+    //make the fk controls
+    string $headJoints[] = {$neckOneJoint, $neckTwoJoint, $headJoint};
+    string $controlNumber[];
+    string $groupNumber[];
+    int $b = 0;
+    for($tmp in $headJoints)
+    {
+        sets  -add ($setName+"bind_joint_SET") $tmp;
+        
+        string $rootName = substitute("_JNT",$tmp,"");
+        //create and name the controller
+        string $controller[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r .5 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+        string $control = `rename $controller[0] ($rootName + "_CTL")`;
+        
+        
+        //create the group used for automation
+        string $controlUse = `group -empty -n ($rootName + "_ctl_USE")`;
+        parent $control $controlUse;
+        
+        //create a group for the controller
+        string $controlGrp = `group -empty -n ($rootName + "_ctl_use_GRP")`;
+        parent $controlUse $controlGrp;
+        
+        string $const[] = `parentConstraint $tmp $controlGrp`;
+        delete $const[0];
+        parentConstraint $control $tmp;
+        
+        $controlNumber[$b] = $control;
+        $groupNumber[$b] = $controlGrp;        
+        $b = $b+1;
+       
+    }
+    
+    parent $groupNumber[2] $controlNumber[1];
+    parent $groupNumber[1] $controlNumber[0];
+    parent $groupNumber[0] $controlsGroup;
+    string $headController = $controlNumber[2];
+    string $headGroup = $groupNumber[2];
+    string $neckTwoController = $controlNumber[1];
+    
+    //make the world space switching
+    string $headWorldLoc = `createNode transform -n "head_world_LOC"`;
+    createNode locator -n "head_world_LOCShape" -parent $headWorldLoc;
+    setAttr ($headWorldLoc+".visibility") 0;
+    
+    addAttr -ln "world"  -at double -min 0 -max 1  $headController;
+    setAttr -e-keyable true ($headController+".world");
+    string $revNode = `createNode reverse -n ($headName+"head_REV")`;
+    parentConstraint -maintainOffset -skipRotate x -skipRotate y -skipRotate z $neckTwoController $headGroup;
+    string $rotP[] = `parentConstraint -maintainOffset -skipTranslate x -skipTranslate y -skipTranslate z $headWorldLoc $neckTwoController $headGroup`;
+    
+    connectAttr ($headController+".world") ($rotP[0]+"."+$headWorldLoc+"W0");
+    connectAttr ($headController+".world") ($revNode+".inputX");
+    connectAttr ($revNode+".outputX") ($rotP[0]+"."+$neckTwoController+"W1");
+    setAttr ($headController+".world") 1;
+    
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////proc to mirror the template/////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+global proc mirrorSetup()
+{
+    string $toMir[] = `ls -sl`;
+    for($tmp in $toMir)
+    {
+        //get the attributes
+        float $trans[] = `getAttr ($tmp+".translate")`;
+        float $rots[] = `getAttr ($tmp+".rotate")`;
+        float $scale[] = `getAttr ($tmp+".scale")`;
+
+
+
+        //get the opposite side
+        string $parts[];
+        tokenize ($tmp,"_",$parts);
+        
+        string $otherSide;
+        string $rootName;
+        if($parts[0]=="left")
+        {
+            $otherSide = substitute("left_",$tmp,"right_");
+            $rootName = substitute("left_",$tmp,"");
+        }
+
+        if($parts[0]=="right")
+        {
+            $otherSide = substitute("right_",$tmp,"left_");
+            $rootName = substitute("right_",$tmp,"");
+        }
+        
+        //make it mirror for specific nodes that arent world space
+        string $validNames[] = {"elbow_LOC","pole_LOC"};
+        if(stringArrayContains($rootName,$validNames))
+        {
+            setAttr ($otherSide+".translate") $trans[0] $trans[1] ($trans[2]*-1);
+            setAttr ($otherSide+".rotate") ($rots[0]*-1) ($rots[1]*-1) $rots[2];
+            setAttr ($otherSide+".scale") $scale[0] $scale[1] $scale[2];
+        }
+
+        //make it mirror the rest
+        else
+        {
+            setAttr ($otherSide+".translate") ($trans[0]*-1) $trans[1] $trans[2];
+            setAttr ($otherSide+".rotate") $rots[0] ($rots[1]*-1) ($rots[2]*-1);
+            setAttr ($otherSide+".scale") $scale[0] $scale[1] $scale[2];
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+global proc finalizeBiped()
+{
+    //parent constrain the shoulders to the chest
+    parentConstraint -maintainOffset "fk_back_1_CTL" "left_clavicle_ctl_use_GRP";
+    parentConstraint -maintainOffset "fk_back_1_CTL" "right_clavicle_ctl_use_GRP";
+    //parent constrain the hip controllers to the hip control
+    parentConstraint -maintainOffset "hip_CTL" "left_hip_ctl_use_GRP";
+    parentConstraint -maintainOffset "hip_CTL" "right_hip_ctl_use_GRP";
+    parentConstraint -maintainOffset "hip_CTL" "ik_left_hip_lift_ctl_use_GRP";
+    parentConstraint -maintainOffset "hip_CTL" "ik_right_hip_lift_ctl_use_GRP";
+    //parent constrain the neck to the chest
+    parentConstraint -maintainOffset "fk_back_1_CTL" "neck_01_ctl_use_GRP";
+    
+    //make space switching for ik controls
+    string $theSide[] = {"left", "right"};
+    for($side in $theSide)
+    {
+        //make constraints
+        string $ikSpaceCon[] = `parentConstraint -maintainOffset "chest_CTL" "hip_CTL" "head_01_CTL" "BODY" ("ik_"+$side+"_ctl_USE")`;
+
+        //make the attributes and set driven key them
+        addAttr -ln "space"  -at "enum" -en "chest:hips:head:world:" ($side+"_ikArm_CTRL");
+        setAttr -e -keyable true ($side+"_ikArm_CTRL.space");
+
+        setDrivenKeyframe -ott "linear" -itt "linear" -dv 0 -v 1 -currentDriver ($side+"_ikArm_CTRL.space") ($ikSpaceCon[0]+".chest_CTLW0");
+        setDrivenKeyframe -ott "linear" -itt "linear" -dv 1 -v 0 -currentDriver ($side+"_ikArm_CTRL.space") ($ikSpaceCon[0]+".chest_CTLW0");
+
+        setDrivenKeyframe -ott "linear" -itt "linear" -dv 0 -v 0 -currentDriver ($side+"_ikArm_CTRL.space") ($ikSpaceCon[0]+".hip_CTLW1");
+        setDrivenKeyframe -ott "linear" -itt "linear" -dv 1 -v 1 -currentDriver ($side+"_ikArm_CTRL.space") ($ikSpaceCon[0]+".hip_CTLW1");
+        setDrivenKeyframe -ott "linear" -itt "linear" -dv 2 -v 0 -currentDriver ($side+"_ikArm_CTRL.space") ($ikSpaceCon[0]+".hip_CTLW1");
+
+        setDrivenKeyframe -ott "linear" -itt "linear" -dv 1 -v 0 -currentDriver ($side+"_ikArm_CTRL.space") ($ikSpaceCon[0]+".head_01_CTLW2");
+        setDrivenKeyframe -ott "linear" -itt "linear" -dv 2 -v 1 -currentDriver ($side+"_ikArm_CTRL.space") ($ikSpaceCon[0]+".head_01_CTLW2");
+        setDrivenKeyframe -ott "linear" -itt "linear" -dv 3 -v 0 -currentDriver ($side+"_ikArm_CTRL.space") ($ikSpaceCon[0]+".head_01_CTLW2");
+
+        setDrivenKeyframe -ott "linear" -itt "linear" -dv 2 -v 0 -currentDriver ($side+"_ikArm_CTRL.space") ($ikSpaceCon[0]+".BODYW3");
+        setDrivenKeyframe -ott "linear" -itt "linear" -dv 3 -v 1 -currentDriver ($side+"_ikArm_CTRL.space") ($ikSpaceCon[0]+".BODYW3");
+
+    }
+    string $controllers[] = { "left_ikLeg_CTRL",
+                                "ik_left_toe_CTL",
+                                "ik_left_ball_lift_CTL",
+                                "ik_left_ball_CTL",
+                                "left_ikLeg_CTRL",
+                                "ik_left_ankle_CTL",
+                                "left_leg_ATT",
+                                "left_ikLegPV_CTRL",
+                                "left_ball_CTRL",
+                                "left_ankle_CTRL",
+                                "left_knee_CTRL",
+                                "left_hip_CTRL",
+                                "left_ikArmPV_CTRL",
+                                "left_hand_ATT",
+                                "left_ikArm_CTRL",
+                                "left_clavicle_CTRL",
+                                "left_shoulder_CTRL",
+                                "left_elbow_CTRL",
+                                "left_wrist_CTRL",
+                                "left_thumb_one_CTL",
+                                "left_thumb_two_CTL",
+                                "left_thumb_three_CTL",
+                                "left_ring_base_CTL",
+                                "left_ring_one_CTL",
+                                "left_ring_two_CTL",
+                                "left_ring_three_CTL",
+                                "left_middle_base_CTL",
+                                "left_middle_one_CTL",
+                                "left_middle_two_CTL",
+                                "left_middle_three_CTL",
+                                "left_pointer_base_CTL",
+                                "left_pointer_one_CTL",
+                                "left_pointer_two_CTL",
+                                "left_pointer_three_CTL",
+                                "left_pinky_base_CTL",
+                                "left_pinky_one_CTL",
+                                "left_pinky_two_CTL",
+                                "left_pinky_three_CTL"};
+    for($side in $controllers)
+    {
+        setAttr ($side+".overrideEnabled") 1;
+        setAttr ($side+".overrideColor") 6;
+        
+        string $other = substitute("left_",$side,"right_");
+        setAttr ($other+".overrideEnabled") 1;
+        setAttr ($other+".overrideColor") 13;
+
+    }
+                                
+    //////////////////
+    ///make the mirroring attributes
+    ///////////////////
+     
+     string $toMirror[] = {"left_thumb_one_CTL",
+                            "left_thumb_two_CTL",
+                            "left_thumb_three_CTL",
+                            "left_ring_base_CTL",
+                            "left_ring_one_CTL",
+                            "left_ring_two_CTL",
+                            "left_ring_three_CTL",
+                            "left_middle_base_CTL",
+                            "left_middle_one_CTL",
+                            "left_middle_two_CTL",
+                            "left_middle_three_CTL",
+                            "left_pointer_base_CTL",
+                            "left_pointer_one_CTL",
+                            "left_pointer_two_CTL",
+                            "left_pointer_three_CTL",
+                            "left_pinky_base_CTL",
+                            "left_pinky_one_CTL",
+                            "left_pinky_two_CTL",
+                            "left_pinky_three_CTL",
+                            "ik_left_ankle_CTL",
+                            "ik_left_toe_CTL",
+                            "ik_left_ball_CTL",
+                            "ik_left_ball_lift_CTL",
+                            "ik_left_toe_lift_CTL",
+                            "left_shoulder_CTRL",
+                            "left_elbow_CTRL",
+                            "left_wrist_CTRL",
+                            "left_clavicle_CTRL",
+                            "left_arm_bendy_CTL",
+                            //the rest are world space
+                            "left_ikArmPV_CTRL",
+                            "left_ikLegPV_CTRL",
+                            "left_ikArm_CTRL",
+                            "left_ikLeg_CTRL"};
+        
+
+        string $otherSideMirror[];
+        int $x = 0;
+        for($tmp in $toMirror)
+        {
+            string $other = substitute ("left_",$tmp,"right_");
+            $otherSideMirror[$x] = $other;
+            $x = $x+1;
+            
+        }
+          
+        select -cl;                    
+        select -tgl $toMirror $otherSideMirror;
+        string $addMirror[] = `ls -sl`;
+        for($tmp in $addMirror)
+        {
+                addAttr -ln "type"  -at double  -min 0 -max 2 -dv 0 $tmp;
+                setAttr ($tmp+".type") 2;
+                
+                if(`gmatch $tmp "left_arm_bendy_CTL"`||`gmatch $tmp "left_ikArmPV_CTRL"`||`gmatch $tmp "left_ikLegPV_CTRL"`||`gmatch $tmp "left_ikArm_CTRL"`||`gmatch $tmp "left_ikLeg_CTRL"`||`gmatch $tmp "right_arm_bendy_CTL"`||`gmatch $tmp "right_ikArmPV_CTRL"`||`gmatch $tmp "right_ikLegPV_CTRL"`||`gmatch $tmp "right_ikArm_CTRL"`||`gmatch $tmp "right_ikLeg_CTRL"`)
+                {
+                    setAttr ($tmp+".type") 0;
+                }
+        }
+                               
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////face rig stuff
+
+global proc makeFaceTemplate()
+{
+    sets -name "faceTemplateSet";
+    //make locators, name and place them
+    
+    string $theNames[] = {"up_lip",
+                         "left_up_lip_02", 
+                         "left_up_lip_01",
+                          "left_lip", 
+                          "left_down_lip_01",
+                          "left_down_lip_02",
+                          "down_lip",
+                          "right_down_lip_02",
+                          "right_down_lip_01",
+                          "right_lip",
+                          "right_up_lip_01",
+                          "right_up_lip_02",
+                          
+                          "jaw",
+                          "jawel",
+                          
+                          "left_brow_01",
+                          "left_brow_02",
+                          "left_brow_03",
+                          "right_brow_01",
+                          "right_brow_02",
+                          "right_brow_03",
+                          
+                          "left_under_eye_01",
+                          "left_under_eye_02",
+                          "left_under_eye_03",
+                          "right_under_eye_01",
+                          "right_under_eye_02",
+                          "right_under_eye_03",
+                          
+                          "nose",
+                          "left_nose",
+                          "right_nose",
+                          
+                          "left_cheek",
+                          "right_cheek",
+                          
+                          "chin"
+                          };
+                          
+    float $placement[] = {0,1,0,
+                         1,1,0,
+                         2,1,0,
+                         3,0,0,
+                         2,-1,0,
+                         1,-1,0,
+                         0,-1,0,
+                         -1,-1,0,
+                         -2,-1,0,
+                         -3,0,0,
+                         -2,1,0,
+                         -1,1,0,
+                         
+                         0,0,-3,
+                         0,0,-3,
+                         
+                         3,12,0,
+                         4,12,0,
+                         5,12,0,
+                         -3,12,0,
+                         -4,12,0,
+                         -5,12,0,
+                         
+                          3,8,0,
+                         4,8,0,
+                         5,8,0,
+                         -3,8,0,
+                         -4,8,0,
+                         -5,8,0,
+                         
+                         0,5,0,
+                         1,5,0,
+                         -1,5,0,
+                         
+                         7,0,0,
+                         -7,0,0,
+                         
+                         0,-2,0
+                                           
+                         };
+                         
+    int $x = 0;
+    string $faceLocGroup = `group -em -n "face_template_GRP"`;
+    for($tmp in $theNames)
+    {
+        string $theLoc = `createNode transform -n ($tmp+"_face_TMP")`;
+        createNode locator -n ($tmp+"_LOCShape") -parent $theLoc;
+        sets -add "faceTemplateSet"  $theLoc;
+        parent $theLoc $faceLocGroup;
+        setAttr ($theLoc+".localScaleX") .5;
+        setAttr ($theLoc+".localScaleY") .5;
+        setAttr ($theLoc+".localScaleZ") .5;
+        
+        string $axis[] = {"x","y","z"};
+        for($a in $axis)
+        {
+            setAttr ($theLoc+".t"+$a) $placement[$x];
+            $x = $x+1;
+        }
+        
+        
+    }
+    
+    //locators that need special shapes
+    
+    string $special[] = { "left_eye",
+                          "right_eye",
+                          "left_uplid",
+                          "left_downlid",
+                          "right_uplid",
+                          "right_downlid"
+                          
+                          };
+                          
+    
+    float $specialPlacement[] = { 4,10,0,
+                                   -4,10,0,
+                                   4,10,0,
+                                   4,10,0,
+                                   -4,10,0,
+                                   -4,10,0
+                                   
+                                   };
+                                   
+    int $y = 0;
+    for($tmp in $special)
+    {
+        string $curve = `curve -d 1 -p -.05 0 0 -p -.05 0 1.1 -p -.15 0 1.1 -p 0 0 1.3 -p .15 0 1.1 -p .05 0 1.1 -p .05 0 0 -p -.05 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7  -n ($tmp+"_face_TMP")`;
+        parent $curve $faceLocGroup;
+        sets -add "faceTemplateSet" $curve;
+        string $axis[] = {"x","y","z"};
+        for($a in $axis)
+        {
+            setAttr ($curve+".t"+$a) $specialPlacement[$y];
+            $y = $y+1;
+        }
+        
+        if(`gmatch $tmp "*downlid"`)
+        {
+            setAttr ($curve+".rotateX") 45;
+        }
+    
+        if(`gmatch $tmp "*uplid"`)
+        {
+            setAttr ($curve+".rotateX") -45;
+        }
+        
+        
+    }                  
+}                    
+
+
+
+
+global proc makeFaceRig()
+{
+    //find all template locators   
+    string $faceJointGroup = `group -em -n "face_jnt_GRP"`;
+    string $faceControlGroup = `group -em -n "face_ctl_GRP"`;
+    select -r faceTemplateSet ;
+    //make joints and controllers for them
+    string $toRig[] = `ls -sl`;
+    for($tmp in $toRig)
+    {
+       
+        
+       
+        string $rootName = substitute ("_face_TMP",$tmp,"");
+        select -cl;
+        string $theJoint = `joint -n ($rootName+"_JNT")`;
+        select -cl;
+        
+        string $circle[] = `circle -ch on -o on -nr 0 1 0`;
+        string $controller = `rename $circle[0]($rootName+"_CTL")`;
+        string $use = `group -em -n ($rootName+"_ctl_USE")`;
+        string $group =`group -em -n ($rootName+"_ctl_use_GRP")`;
+        parent $controller $use;
+        parent $use $group;
+        parentConstraint $controller $theJoint;
+        scaleConstraint $controller $theJoint;
+        
+        string $tempPConst[] = `parentConstraint $tmp $group`;
+        delete $tempPConst;
+        
+        parent $theJoint $faceJointGroup;
+        parent $group $faceControlGroup;
+        
+    }  
+    //some specific places need special care -eyebrows  - eyeballs
+    //parent controllers to other ones and group things
+    string $lowerLipGroup = `group -em -n "lower_lip_ctl_GRP"`;
+    string $upperLipGroup = `group -em -n "upper_lip_ctl_GRP"`;
+    string $sideLipGroup = `group -em -n "side_lip_ctl_GRP"`;
+    string $lipGroup = `group -em -n "lip_ctl_GRP"`;
+    string $leftBrowControl[] = `circle -ch on -o on -nr 0 1 0 -r 2-n "left_brow_CTL"`;
+    string $leftBrowGroup = `group -em -n "left_brow_ctl_GRP"`;
+    string $rightBrowControl[] = `circle -ch on -o on -nr 0 1 0 -r 2 -n "right_brow_CTL"`;
+    string $rightBrowGroup = `group -em -n "right_brow_ctl_GRP"`;
+    string $leftUndereyeGroup = `group -em -n "left_undereye_GRP"`;
+    string $rightUndereyeGroup = `group -em -n "right_undereye_GRP"`;
+    
+    parent $lowerLipGroup $upperLipGroup $sideLipGroup $lipGroup $leftBrowGroup $rightBrowGroup $leftUndereyeGroup $rightUndereyeGroup $faceControlGroup;
+    
+    //parent mouth controllers
+    parent "left_up_lip_01_ctl_use_GRP" "left_down_lip_01_ctl_use_GRP" "left_lip_CTL";
+    parent "right_up_lip_01_ctl_use_GRP" "right_down_lip_01_ctl_use_GRP" "right_lip_CTL";
+    
+    //get the groups to the right spot
+    string $sideConst[] = `parentConstraint "left_lip_ctl_use_GRP" "right_lip_ctl_use_GRP" $sideLipGroup`;
+    delete $sideConst;
+    string $topConst[] = `parentConstraint "up_lip_CTL" $upperLipGroup`;
+    delete $topConst;
+    string $bottomConst[] = `parentConstraint "down_lip_CTL" $lowerLipGroup`;
+    delete $bottomConst;
+    
+    parent "left_lip_ctl_use_GRP" "right_lip_ctl_use_GRP" $sideLipGroup;
+    parent "right_up_lip_02_ctl_use_GRP" "left_up_lip_02_ctl_use_GRP" "up_lip_ctl_use_GRP" $upperLipGroup;
+    parent "right_down_lip_02_ctl_use_GRP" "left_down_lip_02_ctl_use_GRP" "down_lip_ctl_use_GRP" $lowerLipGroup;
+    parent $sideLipGroup $lowerLipGroup $upperLipGroup $lipGroup;
+    
+    
+    parent "jaw_ctl_use_GRP" "jawel_CTL";
+    parent $lipGroup "jawel_CTL";
+    parentConstraint -maintainOffset "jaw_CTL" $lowerLipGroup;
+    parentConstraint -maintainOffset "jaw_CTL" "jawel_CTL" $sideLipGroup;
+    
+    
+    parent $leftBrowControl[0] $leftBrowGroup;
+    string $leftBrowConst[] = `parentConstraint "left_brow_02_CTL" $leftBrowGroup`;
+    delete $leftBrowConst;
+    parent "left_brow_01_ctl_use_GRP" "left_brow_02_ctl_use_GRP" "left_brow_03_ctl_use_GRP" $leftBrowControl[0];
+    
+    parent $rightBrowControl[0] $rightBrowGroup;
+    string $rightBrowConst[] = `parentConstraint "right_brow_02_CTL" $rightBrowGroup`;
+    delete $rightBrowConst;
+    parent "right_brow_01_ctl_use_GRP" "right_brow_02_ctl_use_GRP" "right_brow_03_ctl_use_GRP" $rightBrowControl[0];
+    
+    parent "left_under_eye_01_ctl_use_GRP" "left_under_eye_02_ctl_use_GRP" "left_under_eye_03_ctl_use_GRP" $leftUndereyeGroup;
+    parent "right_under_eye_01_ctl_use_GRP" "right_under_eye_02_ctl_use_GRP" "right_under_eye_03_ctl_use_GRP" $rightUndereyeGroup;
+    
+    parent "left_nose_ctl_use_GRP" "right_nose_ctl_use_GRP" "nose_CTL";
+    parent "chin_ctl_use_GRP" "jaw_CTL";
+    
+    
+   
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//make a dynamic rig 
+global proc dynamicChainUI()
+{
+    window -title "dynamic chainer" dynamicChainWindow;
+    rowColumnLayout -numberOfColumns 2;
+    textField chainName;
+    button -c "makeChainLoc" -label "make locator";
+    button -c "makeTheChain" -label "make the chain";
+    showWindow dynamicChainWindow;
+}
+
+
+/////////////make the locators that will be the joint chains
+global proc makeChainLoc()
+{
+    //make needed variables
+    int $x = 1;
+    string $checkParts[];
+    
+    string $text = `textField -q -text chainName`;
+    string $listCheck[] = `ls gmatch ($text+"_dyn_*_LOC")`;
+    int $checkSize = `size $listCheck`;
+    if($checkSize > 0)
+    {   
+        int $lastChecks = $checkSize-1;
+        tokenize ($listCheck[$lastChecks],"_",$checkParts);
+        $x = int($checkParts[2])+1;
+        print $x;
+    }
+    string $theLoc = `createNode transform -n ($text+"_dyn_"+$x+"_LOC")`;
+    createNode locator -n ($text+"_dyn_"+$x+"_LOCShape") -parent $theLoc;
+    
+    string $theUpVector = `curve -d 1 -p -.05 0 0 -p -.05 .1 0 -p -.15 .1 0 -p 0 .3 0 -p .15 .1 0 -p .05 .1 0 -p .05 0 0 -p -.05 0 0 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7  -n ($text+"_dyn_"+$x+"_UP")`;
+    parent $theUpVector $theLoc;
+    setAttr ($theUpVector+".translate") 0 2 0;
+    
+    select $theLoc;
+    
+}
+
+
+
+///////////////////////make the chain
+
+global proc makeTheChain()
+{
+    string $text = `textField -q -text chainName`;
+    ///////////////////make the groups required for organization//////
+    string $locGroup;
+    string $dynNoScaleGroup = `group -em -n ($text+"_dyn_do_not_scale_GRP")`;
+    string $dynScaleGroup = `group -em -n ($text+"_dyn_scale_GRP")`;
+    string $dynGroup = `group -em -n ($text+"_dyn_GRP")`;
+    parent $dynNoScaleGroup $dynScaleGroup $dynGroup;
+    if(`objExists "dynamic_hair_loc_GRP"`)
+    {
+        $locGroup = "dynamic_hair_loc_GRP";
+    }
+    else
+    {
+        $locGroup = `group -em -n "dynamic_hair_loc_GRP"`;
+    }
+/////////////////////////////////////////////////////////////////////////////////////////////////////////    
+    //make the joint chain////////////////////////////////////////
+    //get those variables
+    
+    string $dynJointArray[];
+    string $bndJointArray[];
+    int $p = 0;
+    //find the locators
+    string $theLocators[] = `ls gmatch ($text+"_dyn_*_LOC")`;
+    //parent $theLocators $locGroup;
+    for($tmp in $theLocators)
+    {
+        //get the rootname of the locator
+        string $rootName = substitute("_LOC",$tmp,"");
+        string $bindName = substitute("_dyn",$rootName,"_bnd");
+        //make the joint for dynamics and bind
+        select -cl;
+        string $theDynJoint = `joint -n ($rootName+"_JNT")`;
+        select -cl;
+        string $theBindJoint = `joint -n ($bindName+"_JNT")`;
+        select -cl;
+        //get the joint to the correct translation
+        string $pointCon[] = `pointConstraint $tmp $theDynJoint`;
+        delete $pointCon;
+        string $pointCon[] = `pointConstraint $tmp $theBindJoint`;
+        delete $pointCon;
+        
+        if(`size $dynJointArray` > 0)
+        {
+            //orient the joints
+            string $aimC[] = `aimConstraint -offset 0 0 0 -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject ($rootName+"_UP") $theDynJoint $dynJointArray[$p-1]`;
+            delete $aimC;
+            string $aimC[] = `aimConstraint -offset 0 0 0 -weight 1 -aimVector 1 0 0 -upVector 0 1 0 -worldUpType "object" -worldUpObject ($rootName+"_UP") $theBindJoint $bndJointArray[$p-1]`;
+            delete $aimC;
+            
+            parent $theDynJoint $dynJointArray[$p-1];
+            parent $theBindJoint $bndJointArray[$p-1];
+        }
+        
+        $dynJointArray[$p] = $theDynJoint;
+        $bndJointArray[$p] = $theBindJoint;
+        $p = $p+1;
+        parent $tmp $locGroup;
+    }
+    ////freeze the transforms of the joints
+    select -cl;
+    print $dynJointArray[1];
+    select $dynJointArray[0];
+    select -tgl $bndJointArray[0];
+    makeIdentity -apply true -t 1 -r 1 -s 1 -n 0;
+    select -cl;
+    
+    //make the curves/////////////////////
+    string $curveCommand = "curve -d 1";
+    string $commandEnd;
+    string $jointPositionX[];
+    string $jointPositionY[];
+    string $jointPositionZ[];
+    int $q = 0;
+
+    for($forCurve in $dynJointArray)
+    {
+        float $theTranslation[] = `xform -q -ws -translation $forCurve`;
+        $curveCommand = ($curveCommand+" -p "+$theTranslation[0]+" "+$theTranslation[1]+" "+$theTranslation[2]);
+        $commandEnd = ($commandEnd+" -k "+$q);
+        $q = $q+1;
+    }
+    
+    
+    string $dynamicCurve= eval($curveCommand+$commandEnd+" -n "+$text+"_dynamic_CRV");  
+    string $outputCurve= eval($curveCommand+$commandEnd+" -n "+$text+"_output_CRV"); 
+    
+    //make the curve dynamnic
+    //make the hair system
+    string $hairSystemTransform = `createNode transform -n ($text+"_hairSystem")`;
+    string $hairSystem = `createNode hairSystem -n ($text+"_hairSystemShape") -parent $hairSystemTransform`;
+    //make the locator that will hold all of the attributes
+    string $attLoc = `createNode transform -n ($text+"_dyn_ATT")`;
+    createNode locator -n ($text+"_dyn_ATTShape") -parent $attLoc;
+    addAttr -ln "base_stiffness"  -at double  -min 0 -max 1 -dv 0 $attLoc;
+    setAttr -e-keyable true ($attLoc+".base_stiffness");
+    addAttr -ln "tip_stiffness"  -at double  -min 0 -max 1 -dv 0 $attLoc;
+    setAttr -e-keyable true ($attLoc+".tip_stiffness");
+    addAttr -ln "simulate"  -at "enum" -en "off:static:dynamicFollicles:AllFollicles"  $attLoc;
+    setAttr -e-keyable true ($attLoc+".simulate");
+    //set the attributes to what they will be off the bat
+    setAttr ($attLoc+".base_stiffness") 1;
+    setAttr ($attLoc+".tip_stiffness") 0;
+    setAttr ($attLoc+".simulate") 1;
+    //connect the attributes from the hairSystem to the attLoc
+    connectAttr ($attLoc+".base_stiffness") ($hairSystem+".startCurveAttract");
+    connectAttr ($attLoc+".tip_stiffness") ($hairSystem+".attractionScale[1].attractionScale_FloatValue");
+    connectAttr ($attLoc+".simulate") ($hairSystem+".simulationMethod");
+    /////////connecting the hair system to the controls
+    //make the follicle
+    string $follicleTransform = `createNode transform -n ($text+"_FOL")`;
+    string $theFollicle = `createNode follicle -n ($text+"_FOLShape") -parent $follicleTransform`;
+    setAttr ($theFollicle+".degree") 1;
+    
+    //connect the dynamiccurve start position to the follicle
+    connectAttr ($dynamicCurve+".worldSpace[0]") ($theFollicle+".startPosition");
+    //connect follicle to the hairsystem and output curve
+    connectAttr ($theFollicle+".outHair") ($hairSystem+".inputHair[0]");
+    connectAttr ($hairSystem+".outputHair[0]") ($theFollicle+".currentPosition");
+    connectAttr ($theFollicle+".outCurve") ($outputCurve+".create");
+    connectAttr "time1.outTime" ($hairSystem+".currentTime");
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////    
+    //////make the fk chain///////////
+    //make a loop based on how many joints there are
+    int $t = 0;
+    int $y = 1;
+    string $clusterGroup = `group -em -n ($text+"_cls_GRP")`;
+    string $dynControlGroupArray[];
+    string $dynControlArray[];
+    string $bndControlGroupArray[];
+    string $bndControlArray[];
+    for($jointPoint in $dynJointArray)
+    {
+        string $rootName = substitute("_JNT",$jointPoint,"");
+        //create and name the controller
+        string $controller[0] = `circle -ch on -o on -nr 1 0 0`;
+        string $control = `rename $controller[0] ($rootName + "_CTL")`;        
+        //create the group used for automation
+        string $controlUse = `group -empty -n ($rootName + "_ctl_USE")`;
+        parent $control $controlUse;        
+        //create a group for the controller
+        string $controlGrp = `group -empty -n ($rootName + "_ctl_use_GRP")`;
+        parent $controlUse $controlGrp;
+        //get the controller over to the joint
+        string $tempConstraint[] = `parentConstraint $tmp $controlGrp`;
+        delete $tempConstraint[0];
+        ////cluster the point on the curve
+        select ($dynamicCurve+".cv["+$t+"]");
+        string $theCluster[] = `cluster -n ($rootName+"_CLS")`;
+        parent $theCluster[1] $clusterGroup;
+        //constrain the cluster to the controller
+        string $tempPConst[] = `parentConstraint $jointPoint $controlGrp`;
+        delete $tempPConst;
+        parentConstraint -mo $control $theCluster;
+        
+        /////parent the controllers
+        if($t>0)
+        {
+            parent $controlGrp $dynControlArray[$t-1];
+        }
+        
+        ////////////do it all again for the bnd joints
+        string $bindName = substitute("_dyn",$rootName,"_bnd");
+        //create and name the controller
+        string $bindController = `curve -d 1 -p 1 0 -1 -p -1 0 -1 -p -1 0 1 -p 1 0 1 -p 1 0 -1 -k 0 -k 1 -k 2 -k 3 -k 4`;
+        string $bindControl = `rename $bindController ($bindName + "_CTL")`;        
+        //create the group used for automation
+        string $bindControlUse = `group -empty -n ($bindName + "_ctl_USE")`;
+        parent $bindControl $bindControlUse;        
+        //create a group for the controller
+        string $bindControlGrp = `group -empty -n ($bindName + "_ctl_use_GRP")`;
+        parent $bindControlUse $bindControlGrp;
+        //get the controller over to the joint
+        string $tempConstraint[] = `parentConstraint $jointPoint $bindControlGrp`;
+        print $tmp;
+        delete $tempConstraint[0];
+        parentConstraint $bindControl ($bindName+"_JNT");
+        if($t>0)
+        {
+            parent $bindControlGrp $bndControlArray[$t-1];
+        }
+        
+        
+        $dynControlArray[$t] = $control;
+        $dynControlGroupArray[$t] = $controlGrp;
+        $bndControlGroupArray[$t] = $bindControlGrp;
+        $bndControlArray[$t] = $bindControl;
+        $t = $t+1;
+        $y = $y+1;
+    }
+    //////hide the last controller on the chain
+    setAttr($dynControlArray[$t-1]+".visibility") 0;
+    setAttr($bndControlArray[$t-1]+".visibility") 0;
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////    
+    //time to make the ikspline
+    //make the locators for the ikSpline
+    string $baseUpVector = `createNode transform -n ($text+"_base_UPV")`;
+    createNode locator -n ($text+"_base_UPVShape") -parent $baseUpVector;
+    string $tipUpVector = `createNode transform -n ($text+"_tip_UPV")`;
+    createNode locator -n ($text+"_tip_UPVShape") -parent $tipUpVector;
+    
+    string $baseUpVectorGroup = `group -em -n ($text+"_base_upv_GRP")`;
+    string $tipUpVectorGroup = `group -em -n ($text+"_tip_upv_GRP")`;
+    string $upVectorGroup = `group -em -n ($text+"_upv_GRP")`;
+    parent $baseUpVector $baseUpVectorGroup;
+    parent $tipUpVector $tipUpVectorGroup;
+    parent $baseUpVectorGroup $tipUpVectorGroup $upVectorGroup;
+    setAttr ($upVectorGroup+".visibility") 0;
+    
+    parentConstraint $dynControlArray[0] $baseUpVectorGroup;
+    parentConstraint $dynControlArray[$t-2] $tipUpVectorGroup;
+    setAttr ($baseUpVector+".ty") 10;
+    setAttr ($tipUpVector+".ty") 10;
+    //make spine and connect upvectors
+    string $theIkHandle[] = `ikHandle -sol ikSplineSolver -sj $dynJointArray[0] -ee $dynJointArray[$p-1] -ccv false -curve $outputCurve -pcv false -n ($text+"_ikHandle")`;
+    setAttr ($theIkHandle[0]+".dTwistControlEnable") 1;
+    setAttr ($theIkHandle[0]+".dWorldUpType") 2;
+    connectAttr ($baseUpVector+".worldMatrix[0]") ($theIkHandle[0]+".dWorldUpMatrix");
+    connectAttr ($tipUpVector+".worldMatrix[0]") ($theIkHandle[0]+".dWorldUpMatrixEnd");
+
+
+///////////////////////////////////////////////////////////////////////////
+    int $z = 1;
+    for($connect in $dynJointArray)
+    {
+        if($z==1)
+        {
+            parentConstraint $connect ($text+"_bnd_"+$z+"_ctl_use_GRP");
+        }
+        
+        else
+        {
+            connectAttr ($connect+".rotate") ($text+"_bnd_"+$z+"_ctl_USE.rotate");
+        }
+        
+        $z = $z+1;
+    }
+
+
+
+    
+    /////////////the final parenting/////////
+    parent $dynamicCurve $outputCurve $hairSystemTransform $theIkHandle[0] $follicleTransform $attLoc $dynNoScaleGroup;
+    parent $clusterGroup $dynControlGroupArray[0] $dynJointArray[0] $upVectorGroup $bndJointArray[0] $bndControlGroupArray[0] $dynScaleGroup;
+    
+}
+
+
+
+
+
+
+
+global proc sonAutoRig(){
+
+auto;}
+
+
+
+
+
+
+

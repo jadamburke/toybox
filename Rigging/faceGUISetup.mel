@@ -1,0 +1,257 @@
+
+//string $mouthControlSet =  `sets -name "faceControls"`;
+
+
+
+//make the GUI!!!!!
+
+//make the boxes
+//find out what kind of boxes to make
+string $leftLip = "left_lip";
+string $rightLip = "right_lip";
+string $lowerLip = "lower_lip";
+string $upperLip = "upper_lip";
+string $jaw = "jaw";
+string $leftBrow = "left_brow";
+string $rightBrow  = "right_brow";
+string $leftLid = "left_lids";
+string $rightLid = "right_lids";
+string $allMouth = "all_mouth";
+string $fonims = "fonims";
+
+string $guiGroup = `curve -d 1 -p 0 16 -10 -p 0 -7 -10 -p 0 -7 10 -p 0 16 10 -p 0 16 -10 -k 0 -k 1 -k 2 -k 3 -k 4 -n "GUI_CRV"`;
+    addAttr -ln "lock"  -at double  -min 0 -max 1 -dv 0 $guiGroup;
+    setAttr -e-keyable true ($guiGroup+".lock");
+string $boxNumber[];
+int $i = 0;
+float $dist = 0;
+select faceControls;
+string $son[] = `ls -sl`;
+string $theParts[] = {$leftLip, $rightLip, $lowerLip, $upperLip, $jaw, $leftBrow, $rightBrow, $leftLid, $rightLid, $allMouth, $fonims};
+for($tmp in $theParts)
+{
+    
+   
+    for($each in $son)
+    {
+        string $rootName = substitute("_CTL",$each,"");
+        select $each;
+        string $thaGroup = `group -n ($rootName+"_"+$tmp+"_USE")`;
+        xform -os -piv 0 0 0 $thaGroup;
+       
+    
+    }
+
+    string $text[] = `textCurves -f "Tahoma|w400|h-3" -t $tmp -n ($tmp+"_TXT")`;
+    setAttr ($tmp+"_TXTShape.ty") 2;
+    setAttr ($tmp+"_TXTShape.tz") -1.5;
+    setAttr ($tmp+"_TXTShape.ry") -90;
+    string $innerBox =  `curve -d 1 -p 0 1 -1 -p 0 -1 -1 -p 0 -1 1 -p 0 1 1 -p 0 1 -1 -k 0 -k 1 -k 2 -k 3 -k 4 -n ($tmp+"_inner_box_CRV")`;
+    string $outerBox =  `curve -d 1 -p 0 1.5 -1.5 -p 0 -1.5 -1.5 -p 0 -1.5 1.5 -p 0 1.5 1.5 -p 0 1.5 -1.5 -k 0 -k 1 -k 2 -k 3 -k 4 -n ($tmp+"_outer_box_CRV")`;
+    string $theCircle[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r .2 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1 -n ($tmp+"_circle_CRV")`;
+    select -r ($theCircle[0]+".cv[0:7]");
+    rotate -r -ocp -os 90 0 90 ;
+    string $theCircleGroup = `group -em -n ($tmp+"_circle_crv_GRP")`;
+    parent $theCircle[0] $theCircleGroup;
+    parent $theCircleGroup $innerBox;
+    parent $innerBox $outerBox;
+    parent $outerBox $guiGroup;
+    parent $text $outerBox;
+    
+    
+    setAttr ($theCircleGroup+".ry") -90;
+    transformLimits -tx -1.5 1.5 -etx 1 1 $theCircle[0];
+    transformLimits -ty -1.5 1.5 -ety 1 1 $theCircle[0];
+    setAttr -lock true -keyable false -channelBox false ($theCircle[0]+".tz");
+    setAttr -lock true -keyable false -channelBox false ($theCircle[0]+".rx");
+    setAttr -lock true -keyable false -channelBox false ($theCircle[0]+".ry");
+    setAttr -lock true -keyable false -channelBox false ($theCircle[0]+".rz");
+    setAttr -lock true -keyable false -channelBox false ($theCircle[0]+".sx");
+    setAttr -lock true -keyable false -channelBox false ($theCircle[0]+".sy");
+    setAttr -lock true -keyable false -channelBox false ($theCircle[0]+".sz");
+    
+
+    
+    $boxNumber[$i] = $outerBox;
+    $i = $i+1;
+    $dist = $dist+2;
+}
+//left lip
+setAttr ($boxNumber[0]+".tz") 4;
+//right lip
+setAttr ($boxNumber[1]+".tz") -4;
+//lower lip
+setAttr ($boxNumber[2]+".ty") -5;
+//upper lip
+setAttr ($boxNumber[3]+".ty") 5;
+//jaw
+setAttr ($boxNumber[4]+".ty") -5;
+setAttr ($boxNumber[4]+".tz") -7.5;
+//leftBrow
+setAttr ($boxNumber[5]+".ty") 13;
+setAttr ($boxNumber[5]+".tz") 7.5;
+//right brow
+setAttr ($boxNumber[6]+".ty") 13;
+setAttr ($boxNumber[6]+".tz") -7.5;
+//left lid
+setAttr ($boxNumber[7]+".ty") 8.5;
+setAttr ($boxNumber[7]+".tz") 7.5;
+//right lid
+setAttr ($boxNumber[8]+".ty") 8.5;
+setAttr ($boxNumber[8]+".tz") -7.5;
+//all mouth
+setAttr ($boxNumber[9]+".ty") -5;
+setAttr ($boxNumber[9]+".tz") 7.5;
+
+setAttr ($guiGroup+".ry") 90;
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+
+
+//Make window
+global proc guiSetup ()
+{
+window -title "move to position and pose the face and hit the button" sdkWindow;
+rowColumnLayout -numberOfColumns 2;
+button -c "ex" -label "X";
+button -c "why" -label "Y";
+
+showWindow sdkWindow;
+
+
+}
+
+global proc ex()
+{
+    
+    string $son[] = `ls -sl`;
+    //get the rootName
+    string $rootName = substitute("_circle_CRV",$son[0],"");
+    
+    select "faceControls";
+    string $setMembers[] = `ls -sl`;
+    for($tmp in $setMembers)
+    {
+        
+       string $parts[];
+       tokenize($tmp,"_",$parts);
+       string $control;
+       if($parts[0] = "do")
+       {
+           $control = substitute("_CTL",$tmp,"_ctl_USE");
+       }
+             
+        else
+        {
+            $control = $tmp;
+        }
+
+    	string $noCTL = substitute("_CTL",$control,"");
+        float $theTrans[] = `getAttr ($tmp+".translate")`;
+        float $theRot[] = `getAttr ($tmp+".rotate")`;
+
+       
+       setAttr ($noCTL+"_"+$rootName+"_USE.translate") $theTrans[0] $theTrans[1] $theTrans[2];
+       setAttr ($noCTL+"_"+$rootName+"_USE.rotate") $theRot[0] $theRot[1] $theRot[2];
+       
+       
+
+       
+       setDrivenKeyframe -currentDriver ($son[0]+".translateX") ($noCTL+"_"+$rootName+"_USE.tx") ;
+       setDrivenKeyframe -currentDriver ($son[0]+".tx") ($noCTL+"_"+$rootName+"_USE.ty") ;
+       setDrivenKeyframe -currentDriver ($son[0]+".tx") ($noCTL+"_"+$rootName+"_USE.tz") ;
+       setDrivenKeyframe -currentDriver ($son[0]+".tx") ($noCTL+"_"+$rootName+"_USE.rx") ;
+       setDrivenKeyframe -currentDriver ($son[0]+".tx") ($noCTL+"_"+$rootName+"_USE.ry") ;
+       setDrivenKeyframe -currentDriver ($son[0]+".tx") ($noCTL+"_"+$rootName+"_USE.rz") ;
+
+    }
+    
+    for($tmp in $setMembers)
+    {
+               
+       int $transState = `getAttr -se ($tmp+".translateX")`;
+       print $transState;
+       if($transState == 1)
+       {
+           setAttr ($tmp+".translate") 0 0 0;
+       }
+       
+       int $rotState = `getAttr -se ($tmp+".rotateX")`;
+       if($rotState == 1)
+       {
+           setAttr ($tmp+".rotate") 0 0 0;
+       }
+    }
+    
+    
+}
+
+
+global proc why()
+{
+    
+    string $dude[] = `ls -sl`;
+    //get the rootName
+    string $rootName = substitute("_circle_CRV",$dude[0],"");
+    
+    select "faceControls";
+    string $setMembers[] = `ls -sl`;
+    
+
+    
+    for($tmp in $setMembers)
+    {
+        
+               string $parts[];
+       tokenize($tmp,"_",$parts);
+       string $control;
+       if($parts[0] = "do")
+       {
+           $control = substitute("_CTL",$tmp,"_ctl_USE");
+       }
+             
+        else
+        {
+            $control = $tmp;
+        }
+        
+        string $noCTL = substitute("_CTL",$control,"");
+        float $theTrans[] = `getAttr ($tmp+".translate")`;
+        float $theRot[] = `getAttr ($tmp+".rotate")`;
+       
+       setAttr ($noCTL+"_"+$rootName+"_USE.translate") $theTrans[0] $theTrans[1] $theTrans[2];
+       setAttr ($noCTL+"_"+$rootName+"_USE.rotate") $theRot[0] $theRot[1] $theRot[2];
+       
+       
+
+       
+       setDrivenKeyframe -currentDriver ($dude[0]+".ty") ($noCTL+"_"+$rootName+"_USE.tx") ;
+       setDrivenKeyframe -currentDriver ($dude[0]+".ty") ($noCTL+"_"+$rootName+"_USE.ty") ;
+       setDrivenKeyframe -currentDriver ($dude[0]+".ty") ($noCTL+"_"+$rootName+"_USE.tz") ;
+       setDrivenKeyframe -currentDriver ($dude[0]+".ty") ($noCTL+"_"+$rootName+"_USE.rx") ;
+       setDrivenKeyframe -currentDriver ($dude[0]+".ty") ($noCTL+"_"+$rootName+"_USE.ry") ;
+       setDrivenKeyframe -currentDriver ($dude[0]+".ty") ($noCTL+"_"+$rootName+"_USE.rz") ;
+
+    }
+    
+    for($tmp in $setMembers)
+    {
+       int $transState = `getAttr -se ($tmp+".translateX")`;
+      print ($tmp+$transState+"\n");
+       if($transState == 1)
+       {
+           setAttr ($tmp+".translate") 0 0 0;
+       }
+       
+       int $rotState = `getAttr -se ($tmp+".rotateX")`;
+       if($rotState == 1)
+       {
+           setAttr ($tmp+".rotate") 0 0 0;
+       }
+    }
+    
+    
+}
+

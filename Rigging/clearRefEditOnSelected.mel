@@ -1,5 +1,5 @@
 // clearReferenceEditOnSelected
-// referenceEdit -failedEdits true -successfulEdits true -editCommand connectAttr -removeEdits "|plantFiddleHeadFrond10_GOD|plantFiddleHeadFrond10_DIRECTION|plantFiddleHeadFrond10_BODY|plantFiddleHeadFrond10_fern5Ctrl|plantFiddleHeadFrond10_fernMesh5_animated|plantFiddleHeadFrond10_fernSingle1Leaf5|plantFiddleHeadFrond10_polySurface133|plantFiddleHeadFrond10_polySurfaceShape133.instObjGroups.objectGroups[1]";
+// referenceEdit -failedEdits true -successfulEdits true -removeEdits "|plantFiddleHeadFrond10_GOD|plantFiddleHeadFrond10_DIRECTION|plantFiddleHeadFrond10_BODY|plantFiddleHeadFrond10_fern5Ctrl|plantFiddleHeadFrond10_fernMesh5_animated|plantFiddleHeadFrond10_fernSingle1Leaf5|plantFiddleHeadFrond10_polySurface133|plantFiddleHeadFrond10_polySurfaceShape133.instObjGroups.objectGroups[1]";
 
 
 global proc clearRefEditOnSelected() {
@@ -39,12 +39,12 @@ global proc clearRefEditOnSelected() {
 			
 			if ($refNodes[$index] == $each){
 				print ("referenceEdit -failedEdits true -successfulEdits true -editCommand connectAttr -removeEdits "+$every+"\n");
-				referenceEdit -failedEdits true -successfulEdits true -editCommand connectAttr -removeEdits $every;
+				referenceEdit -failedEdits true -successfulEdits true -removeEdits $every;
 				
 				//if ($shapeNodes[$index] != ""){
-					print ("referenceEdit -failedEdits true -successfulEdits true -editCommand connectAttr -removeEdits "+$shapeNodes[$index]+"\n");
+					print ("referenceEdit -failedEdits true -successfulEdits true -removeEdits "+$shapeNodes[$index]+"\n");
 					if ($shapeNodes[$index] != ""){
-						referenceEdit -failedEdits true -successfulEdits true -editCommand connectAttr -removeEdits $shapeNodes[$index];
+						referenceEdit -failedEdits true -successfulEdits true -removeEdits $shapeNodes[$index];
 					}
 				//}
 			}

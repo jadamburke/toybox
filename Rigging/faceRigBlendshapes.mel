@@ -1,0 +1,79 @@
+// faceRigBlendshapes
+// Created by: jason
+// Date: 2013/03/18 10:21:19
+
+global proc faceRigBlendshapes(){
+
+string $sels[] = `ls -sl`;
+for ($geo in $sels)
+{
+    
+    //duplicate the geo
+    string $names[] = {"filter_in_", "face_rig_", "eye_rig_", "face_deformer_"};
+    int $i = 0;
+    for($name in $names)
+    {
+    //if the group doesnt exist, make it
+        string $rootName2 = substitute("bnd_",$geo,"");
+        print ($rootName2+"\n");
+        string $rootName = substitute ("geo_",$rootName2,"");
+        print ($rootName+"\n");
+        if (!`objExists ($name+"geo_GRP")`)
+        {
+            group -em -n ($name+"geo_GRP");
+        }
+        
+        string $theGroup = ($name+"geo_GRP");
+        
+        //put the geo in the right place and group
+        string $copy[] = `duplicate -n ($name+$rootName) $geo`;
+        setAttr -lock true ($copy[0]+".translate");
+        setAttr -lock true ($copy[0]+".rotate");
+        setAttr -lock true ($copy[0]+".scale");
+        parent $copy $theGroup;
+        
+        //connect the blendshape
+        if($i == 0)
+        {
+            if(!`objExists ($rootName+$geo+"_to_BND")`)
+            {
+                string $blend[] = `blendShape -frontOfChain -n ($rootName+"_to_BND") $copy[0] $geo`;
+                setAttr ($blend[0]+"."+$copy[0]) 1;
+            }
+        }
+        
+        else
+        {
+            if(!`objExists ($rootName+"_to_filter_in")`)
+            {
+                string $blend[] = `blendShape -n ($rootName+"_to_filter_in") $copy[0] ("filter_in_"+$rootName)`;
+                setAttr ($blend[0]+"."+$copy[0]) 1;
+            }
+            
+            else
+            {
+                blendShape -e  -t ("filter_in_"+$rootName) $i $copy[0] 1 ($rootName+"_to_filter_in");
+                setAttr ($rootName+"_to_filter_in."+$copy[0]) 1;
+            }
+            
+        }
+        
+        $i = $i+1;
+    }
+    
+}    
+
+
+
+
+
+
+
+
+//make or connect the blendshape
+
+
+
+
+
+}

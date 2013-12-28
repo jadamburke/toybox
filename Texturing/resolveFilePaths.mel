@@ -1,0 +1,35 @@
+// resolveFilePaths.mel
+// Created by: adam
+// Date: 2013/04/11 22:46:18
+
+global proc resolveFilePaths(){
+
+}
+
+
+// finds all file paths and ensures their path is a full expanded path
+global proc resolveFilePaths() {
+
+	// resolve file reference paths to absolute path
+	string $fileRefs[] = `file -q -r`;
+	for ($each in $fileRefs){
+		string $filePath = `referenceQuery -filename -wcn $each`;
+		string $rnNode = `referenceQuery -rfn $each`;
+		$resolvedPath = `workspace -en $filePath`;
+		file -loadReference $resolvedPath $each;
+	}
+
+
+	string $mayaFiles[] = `ls -type file -type psdFileTex -type mentalrayTexture`;
+
+	for ($each in $mayaFiles){
+		string $texPath = `getAttr ($each+".ftn")`;
+		string $newPath = `workspace -en $texPath`;
+		setAttr -type "string" ($each+".ftn") $newPath;
+	}
+}
+
+// check smoothing
+// frame range
+// frame by
+// resolution

@@ -5,8 +5,9 @@ global proc dupePerFrame () {
 	$selected = `ls -sl`;
 	float $startFrame = `playbackOptions -q -min`;
 	float $endFrame = `playbackOptions -q -max`;
+	float $byFrame = 1;
 	
-	for ($f= $startFrame;$f <= $endFrame; $f++){
+	for ($f= $startFrame;$f <= $endFrame; $f+=$byFrame){
 		
 		currentTime -e $f;
 

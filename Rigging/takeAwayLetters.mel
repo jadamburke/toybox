@@ -1,0 +1,23 @@
+global proc takeAwayLetters()
+{
+window -title "write what you dont like son" killWindow;
+rowColumnLayout -numberOfColumns 2;
+textField rid;
+button -c "slice" -label "take them away!";
+showWindow killWindow;
+}
+
+global proc slice ()
+{
+string $text = `textField -q -text rid`;
+
+string $selection[] = `ls -selection`;
+ for($tmp in $selection)
+ {
+string $stuff = substitute ($text,$tmp,"");
+  rename $tmp($stuff);
+ 
+
+ 
+ }
+}

@@ -1,0 +1,17 @@
+// referenceBlend.mel
+// Created by: jason
+// Date: 2013/01/07 12:04:19
+
+// BLENDSHAPE BIND GEO TO REFERENCED GEO
+//select the bind geo
+
+global proc referenceBlend()
+{
+    string $bndSel[] = `ls -sl`;
+    for($tmp in $bndSel)
+    {
+        string $rootName = substitute("bnd_",$tmp,"");
+        blendShape -n ($rootName+"_bnd_to_geo") $tmp ("geo_"+$rootName);
+        setAttr ($rootName+"_bnd_to_geo."+$tmp) 1;
+    } 
+}

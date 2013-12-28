@@ -1,0 +1,26 @@
+// copySkinWeights
+// Created by: jason
+// Date: 2013/02/20 12:48:22
+
+global proc copySkinWeights(){
+
+string $son[] = `ls -sl`;
+for($tmp in $son)
+{
+    string $rootName = substitute ("OLD_bnd_",$tmp,"bnd_");
+    string $theJoints[] = `skinCluster -q -weightedInfluence $tmp`;
+    print $theJoints;
+    print "\n";
+    select -cl;
+    select $theJoints;
+    select -tgl $rootName;
+    skinCluster;
+    
+    select $tmp;
+    select -tgl $rootName;
+    copySkinWeights  -noMirror -surfaceAssociation closestPoint -influenceAssociation oneToOne;
+    
+}
+
+
+}

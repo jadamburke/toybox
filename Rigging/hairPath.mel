@@ -1,0 +1,30 @@
+// hairPath.mel
+// Created by: jason
+// Date: 2013/01/08 15:44:30
+
+
+
+//make a window with a text box to specify version number
+global proc hairPath ()
+{
+    window -title "Set the path for the shave node" hairPathWindow;
+    rowColumnLayout -numberOfColumns 2;
+    textField version;
+    button -c "setHairPath" -label "set path";
+    showWindow hairPathWindow;
+}
+//get the project directory and file name
+global proc setHairPath()
+{
+    string $theVersion = `textField -q -text version`;
+    string $projectPath = `workspace -fullName`;
+    
+    string $fileName = `file -q -sn -shn`;
+    string $fileNameParts[];
+    tokenize ($fileName,".",$fileNameParts);
+    
+    string $thePath = ($projectPath+"/data/haircutCache/"+$fileNameParts[0]+"/"+$theVersion);
+    setAttr -type "string" shaveGlobals.tmpDir $thePath;
+    
+    //set the attr of the shave node to the correct directory 
+}

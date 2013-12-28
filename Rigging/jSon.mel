@@ -1,0 +1,438 @@
+//riggin script
+
+
+//Make window
+global proc jSon ()
+{
+window -title "select the joints u wanna rename, name and press" theWindow;
+rowColumnLayout -numberOfColumns 2;
+textField getName;
+button -c "toName" -label "rename";
+textField prefix;
+button -c "addFront" -label "add infront";
+textField suffix;
+button -c "addEnd" -label "add behind";
+textField destroy;
+button -c "takeAway" -label "take away";
+textField padText;
+button -c "addPad" -label "add pad";
+
+button -c "selectFKproc" -label "selected FK!";
+    optionMenu shapeMenu;
+        menuItem -label "circle";
+        menuItem -label "square";
+
+
+//rowColumnLayout -numberOfColumns 2 ;
+intSliderGrp -label "follicleNumber" -field true -fieldMinValue 1 -fieldMaxValue 20 -minValue 1 -maxValue 10 -value 1 numOfFols;
+button -c "folNum" -label "make follicles";
+
+
+frameLayout -collapsable true -label "constraints";
+button -c "worldSwitch" -label "orient world";
+button -c "parentWorld" -label "parent world";
+button -c "threeParentConstraint" -label "three parent";
+
+showWindow theWindow;
+
+
+}
+
+//the Name part
+
+
+//rename process
+
+global proc toName ()
+
+{
+
+// query the textField
+string $text = `textField -q -text getName`;
+
+//create array from selected joints
+string $selectedArray[] = `ls -selection`;
+int $number = 1;
+
+//create a loop that names every one of them
+for($tmp in $selectedArray)
+
+{
+
+string $padNumber = $number;
+
+if($number < 10) $padNumber = ("0"+$padNumber);
+
+string $namedJoint = `rename $tmp($text +"_"+ $padNumber)`;
+
+$number = $number + 1;
+
+
+
+
+}
+}
+
+//add to end process
+
+global proc addEnd ()
+{
+//query the text field
+string $text = `textField -q -text suffix`;
+
+//make array from selected stuff
+string $selectedArray2[] = `ls -selection`;
+
+//make loop that names everyone
+for($tmp in $selectedArray2)
+
+{
+string $subs = `rename $tmp($tmp + $text)`;
+
+
+}
+
+}
+
+
+//add to beginning process
+global proc addFront ()
+{
+//get the text field
+string  $text = `textField -q -text prefix`;
+
+//make array from selected stuff
+string $selectedArray3[] = `ls -selection`;
+
+//make the loop to do it all!
+for($tmp in $selectedArray3)
+
+{
+    string $parts[];
+    
+tokenize ($tmp,"|",$parts);
+int $theSize = `size($parts)`;
+int $x = $theSize-1;
+string $pre = `rename $tmp($text + $parts[$x])`;
+
+}
+
+
+
+
+
+
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+//take away letters
+
+global proc takeAway ()
+{
+string $text = `textField -q -text destroy`;
+
+string $selection[] = `ls -selection`;
+ for($tmp in $selection)
+ {
+string $stuff = substitute ($text,$tmp,"");
+  rename $tmp($stuff);
+ 
+
+ 
+ }
+};
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//add a pad
+global proc addPad()
+{
+    string $padSels[] = `ls -sl`;
+    for($tmp in $padSels)
+    {
+    
+        string $padName = `textField -q -text padText`;
+        
+        string $sub1 = substitute("_CTL",$tmp,"");
+        string $sub2 = substitute("_USE",$sub1,"");
+        string $thePad = `group -em -n ($sub2+$padName)`;
+        
+        string $tempPConst[] = `parentConstraint $tmp $thePad`;
+        delete $tempPConst;
+        
+        string $parent[] = `listRelatives -parent $tmp`;
+        parent $thePad $parent[0];
+        parent $tmp $thePad;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//selected auto FK part
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+global proc selectFKproc ()
+{
+
+
+//select the joints you want
+string  $theseFingers2[] = `ls -selection`;
+
+//make a loop
+for($tmp in $theseFingers2)
+
+{
+    //find the desired shape
+    int $x = `optionMenu -q -sl shapeMenu`;
+    print $x;
+    string $theShape;
+    if($x == 1)
+    {
+        $theShape = "circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 0";
+        
+    }
+    
+    if($x == 2)
+    {
+        $theShape = "curve -d 1 -p 1 0 -1 -p -1 0 -1 -p -1 0 1 -p 1 0 1 -p 1 0 -1 -k 0 -k 1 -k 2 -k 3 -k 4";
+    }
+    
+    //Find the root name of each joint to name the controllers on
+    string $rootName1 = substitute("_CLS", $tmp, "");
+    string $rootName = substitute("_JNT", $rootName1, "");
+    
+    //create and name the controller
+    string $controller[0] = `eval($theShape)`;
+    string $control = `rename $controller[0] ($rootName + "_CTL")`;
+    
+    //create the group used for automation
+    string $controlUse = `group -empty -n ($rootName + "_ctl_USE")`;
+    parent $control $controlUse;
+    
+    //create a group for the controller
+    string $controlGrp = `group -empty -n ($rootName + "_ctl_use_GRP")`;
+    parent $controlUse $controlGrp;
+    
+    //get the controller over to the joint
+    string $tempConstraint[] = `parentConstraint $tmp $controlGrp`;
+    delete $tempConstraint [0];
+    parentConstraint $control $tmp;
+
+
+
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//ribbon script
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//make window - fields for: how many folicles, 
+
+}
+
+
+global proc folNum()
+{
+
+
+//float for later
+float $u = 0;
+
+//get the nurb
+
+string $theNrb[] = `ls -selection`;
+
+//query text
+int $value = `intSliderGrp -q -value numOfFols`;
+print ("input"+$value+"\n");
+
+
+int $value2= $value+1;
+
+for($i=1;$i<$value2;$i++)
+{
+print ($i+"\n");
+
+//get nrb shape
+string $nrbName = $theNrb[0];
+string $nrbShape = ($nrbName +"Shape");
+
+string $name = substitute("_NRB",$nrbName,"");
+
+
+//make and connect the follicles son
+string $fol = `createNode follicle`;
+string $folShapeName = `rename $fol($name+"_"+$i+"_FCLShape")`;
+
+string $folTrans = firstParentOf($folShapeName);
+string $folTransName = `rename $folTrans($name+"_"+$i+"_FCL")`;
+
+connectAttr ($nrbShape+".worldMatrix[0]") ($folShapeName+".inputWorldMatrix");
+connectAttr ($nrbShape+".local") ($folShapeName+".inputSurface");
+
+connectAttr ($folShapeName+".outTranslate") ($folTransName+".translate");
+connectAttr ($folShapeName+".outRotate") ($folTransName+".rotate");
+
+
+//put them in the right places son
+float $z = 1;
+float $y = $z/($value-1);
+print ("i_=_"+$i+"_att_"+$y+"\n");
+
+
+
+
+
+
+
+if($i==1)
+{
+print "pass son";
+setAttr ($folTransName+".parameterV") 0.001;
+setAttr ($folTransName+".parameterU") 0.5;
+}
+
+else if($i==$value)
+{
+setAttr ($folTransName+".parameterV") 0.999;
+setAttr ($folTransName+".parameterU") 0.5;
+}
+
+else
+{
+float $u = $u+$y; 
+
+setAttr ($folTransName+".parameterV") $u;
+setAttr ($folTransName+".parameterU") 0.5;
+}
+print ("U="+$u+"\n");
+
+
+//time to add joints-maybe add a checkbox for them?
+
+string $theJNT = `joint -radius .2 -n ($name+"_"+$i+"_JNT")`;
+parent -w;
+string $jointGRP;
+
+if(`objExists ($name+"_jnt_GRP")`)
+{
+$jointGRP = ($name+"_jnt_GRP");
+parent $theJNT $jointGRP;
+}
+
+else
+{
+string $jointGRP = `group -n ($name+"_jnt_GRP")`;
+}
+
+string $theCTL[] = `circle -c 0 0 0 -nr 0 1 0 -sw 360 -r 1 -d 3 -ut 0 -tol 0.01 -s 8 -ch 1`;
+string $theCTLName = `rename $theCTL[0] ($name+"_"+$i+"_jnt_CTL")`;
+
+string $theGRP = `group -n ($name+"_"+$i+"_jnt_ctl_GRP")`;
+
+parentConstraint $theCTLName $theJNT;
+//parent $theCTLName $theGRP;
+parentConstraint $folTransName $theGRP;
+
+
+}
+}
+/////////////////////////////////////////////////////////////////////////////////////////
+
+global proc worldSwitch()
+{
+    string $son[] = `ls -sl`;
+    string $poleVector = $son[0];
+    string $masterControl = $son[1];
+    string $footControl = $son[2];
+    select $poleVector;
+    pickWalk -d up;
+    string $poleVectorGroup[] = `ls -sl`;
+    string $pCon[] = `parentConstraint -maintainOffset $masterControl $footControl $poleVectorGroup[0]`;
+    
+    addAttr -ln "world"  -at double  -min 0 -max 1 -dv 0 $poleVector;
+    setAttr -e-keyable true ($poleVector+".world");
+    
+    string $revNode = `createNode reverse -n ($poleVector+"_world_REV")`;
+    connectAttr ($poleVector+".world") ($pCon[0]+"."+$masterControl+"W0");
+    connectAttr ($poleVector+".world") ($revNode+".inputX");
+    connectAttr ($revNode+".outputX") ($pCon[0]+"."+$footControl+"W1");
+
+}
+/////////////////////////////////////////////////////////////////////////////
+
+global proc orientWorld()
+{
+
+     //head and fk arms world switch
+    
+    //1-select world control
+    //2-select constrained control
+    //3-select controller to be constrained (probably the group of it)
+    //4-select controller to have attribute on it
+    
+    string $son[] = `ls -selection`;
+    //string $rootName = substitute("",$son[2],"");
+    string $revNode = `createNode reverse -name ($son[2]+"_REV")`;
+    
+    string $transConstraint1[] = `parentConstraint -mo -skipRotate x -skipRotate y -skipRotate z -weight 1 $son[1] $son[2]`;
+    string $rotConstraint1[] = `parentConstraint -mo -skipTranslate x -skipTranslate y -skipTranslate z $son[0] $son[1] $son[2]`;
+    
+    addAttr -ln "world"  -at double  -min 0 -max 1 -dv 0 ($son[3]);
+    setAttr -e-keyable true ($son[3]+".world");
+    
+    connectAttr ($son[3]+".world") ($rotConstraint1[0]+"."+$son[0]+"W0");
+    connectAttr ($son[3]+".world") ($revNode+".inputX");
+    connectAttr ($revNode+".outputX") ($rotConstraint1[0]+"."+$son[1]+"W1");
+
+}
+
+
+//////////////////////////////////////////////////////////////
+global proc threeParentConstraint()
+{
+    //elbow pol vector constraints
+    //master control - cog - ik hand
+    
+    string $son[] = `ls -sl`;
+    string $masterControl = $son[0];
+    string $cogControl = $son[1];
+    string $handControl = $son[2];
+    string $polVector = $son[3];
+    
+    string $polGroup = substitute("_POL",$polVector,"_pol_GRP");
+    
+    string $pConst[] = `parentConstraint -mo $masterControl $cogControl $handControl $polGroup`;
+    
+    addAttr -ln "space"  -at "enum" -en "master:cog:hand:"  $polVector;
+    setAttr -e-keyable true ($polVector+".space");
+    
+    setAttr ($polVector+".space")0;
+    setAttr ($pConst[0]+"."+$masterControl+"W0") 1;
+    setDrivenKeyframe -currentDriver ($polVector+".space") ($pConst[0]+"."+$masterControl+"W0");
+    setAttr ($polVector+".space")1;
+    setAttr ($pConst[0]+"."+$masterControl+"W0") 0;
+    setDrivenKeyframe -currentDriver ($polVector+".space") ($pConst[0]+"."+$masterControl+"W0");
+    
+    setAttr ($polVector+".space") 1;
+    setAttr ($pConst[0]+"."+$cogControl+"W1") 1;
+    setDrivenKeyframe -currentDriver ($polVector+".space") ($pConst[0]+"."+$cogControl+"W1");
+    setAttr ($polVector+".space") 2;
+    setAttr ($pConst[0]+"."+$cogControl+"W1") 0;
+    setDrivenKeyframe -currentDriver ($polVector+".space") ($pConst[0]+"."+$cogControl+"W1");
+    setAttr ($polVector+".space") 0;
+    setAttr ($pConst[0]+"."+$cogControl+"W1") 0;
+    setDrivenKeyframe -currentDriver ($polVector+".space") ($pConst[0]+"."+$cogControl+"W1");
+    
+    setAttr ($polVector+".space") 2;
+    setAttr ($pConst[0]+"."+$handControl+"W2") 1;
+    setDrivenKeyframe -currentDriver ($polVector+".space") ($pConst[0]+"."+$handControl+"W2");
+    setAttr ($polVector+".space") 1;
+    setAttr ($pConst[0]+"."+$handControl+"W2") 0;
+    setDrivenKeyframe -currentDriver ($polVector+".space") ($pConst[0]+"."+$handControl+"W2");
+    
+
+
+
+}
