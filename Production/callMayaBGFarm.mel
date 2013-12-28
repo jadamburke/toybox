@@ -1,0 +1,100 @@
+//callMayaBG `file -q -sn` `workspace -q -rd` "" "print \"Hello\"" 1;
+//callMayaBG `file -q -sn` `workspace -q -rd` "" "abxShotsMaster()";
+
+global proc int callMayaBGFarm (int $noUI, int $threaded, string $filePath, string $projDir, string $sourceScript, string $command){
+    
+    $ppTools = `getenv MAYA_PPTOOLS`;
+    $smedgePath = "C:/\"Program Files (x86)\"/Smedge2014/Submit.exe script ";
+    // basic job type and range info (required by smedge)
+    $smedgeOptions = "-type \"MayaTask\" -Range 1-1 -Pool \"maya_task\" -Priority 80 ";
+    // file to open in batch mode
+    $smedgeOptions += ("-scene \""+$filePath+"\" ");
+    // job name
+    $smedgeOptions += ("-name \"Task:"+`basenameEx $filePath`+"\" ");
+    // job project path
+    $smedgeOptions += ("-project \""+$projDir+"\" ");
+    // scripts to source
+    $smedgeOptions += ("-source \""+$sourceScript+"\" ");
+    // commands to execute upon loading
+    // maya idiotically does not source before command is called so we must prepend it
+    $command = ("source \\\""+$sourceScript+"\\\";"+$command);
+    $smedgeOptions += ("-command \""+encodeString($command)+";quit -f;\" ");
+
+    /*
+    //$mayaBG = ($ppTools+"/env/ppMayaBatch.bat");
+    $mayaBG = "//moon/pipeline/pub/maya/2012-x64/env/ppMayaRender.bat";
+    $mayaCmdLine = "-prompt ";
+    // if noUI is false then run the interactive maya
+    if (!$noUI){
+         $mayaBG = "//moon/pipeline/pub/maya/2012-x64/env/ppMaya.bat"; 
+         $mayaCmdLine = " "; 
+    }
+
+    string $sysCmd = "";
+    $command = ("source \\\""+$ppTools+"/scripts/production/abxLockFile.mel\\\";"+$command);
+    $command += ";mayaBGQuit();";
+
+    //$command += ("quit -f;");
+    if (`about -os` == "mac") {
+	    $result = exec ("mayabatch -prompt -proj \""+$projDir+"\" -command \""+$command+"\" -file \""+$filePath+"\" -script \""+$sourceScript+"\"");
+        print $result;
+    }
+    else if (`about -os` == "win" || `about -os` == "win64"){
+        if ($threaded == 1)
+            $sysCmd = ("start \""+$mayaBG+"\" ");
+        else 
+            $sysCmd = ($mayaBG+" ");
+    	
+    	///print ("system start "+$mayaBG+" \""+toNativePath($abxScriptPath)+"\"\n");
+    }
+    //else {
+    //	system (" \""+toNativePath($abxScriptPath)+"\" &");
+    //}
+    if ($projDir != "")
+        $sysCmd += ("-prompt -proj \""+$projDir+"\" ");
+    if ($command != "")
+        $sysCmd += ("-command \""+$command+"\" ");
+    if ($filePath != "")
+        $sysCmd += ("-file \""+$filePath+"\" ");
+    if ($sourceScript != ""){
+        $sysCmd += ("-script \""+$sourceScript+"\"");
+    }
+   
+    $smedge = "start C:/\\\"Program Files (x86)\\\"/Smedge2012.1/Submit.exe";
+    $smedge += (" script -scene \\\""+$filePath+"\\\"");
+    // frame ranges are irrelevant, scripts will execute caching
+
+    $smedge += (" -type 0 -paused yes ");
+    //$smedge += (" -product \"Maya\"");
+    $smedge += (" -j \\\"Maya Interactive Batch Job\\\"");
+    if ($projDir != "")
+        $sysCmd += (" -proj \""+$projDir+"\" ");
+    $smedge += (" -p 50");
+    $smedge += (" -extra ");
+    if ($command != "")
+        $smedge += ("-command \\\""+$command+"\\\" ");
+    if ($sourceScript != "")
+        $smedge += ("-script \\\""+$sourceScript+"\\\"");
+
+    
+    //print ("system (\""+$sysCmd+"\");\n");
+    print ("system (\""+$smedge+"\");\n");
+    system ($smedge);
+     */
+    string $smedge = ($smedgePath+$smedgeOptions);
+    print ("system (\""+$smedge+"\");\n");
+    system ($smedge);
+
+    // add checks to make all processes were successful.
+    return 1;
+}
+
+// quits maya if no errors occurred
+global proc mayaBGFarmQuit(){
+        quit -f;
+}
+
+/*
+C:\Users\adam>C:/"Program Files (x86)"/Smedge2012.1/Submit.exe script -type "MayaTask"  -paused yes -Range 1-1 -scene "M:/STORY2012_PP10088/3D/STORY2012_maya/scenes/_ALL_SHOTS/TESTING/TESTING_010/ANM/
+work/TESTING_010_anm_v012.ma" -name "Maya Interactive Batch Job"
+*/

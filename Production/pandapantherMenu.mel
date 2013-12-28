@@ -6,51 +6,68 @@
 
 
 global proc pandapantherMenu () {
+	
 
-	global string $gPPScripts; // = "//MONKEY/Resources/Maya/2012-x64/scripts";
+	print ("Generating PandaPanther Menu\n");
+	string $ppScripts = `getenv MAYA_PPTOOLS`; // = "//MONKEY/Resources/Maya/2012-x64/scripts";
 
 	global string $gMainWindow;
 
-
+	string $menuTitle = "PandaPanther";
+	if (`getenv MODE` == "dev" || `getenv MODE` == "DEV")
+		$menuTitle = "**PandaPanther DEV**";
 	if (`menu -q -exists  ppMainMenu`){
     		menu -e -dai  ppMainMenu;
     	}
 	else {
 		setParent $gMainWindow ;
-    		menu -l "PandaPanther" -p MayaWindow -to true ppMainMenu ;
+    		menu -l $menuTitle -p MayaWindow -to true ppMainMenu ;
     	}
 
 	setParent -menu ppMainMenu ;
 
 	menuItem -label "New Scene" -sm true;
-
-		menuItem -l "New HD Scene 24fps" -c "ppDoNewScene \"hd24fps\"";
-
-		menuItem -l "New SD Scene 24fps" -c "ppDoNewScene \"hd24fps\"";
-	
-		menuItem -divider true ;
-	
 		menuItem -l "New Empty Scene" -c "ppDoNewScene \"empty\"";
-
+		menuItem -divider true ;
+		menuItem -l "New Anm Scene" -c "ppDoNewScene (\"anm\")";
+		menuItem -l "New Lgt Scene" -c "ppDoNewScene (\"lgt\")";
+		menuItem -divider true ;
 		menuItem -l "New Rig Scene" -c "ppDoNewScene \"rig\"";
 
 	setParent -menu ppMainMenu;
-	menuItem -en 0 -l  "New Camera";
-	menuItem -en 1 -l "Save Increment" -c ("if (`exists abxShots`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/abxShots.mel\";if (`exists abxShots`) abxShotsIncrementalSave \"auto\" \"\" \"\"");
+	menuItem -en 1 -l  "New Camera" -sm true;
+		menuItem -en 1 -l "Camera" -c "ppDoNewCamVerbosity \"camera\" 1";
+		menuItem -en 1 -l "Camera and Aim" -c "ppDoNewCamVerbosity \"cameraAim\" 1";
+		menuItem -en 1 -l "Camera, Aim and Up" -c "ppDoNewCamVerbosity \"cameraAimUp\" 1";
+		menuItem -divider true ;
+		menuItem -en 1 -l "Camera Orbit" -c "ppDoNewCamVerbosity \"orbitCam\" 1";
+		menuItem -divider true ;
+		menuItem -l "StereoCam Tools" -c ("if (`exists ppStereoCam`==0) source \""+$ppScripts+"/scripts/production/ppStereoCam.mel\";if (`exists ppStereoCam`) ppStereoCam");
+		menuItem -divider true ;
+		menuItem -l "renderCam for Track Shots" -c "ppDoNewCamVerbosity \"renderCam4Track\" 1";
+
+	setParent -menu ppMainMenu;
+	menuItem -en 1 -l "Save Increment" -c ("if (`exists abxShots`==0) source \""+$ppScripts+"/scripts/Production/abxShots.mel\";if (`exists abxShots`) abxShotsIncrementalSave \"auto\" \"\" \"\"");
 
 	menuItem -divider true ;
 
-	menuItem -l  "Playblast HUD" -c ("if (`exists playblastHUD`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/playblastHUD.mel\";if (`exists playblastHUD`) playblastHUD");
-	menuItem -l "Anim Playblast..." -sm true ppAnimPBMenu;
+	menuItem -l  "Playblast HUD" -cb 1 -c ("if (`exists playblastHUD`==0) source \""+$ppScripts+"/scripts/Toolbox/Pipeline/playblastHUD.mel\";if (`exists playblastHUD`) playblastHUD");
 
-		menuItem -parent ppAnimPBMenu -l "Playblast renderCam" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";ppStereoCamAnmPlayblast \"center\"  \"parallel\"0");
-		menuItem -divider true;
-		menuItem -parent ppAnimPBMenu -l "Playblast Left" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";ppStereoCamAnmPlayblast \"left\"  \"parallel\"0");
-		menuItem -parent ppAnimPBMenu -l "Playblast Right" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";ppStereoCamAnmPlayblast \"right\"  \"parallel\"0"); 
+	menuItem -l "PP Auto Playblast" -c (" source \""+$ppScripts+"/scripts/Production/ppPlayblast.mel\";ppPlayblastDoCurrentScene 2");
+	
+	menuItem -l "Change HUD User Name" -c ("if (`exists playblastHUD`==0) source \""+$ppScripts+"/scripts/Toolbox/Pipeline/playblastHUD.mel\";if (`exists playblastHUDNameOverride`) playblastHUDNameOverride");
+
+	//menuItem -l "Anim Playblast..." -sm true ppAnimPBMenu;
+
+		//menuItem -parent ppAnimPBMenu -l "Playblast renderCam" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";ppStereoCamAnmPlayblast \"center\"  \"parallel\"0");
+		//menuItem -divider true;
+		//menuItem -parent ppAnimPBMenu -l "Playblast Left" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";ppStereoCamAnmPlayblast \"left\"  \"parallel\"0");
+		//menuItem -parent ppAnimPBMenu -l "Playblast Right" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";ppStereoCamAnmPlayblast \"right\"  \"parallel\"0"); 
 		 
-		setParent -menu ..;
+		//setParent -menu ..;
+	menuItem -divider true ;
 
-	menuItem -l "StereoCam Tools" -c ("if (`exists ppStereoCam`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/ppStereoCam.mel\";if (`exists ppStereoCam`) ppStereoCam");
+	menuItem -l "StereoCam Tools" -c ("if (`exists ppStereoCam`==0) source \""+$ppScripts+"/scripts/production/ppStereoCam.mel\";if (`exists ppStereoCam`) ppStereoCam");
 	menuItem -divider true ;
 
 
@@ -75,7 +92,7 @@ global proc pandapantherMenu () {
 
 
 	menuItem -divider true ;
-	menuItem -label "Auto Master Scene" -c ("if (`exists abxShots`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/abxShots.mel\";if (`exists abxShots`) abxShotsMaster \"auto\" \"\" \"\"");
+	menuItem -label "Auto Master Scene" -c ("if (`exists abxShots`==0) source \""+$ppScripts+"/scripts/Toolbox/Pipeline/abxShots.mel\";if (`exists abxShots`) abxShotsMaster \"auto\" \"\" \"\"");
 	
 
 	// Passes Tool
@@ -83,12 +100,15 @@ global proc pandapantherMenu () {
 
 	menuItem -divider true ;
 
-	menuItem -en 0 -l "Render Farm Submit";
+	//menuItem  -l "Render Farm LO Submit" -c"python(\"import rainbow.render;reload(rainbow.render);rainbow.render.pre_render_check()\")";
+	menuItem  -l "Render Farm Submit" -c"ppRenderFarmSubmit";
 
 	// smedge renderer
-	menuItem -l "Render Farm Manager" -c "system \"start \\\"C:/Program Files (x86)/Smedge 2011/SmedgeGui.exe\\\"\"";
+	menuItem -l "Render Farm Manager" -c "system \"start \\\"C:/Program Files (x86)/Smedge2001.1/SmedgeGui.exe\\\"\"";
 
-	// 
+	menuItem -divider true ;
+	menuItem -l "Export Camera for Nuke" -c "ppNukeCamExport \"\"";
+	menuItem -l "Export Nulls on Selected" -c "ppNukeNullsExport \"\"";
 
 	//menuItem -divider true ;
 
@@ -101,10 +121,165 @@ global proc pandapantherMenu () {
 	menuItem -l "Browse Maya Project" -c "ppBrowseProject";
 
 	menuItem -divider true ;
-	menuItem -l "PandaPanther Wiki" -c "system \"start \\\"C:/Program Files (x86)/Mozilla Firefox/firefox.exe\\\" \\\"http://wiki.pandapanther.com/groups/pandapantherproductionwiki/\\\"\"";
+	menuItem -l "Documentation" -c "system \"start \\\"C:/Program Files (x86)/Mozilla Firefox/firefox.exe\\\" \\\"http://rainbow/docs/\\\"\"";
+	//menuItem -l "Old Wiki" -c "system \"start \\\"C:/Program Files (x86)/Mozilla Firefox/firefox.exe\\\" \\\"http://wiki.pandapanther.com/groups/pandapantherproductionwiki/\\\"\"";
+	menuItem -divider true;
+	menuItem  -l "Refresh Pipeline Tools" -c "ppMenuUpdate";
+	//menuItem  -l "Test" -c "ppMenuUpdate";
 
 	
 }
 
+global proc ppRenderFarmSubmit(){
+
+	// check for ref updates before submit
+	abxShotsCheckAllRefsForUpdate; 
+
+	// check for cache updates before submit
+	//evalEcho("source \""+`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Misc/autoCache.mel\";autoCacheFindLatest \"clothSim\";autoCacheFindLatest \"hairSim\"");
+
+	//cloudRezCheck; 
+
+	// turn off distributed rendering
+	evalEcho("if(`objExists vraySettings`) setAttr \"vraySettings.sys_distributed_rendering_on\" 0;");
+
+	// BAKE STEREO CAMS INTO TWO INDIVIDUAL CAMERAS
+	if (`objExists anm:stereoCam` || `objExists anm:master:stereoCam` || `objExists stereoCam` || `objExists master:stereoCam`){
+		evalEcho("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/ppStereoCam.mel\"");
+		$objToDelete = {"l","r"};
+		for ($each in $objToDelete){
+			catchQuiet(`delete $each`);
+		}
+		ppStereoCamMaster("l","r");
+	}
+
+	int $result = python("import rainbow.render;reload(rainbow.render);rainbow.render.pre_render_check();");
+
+	// if the python render submit was not aborted (returns non-zero result)
+	if ($result != 0){
+		// export a baked fbx version of the camera and save in /JOB/COMP/_ALL_SHOTS/..../CAM/*.fbx
+		ppNukeCamExport("");
+	}
+	
+}
+
+// avoids having users restart by rehash on scripts and recreating the ppMenu
+global proc ppMenuUpdate (){
+string $ppScripts = `getenv MAYA_PPTOOLS`;	
+
+	string $result = `confirmDialog -title "pandaPantherMenu Update" -message "This will update all tools without restarting. Make sure to close and reopen any pp tools you already have open" -button "OK" -button "Cancel" -defaultButton "OK" -cancelButton "Cancel" -dismissString "Cancel"`;
+	if ($result == "OK") {
+		//print ("// resourcing stuff\n");
+		catch(eval("source \""+$ppScripts+"/scripts/production/ppPlayblast.mel\""));
+		catch(eval("source \""+$ppScripts+"/scripts/production/abxShots.mel\""));
+		catch(eval("source \""+$ppScripts+"/scripts/production/abxAssets.mel\""));
+		catch(eval("source \""+$ppScripts+"/scripts/production/abxProject.mel\""));
+		catch(eval("source \""+$ppScripts+"/scripts/production/abxToybox.mel\""));
+		catch(eval("source \""+$ppScripts+"/scripts/production/pprainbow.mel\""));
+		catch(eval("source \""+$ppScripts+"/scripts/production/abxLockFile.mel\""));
+		catch(eval("source \""+$ppScripts+"/scripts/production/ppNewScene.mel\""));
+		catch(eval("source \""+$ppScripts+"/scripts/production/ppStereoCam.mel\""));
+		//eval("source \""+$ppScripts+"/scripts/production/pandapantherMenu.mel\"");
+		evalDeferred("source \""+$ppScripts+"/scripts/production/pandapantherMenu.mel\";pandapantherMenu;");
+		//print ("// done resourcing stuff\n");
+
+		if (`window -exists abxShotsWindow`){
+			deleteUI abxShotsWindow;
+			abxShots;
+		}
+		if (`window -exists abxAssetsWindow`){
+			deleteUI abxAssetsWindow;
+			abxAssets;
+		}
+	}
+	
+}
+
+// redefinition of checkMainFileMenu found in 
+global proc checkMainFileMenu()
+{
+	$enable = false;
+	if (`optionVar -exists "RecentFilesList"`)
+	{
+		if (`optionVar -arraySize "RecentFilesList"` > 0) $enable = 1;		
+	}
+	menuItem -e -enable $enable FileMenuRecentFileItems;
+	
+	$enable = hasIncrementalSaves();
+	menuItem -e -enable $enable FileMenuRecentBackupItems;
+
+	$enable = false;
+	if (`optionVar -exists "RecentProjectsList"`)
+	{
+		if (`optionVar -arraySize "RecentProjectsList"` > 0) {
+			$enable = true;		
+		}
+	}
+	menuItem -e -enable $enable FileMenuRecentProjectItems;
+
+	// Create "Send To" menu items for one-click
+	// interop with available applications.
+	//
+	buildSendToSubMenus;
+	pandapantherMenuAlterMenus;
+}
 
 
+// alters main menus to prevent people from doing things the wrong way
+global proc pandapantherMenuAlterMenus(){
+
+	global string $gMainWindow;
+	global string $gMainFileMenu;
+
+	if (`menu -q -exists  $gMainFileMenu`){
+
+		string $childrenItems[] = `menu -q -itemArray $gMainFileMenu`;
+
+		for ($each in $childrenItems){
+			// replace new scene
+			/* DISABLED
+			if (`menuItem -q -l $each` == "New Scene"){
+				//print ("Changing New Scene Command From:\""+`menuItem -q -c $each`+"\" to \"\"\n");
+				menuItem -e -c "pandapantherMenuNewScene;" $each;
+			}
+			*/
+		
+			// replace import
+			if (`menuItem -q -l $each` == "Import..."){
+				//print ("Changing Import Command From:\""+`menuItem -q -c $each`+"\" to \"\"\n");
+				menuItem -e -c "pandapantherMenuImport;" $each;
+			}
+
+		
+		}
+	}
+}
+
+global proc pandapantherMenuNewScene () {
+	$result = `confirmDialog -title "PP New Scene" -message "Choose Which New Scene Method You Want to Use.\n Use PandaPanther New Scene if you are not sure." -button "Original New Scene" -button "PandaPanther New Scene"  -button "Cancel" -defaultButton "PandaPanther New Scene" -cancelButton "Cancel" -dismissString "Cancel"`;
+	if ($result == "PandaPanther New Scene"){
+		eval("ppDoNewScene (\"empty\")");
+	}
+	else if ($result == "Original New Scene"){
+		eval("NewScene");
+	}
+	else{
+
+	}
+
+}
+
+
+global proc pandapantherMenuImport () {
+	$result = `confirmDialog -title "PP Import" -message "Choose Which Import Method You Want to Use. Use PP Import if you are not sure." -button "Original Import" -button "PandaPanther Import"  -button "Cancel" -defaultButton "PandaPanther Import" -cancelButton "Cancel" -dismissString "Cancel"`;
+	if ($result == "PandaPanther Import"){
+		eval("abxShotsImportOtherFile \"\"");
+	}
+	else if ($result == "Original Import"){
+		eval("Import");
+	}
+	else{
+
+	}	
+	
+}

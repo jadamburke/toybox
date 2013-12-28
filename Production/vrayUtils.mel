@@ -1,0 +1,16 @@
+global proc connectVrayProxyMaterials (string $vrayProxyMeshes[], string $prefix)   {
+    if (size($vrayProxyMeshes)==0)
+        $vrayProxyMeshes = `ls -type VRayMeshMaterial`;
+
+    for ($each in $vrayProxyMeshes){
+        $count = `getAttr -size ($each+".shaderNames")`;
+        for ($c=0;$c<$count;$c++){
+            $shaderName = `getAttr ($each+".shaderNames["+$c+"]")`;
+            $shaderName = ($prefix+$shaderName);
+            if (`objExists $shaderName`){
+                catch(`connectAttr ($shaderName+".outColor") ($each+".shaders["+$c+"]")`);
+            }
+            print ("Could not find shader:"+$shaderName+". Skipping vray shader assignment. Please assign manually\n");
+        }
+    }
+}

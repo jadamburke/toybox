@@ -1,0 +1,138 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: abCleanAnimationCurves
+''    Author:  
+''    Last Updated: Sep 27, 2006
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/animation/4302.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+/*
+abCleanAnimationCurves
+brendan ross  09.26.2006
+www.supercrumbly.com
+
+
+use:
+
+Quickly delete all excess flat tangents keys on selected animation curves.
+
+
+instructions:
+
+Select the curves you want to clean up and run the script by entering "abCleanAnimationCurves" in your command line or script editor.
+
+*/
+
+
+global proc abCleanAnimationCurves(){
+	//deletes all redundant flat tangent keyframes from curves selected in the graph editor
+	
+	float $angleTol = 2; //tangents with angles below this value will be considered flat.
+	float $valueTol = .001; //neighboring values that fall within this tolerance will be considered matching.
+	
+	string $aCurvesShown[] = `keyframe -query -name -sl`;
+	
+	if (size($aCurvesShown) > 0){
+		
+		string $curve, $aStr[], $evalStr, $plural;
+		float $aValue[], $aInAngle[], $aOutAngle[];
+		float $currentTime, $aFlt[], $prevValDif, $nextValDif;
+		int $totKeys, $i, $aDelInd[];
+		int $counter = 0;
+		string $aCharSets[] = `ls -type character`;
+		
+		//progress bar stuff
+		
+		int $prog;
+		float $progDenom = float(size($aCurvesShown));
+		float $progNum = 0;
+		waitCursor -state on;
+		progressWindow -title "Working" -progress 0 -status "Deleting Extra Keyframes";
+		
+		
+		for ($curve in $aCurvesShown){
+			
+			//service the progress bar
+			
+			$progNum += 1;
+			$prog = int(($progNum/$progDenom)*100.0);
+			progressWindow -e -progress $prog;
+			
+			//do some clean up
+			
+			clear($aInAngle);
+			clear($aOutAngle);
+			clear($aDelInd);
+			clear($aValue);
+			
+			$aStr = `listConnections -plugs yes -source no $curve`;
+			$curveAtt = $aStr[0];
+			
+			//run through all keyframes on this curve
+			//make an array of value, inAngle, outAngle
+			
+			$aInAngle = `keyTangent -query -inAngle $curve`;
+			$aOutAngle = `keyTangent -query -outAngle $curve`;
+			
+			//make $aInAngle and $aOutAngle absolute values for less work on the comparison
+			
+			for ($i=0;$i<size($aInAngle);$i++) $aInAngle[$i] = abs($aInAngle[$i]);
+			for ($i=0;$i<size($aOutAngle);$i++) $aOutAngle[$i] = abs($aOutAngle[$i]);
+			
+			$currentTime = `findKeyframe -which first $curve`;
+			
+			$totKeys = `keyframe -query -keyframeCount $curve`;
+			
+			for ($i=0;$i<$totKeys;$i++){
+				currentTime -edit $currentTime -update false;
+				$aFlt = `keyframe -query -eval $curve`;
+				$aValue[$i] = $aFlt[0];
+				clear($aFlt);
+				$currentTime = `findKeyframe -which next $curve`;
+			}
+			
+			//now sort through arrays and find deleteable keys
+			
+			for ($i=0;$i<$totKeys;$i++){
+				
+				if ($i == 0 || $i == ($totKeys-1)) continue;
+				if ($aOutAngle[$i-1] < $angleTol && $aInAngle[$i] < $angleTol && $aOutAngle[$i] < $angleTol && $aInAngle[$i+1] < $angleTol){	
+					$prevValDif = abs($aValue[$i-1] - $aValue[$i]);
+					$nextValDif = abs($aValue[$i+1] - $aValue[$i]);
+					if ($prevValDif < $valueTol && $nextValDif < $valueTol){
+						$aDelInd[size($aDelInd)] = $i;
+					}
+				}
+			}
+			
+			//make cutKey string
+			
+			if (size($aDelInd) > 0){
+				$evalStr = "cutKey -clear";
+				for ($i in $aDelInd) $evalStr += " -index "+$i;
+				$evalStr += " "+$curve;
+				eval($evalStr);
+				$counter += size($aDelInd);
+			}
+		}
+		
+		//end progress window
+		
+		progressWindow -endProgress;
+		waitCursor -state off;
+		
+		//give user some stats (everyone loves stats, right?)
+		
+		$plural = ($counter > 1 || $counter == 0) ? "s" : "";
+		print ($counter+" keyframe"+$plural+" cleaned up.");
+		
+	}else{
+		warning "Select at least one animation curve to clean.";
+	}
+}

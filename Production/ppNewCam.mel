@@ -1,0 +1,276 @@
+// ppNewScene
+
+
+
+// this method import a new cam from template scene files
+// by temporarily setting the new file scene option vars to hardcoded template file locations
+// it then restores the option vars to their original values before returning
+
+
+global proc ppNewCam () {
+
+}
+
+global proc ppDoNewCam (string $which) {
+	ppDoNewSceneVerbosity($which, true);
+}
+
+global proc ppDoNewCamQuiet (string $which) {
+	ppDoNewSceneVerbosity($which, false);
+}
+
+global proc ppDoNewCamVerbosity (string $which, int $verbose) {
+	if ($verbose) print ("DOING THE NEW ONE\n");
+	string $ppTools = `getenv MAYA_PPTOOLS`;
+
+	string $newFile = "";
+	
+	switch ($which){
+		case "camera":
+			$newFile = ($ppTools+"/sceneTemplates/cameras/renderCam.ma");
+			break;
+		case "cameraAim":
+			$newFile = ($ppTools+"/sceneTemplates/cameras/renderCamAim.ma");
+			break;
+		case "cameraAimUp":
+			$newFile = ($ppTools+"/sceneTemplates/cameras/renderCamAimUp.ma");
+			break;
+		case "orbitCam":
+			$newFile = ($ppTools+"/sceneTemplates/cameras/orbitCam.ma");
+			break;
+		case "moPathCam":
+			$newFile = ($ppTools+"/sceneTemplates/cameras/moPathCam.ma");
+			break;	
+		case "renderCam4Track":
+			$newFile = ($ppTools+"/sceneTemplates/cameras/renderCam4Track.ma");
+		default: 
+			break;
+	}
+
+
+	if ($verbose) print ("$newCamFile ="+$newFile+"\n");
+	if ($newFile != "")  {
+		//optionVar -intValue "newFileEnabled" 1;
+		//optionVar -stringValue "newFileName" $newFile;
+	}
+	else {
+		//warning ("Could not resolve new scene type. Reverting to default new scene")
+		//optionVar -intValue "newFileEnabled" 0;
+	}
+
+
+	ppPerformNewCam $newFile $verbose;
+}
+
+
+
+
+
+
+global proc ppPerformNewCam (string $fileToOpen, int $verbose) {
+
+		// import the camera safely
+			string $prefix = "CAMIMPORT";
+			// import the geo with a TEMP namespace to prevent clashes
+			evalEcho ("file -import -loadReferenceDepth \"all\" -namespace \""+$prefix+"\" -pr -options \"v=0\" \""+$fileToOpen+"\"");
+
+
+			// apply scene default config to files in import
+			// configure the camera properties based on the scene defaults
+			ppNewCamConfigDefaults ($prefix);
+
+			if (`objExists renderCam` || `objExists master:renderCam`){
+				if (`objExists ($prefix+":renderCam")`){
+					string $objectsToRename[] = `ls ($prefix+":renderCam*")`;
+					for ($each in $objectsToRename){
+						if (`objExists $each`){
+							print ("rename "+$each+" "+`substitute "renderCam" $each "camera"`+";\n");
+							rename $each `substitute "renderCam" $each "camera"`;
+						}
+					}
+				}
+			}
+
+
+			// find reference namespaces within the TEMP namespace that might clash
+			string $refFiles[] = `file -q -r`;
+			string $parentNamespace[];
+			string $origNamespace[];
+			string $newNamespace[];
+			string $clashNamespace[];
+			for ($i=0;$i<size($refFiles);$i++){
+
+				// get the reference node parent namespaces
+				string $pns[] = `file -q -pns $refFiles[$i]`;
+				if (size($pns) > 0)
+					$parentNamespace[$i] = $pns[0];
+				else
+					$parentNamespace[$i] = "";
+				$origNamespace[$i] = `file -q -namespace $refFiles[$i]`;
+			}
+
+			for ($i=0;$i<size($refFiles);$i++){
+				// if parent namespace is clash
+				if ($parentNamespace[$i] == "CAMIMPORT"){					
+					string $validNamespace = $origNamespace[$i];
+					print ("testing CAMIMPORT namespace:"+$origNamespace[$i]+"\n");
+					// get the ref namespace
+					if (`namespace -ex (":"+$origNamespace[$i])`){
+						print ("found clashing CAMIMPORT namespace:"+$origNamespace[$i]+"\n");
+						$clashNamespace[size($clashNamespace)] = $origNamespace[$i];
+						string $namespace = $origNamespace[$i];
+						string $numIfAny =  `match "[0-9]+$" $namespace`;
+						int $numSize = size($numIfAny);
+						int $endPosition = size($namespace) - $numSize;
+						string $baseNamespace = `substring $namespace 1 $endPosition`;
+						int $number = 1;
+						$validNamespace = ($baseNamespace+$number);
+						// while the ref namespace exists on the root namespace
+						while (`namespace -ex (":"+$validNamespace)`){
+							$number++;
+							$validNamespace = ($baseNamespace+$number);
+						}
+					}
+					// set ref namespace to new namespace
+					$newNamespace[$i] = $validNamespace;
+					//file -e -namespace $validNamespace $each;
+				}
+				else {
+					$newNamespace[$i] = $origNamespace[$i];
+				}
+			}		
+
+			// rename root namespaces that clash
+			for ($i=0;$i<size($refFiles);$i++){
+				// if its not 
+				print ("parentNamespace=\""+$parentNamespace[$i]+"\"\n");
+				if ($parentNamespace[$i] == ""){
+					print ("root namespace found\n");
+					if (stringArrayContains($newNamespace[$i],$clashNamespace)){
+						print ("clashing root namespace found\n");
+						$newNamespace[$i] = ($newNamespace[$i]+"CAMIMPORTTEMP");
+					}
+				}
+			}
+
+
+			// temporarily rename the root level namespaces to allow us to remove the CLASH namespace cleanly;
+			for ($i=0;$i<size($refFiles);$i++){
+				if (`gmatch $newNamespace[$i] "*CAMIMPORTTEMP"`){
+					// move the clashing namespace
+					file -e -namespace $newNamespace[$i] $refFiles[$i];
+					// if the namespace persists after renaming the reference namespace 
+					if (`namespace -ex $origNamespace[$i]`){
+						// move the remaining namespace contents to the root
+						namespace -f -mv $origNamespace[$i] ":";
+						// remove the namespace
+						namespace -rm $origNamespace[$i];
+					}
+				}
+			}			
+				
+			// remove the TEMP namespace by moving its contents to the root. let maya handle non-reference clashes on its own.
+			namespace -f -mv "CAMIMPORT" ":";
+			namespace -set ":";
+			namespace -rm "CAMIMPORT";
+
+
+			// rename the reference node namespaces to their new names
+			for ($i=0;$i<size($refFiles);$i++){
+				if ($parentNamespace[$i] == "CAMIMPORT"){
+					if ($newNamespace[$i] != $origNamespace[$i])
+						file -e -namespace $newNamespace[$i] $refFiles[$i];
+				}
+			}
+
+			// restore the clash namespaces to their old names
+			for ($i=0;$i<size($refFiles);$i++){
+				if (`gmatch $newNamespace[$i] "*CAMIMPORTTEMP"`){
+					file -e -namespace $origNamespace[$i] $refFiles[$i];
+				}
+
+			}		
+
+
+
+}
+
+// check the defaults section for 
+
+global proc ppNewCamConfigDefaults(string $prefix){
+
+	string $workspace = `workspace -q -rd`;
+
+	string $lock = "";
+	float $fps = 0;
+	float $w = 0;
+	float $h = 0;
+	float $hA = 0;
+	float $vA =  0;
+	float $aspect = 0;
+	string $sceneScale = "";
+	string $renderer = "";
+
+	if ($workspace != ""){
+		string $prjDetails[] = abxProjectGetShotDetails($workspace);
+		if (size($prjDetails)>7){
+			//print ("// startDetails\n");
+			//print $prjDetails;
+			$lock = $prjDetails[0];
+			$fps = $prjDetails[1];
+			$w = $prjDetails[2];
+			$h = $prjDetails[3];
+			$hA = $prjDetails[5];
+			$vA =  $prjDetails[6];
+			$aspect = $prjDetails[4];
+			$sceneScale = $prjDetails[7];
+			$renderer = $prjDetails[8];
+		}
+	}
+
+
+	string $newCams[] = `ls -dag -type camera ($prefix+":*")`;
+
+
+	for ($each in $newCams) {
+		if ($hA > 0) {
+			if (`objExists $each`)
+				setAttr ($each+".horizontalFilmAperture") $hA;
+		}
+		if ($vA > 0) {
+			if (`objExists $each`)
+				setAttr ($each+".verticalFilmAperture") $vA;
+		}
+	}
+
+	// scale the scene by 75
+	if ($sceneScale == "realWorld"){
+		// scale camera clipping planes
+		for ($each in $newCams) {
+			$camXform = `listRelatives -parent $each`;
+			float $tx = `getAttr ($camXform[0]+".tx")`;
+			float $ty = `getAttr ($camXform[0]+".ty")`;
+			float $tz = `getAttr ($camXform[0]+".tz")`;
+			setAttr ($camXform[0]+".tx") ($tx*75);
+			setAttr ($camXform[0]+".ty") ($ty*75);
+			setAttr ($camXform[0]+".tz") ($tz*75);
+			setAttr ($each+".locatorScale") 35;
+			setAttr ($each+".nearClipPlane") 7.5;
+			setAttr ($each+".farClipPlane") 75000;
+
+			if (`objExists ($prefix+":renderCam_orbit")`){
+				setAttr ($prefix+":renderCam_orbit"+".sx") 75;
+				setAttr ($prefix+":renderCam_orbit"+".sy") 75;
+				setAttr ($prefix+":renderCam_orbit"+".sz") 75;				
+			}
+			if (`objExists ($prefix+":renderCam_roll")`){
+				setAttr ($prefix+":renderCam_roll"+".sx") 75;
+				setAttr ($prefix+":renderCam_roll"+".sy") 75;
+				setAttr ($prefix+":renderCam_roll"+".sz") 75;				
+			}
+
+		}
+		// size the grid
+	}
+}
+

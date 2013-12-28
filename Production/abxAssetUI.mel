@@ -1,0 +1,69 @@
+
+// loads the asset UI used by the asset manager
+// this code is pretty hacked together at the moment
+global proc abxAssetUI (){
+
+	// create a window or dock
+
+}
+
+global proc abxAssetUILoadForm(string $parentForm){
+
+	setParent $parentForm;
+
+	paneLayout -configuration "horizontal2" abxAssetUIMainPane;
+	
+		tabLayout -cc "" abxAssetsUITopLyt;
+			formLayout -p abxAssetsUITopLyt abxAssetsPickerForm;
+				// tab: abxPicker with default tabs as well as loading custom pickers 
+				tabLayout abxPickerCharTabs;
+			// tab: poses
+			formLayout -p abxAssetsUITopLyt abxAssetsPoseForm;
+			// tab: anim lib
+			formLayout -p abxAssetsUITopLyt abxAssetsClipsForm;
+			setParent ..;
+		setParent ..;
+		tabLayout -imw 0 -imh 0 -cc "" abxAssetsUIBtmLyt;
+			formLayout -p abxAssetsUIBtmLyt abxAssetsToolsForm;
+
+
+	formLayout -e 
+        		-af abxAssetUIMainPane top 0
+        		-af abxAssetUIMainPane left 0
+        		-af abxAssetUIMainPane bottom 0
+        		-af abxAssetUIMainPane right 0
+		$parentForm;
+
+	tabLayout -e 
+	-tabLabel abxAssetsPickerForm "Picker"
+	-tabLabel abxAssetsPoseForm "Poses"
+	-tabLabel abxAssetsClipsForm "Clips"
+	abxAssetsUITopLyt;
+
+	tabLayout -e 
+	-tabLabel abxAssetsToolsForm "Tools"
+	abxAssetsUIBtmLyt;
+
+	paneLayout -e -paneSize 2 100 30 abxAssetUIMainPane;
+
+	// tools at bottom
+
+		// animation import / export
+
+		// ik/fk pose matching
+
+		// reference locking / reloading / deferring
+
+		// reference rebuilding (export temp animation, remove ref, clear namespace, new ref, import animation)
+
+		// geo caching tools
+
+		// set to proxy
+
+		// set to previs
+}
+
+global proc abxAssetUIRefreshForm(string $parentForm){
+
+	
+}

@@ -1,0 +1,75 @@
+//callMayaBG `file -q -sn` `workspace -q -rd` "" "print \"Hello\"" 1;
+//callMayaBG `file -q -sn` `workspace -q -rd` "" "abxShotsMaster()";
+
+global proc int callMayaBG (int $noUI, int $threaded, string $filePath, string $projDir, string $sourceScript, string $command){
+    
+   $ppTools = `getenv MAYA_PPTOOLS`;
+   //$mayaBG = ($ppTools+"/env/ppMayaBatch.bat");
+   $mayaBG = "mayabatch.exe";
+   string $sysCmd = "";
+    if ($noUI == 1){
+        $command = ("source \\\""+$ppTools+"/scripts/production/abxLockFile.mel\\\";"+$command);
+        $command += ";mayaBGQuit();";
+    }
+    else {
+        $command = ("file -mf false;global int $hideProjMan; $hideProjMan = 1;"+$command);
+    }
+    string $result;
+
+
+    //$command += ("quit -f;");
+    //$command += ("quit -f;");
+    if (`about -os` == "mac") {
+        if ($noUI == 1)
+           $mayaBG = "mayabatch";
+        else
+           $mayaBG = "maya";
+        $sysCmd = ($mayaBG+" ");
+        
+    }
+    else if (`about -os` == "win" || `about -os` == "win64"){
+        if ($noUI == 1)
+           $mayaBG = "mayabatch.exe";
+        else    
+           $mayaBG = "maya.exe";
+        if ($threaded == 1)
+            $sysCmd = ("start \""+$mayaBG+"\" ");
+        else 
+            $sysCmd = ($mayaBG+" ");
+        
+        ///print ("system start "+$mayaBG+" \""+toNativePath($abxScriptPath)+"\"\n");
+    }
+
+    //else {
+    //	system (" \""+toNativePath($abxScriptPath)+"\" &");
+    //}
+    if ($noUI == 1)
+        $sysCmd += "-prompt ";
+    if ($projDir != "")
+        $sysCmd += ("-proj \""+$projDir+"\" ");
+    if ($command != "")
+        $sysCmd += ("-command \""+$command+"\" ");
+    if ($filePath != "")
+        $sysCmd += ("-file \""+$filePath+"\" ");
+    if ($sourceScript != ""){
+        $sysCmd += ("-script \""+$sourceScript+"\"");
+    }
+    print ("system (\""+$sysCmd+"\");\n");
+    system ($sysCmd);
+    // add checks to make all processes were successful.
+    return 1;
+}
+
+// quits maya if no errors occurred
+global proc mayaBGQuit(){
+    global int $mayaBGError;
+    if ($mayaBGError){
+        error("Shave Plugin did not successfully load. Mastering Aborted. Contact a TD.");
+    }
+    else if (`getenv "MODE"` == "dev"){
+        print ("DEV MODE must manually exit. Type quit -f; to exit prompt");
+    }
+    else {
+        quit -f;
+    }
+}

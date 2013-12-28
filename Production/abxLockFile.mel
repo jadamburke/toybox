@@ -1,0 +1,618 @@
+// abxLockFile
+// Created by: adam
+// Date: 2012/07/10 10:50:59
+
+//overrides the scene open, save, new scene, to lock and unlock files for use
+// on open, it checks for previously opened file and unlocks it, then locks the new open file
+// on new, it unlocks previosly opened file
+// on save, it updates the lock file's date
+// on maya close it unlocks the currently open scene if any
+// maya crash requires you to flush the lock file
+
+global proc abxLockFile(){
+    print ("abxLockFile.mel: helper utilities for abxAssets.mel and abxShots.mel. See source code for more details\n");
+    // modify the OpenScene default runtime command to include checking for lock files
+
+    string $scriptJobs[] = `scriptJob -lj`;
+    for ($each in $scriptJobs){
+        string $each;
+        if (`gmatch $each "*dispTimeKey*"`){
+            string $tokenBuffer[];
+            tokenize $each ":" $tokenBuffer;
+            $abxLockFileJobNum = $tokenBuffer[0];
+            scriptJob -k (int($abxLockFileJobNum));
+        }
+    }
+    $abxLockFileJobNum = `scriptJob -e "quitApplication" "abxLockFileCheckOut(`file -q -sn`)"`;
+}
+
+// checks the scene file to see if its ok to open
+global proc int abxLockFileGetStatus(string $filePath, int $promptUser){
+
+    global string $abxLockFileTStamp;
+
+    string $thisUser = `getenv USER`;
+
+    if (`filetest -r $filePath`){
+        $lockFile = ("."+`basenameEx $filePath`+".lock");
+        $dirPath = (`dirname $filePath`);
+        $lockFilePath = ($dirPath+"/"+$lockFile);
+        if (`filetest -r $lockFilePath`){
+            // read the file for its contents about file
+            // user name, when they locked the file
+            string $content[];
+            $fileId=`fopen $lockFilePath "r"`;
+                string $nextLine = `fgetline $fileId`;
+                $content[size($content)] = $nextLine;
+                while ( size( $nextLine ) > 0 ) {
+                    //print ( $nextLine );
+                    $nextLine = `fgetline $fileId`;
+                    $content[size($content)] = $nextLine;
+                }
+            fclose $fileId;
+            string $tokenBuffer[];
+            tokenize $content[0] ":" $tokenBuffer;
+            //string $user = $tokenBuffer[1];
+            string $user = abxLockFileGetUser($filePath);
+            // date:
+            
+            string $date = abxLockFileGetMDate($lockFilePath);
+
+            if ($promptUser != 0){
+                string $result = "Abort";
+                if ($promptUser == 1)
+                    $result = `confirmDialog -title "Scene File Locked" -message ("This File is already in use by "+$user+" since "+$date)  -button ("Open As Read-Only") -button "Abort" -button ("Take Ownership and Open") -defaultButton "Abort" -dismissString "Abort"`;
+                else if ($promptUser == 2){
+                    // if the internal var time stamp matches the lock file time stamp
+                    if ($abxLockFileTStamp != $date)
+                        $result = `confirmDialog -title "Scene File Locked" -message ("This File is already in use by "+$user+" since "+$date)  -button "Abort" -button ("Take Ownership and Save") -defaultButton "Abort" -dismissString "Abort"`;
+                    else{
+                        $result = "Take Ownership and Save";
+                    }
+                }
+                if ($result == "Abort"){
+                    return 1;
+                }
+                else if ($result == "Open As Read-Only"){
+                    //abxLockFileCheckIn($filePath);
+                    print ("Setting the Requires Rename Flag On Scene Open");
+                    global int $abxLockFileRequireRename;
+                    $abxLockFileRequireRename = true;
+                    return 2;
+                }
+                else{
+                    global int $abxLockFileRequireRename;
+                    $abxLockFileRequireRename = false;
+                    return 0;
+                }
+            }
+            else {
+                $result = "Abort";
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
+global proc string abxLockFileGetUser(string $filePath){
+
+    global string $abxLockFileTStamp;
+
+    string $content[];
+    string $result = "";
+    if (`filetest -r $filePath`){
+        $lockFile = ("."+`basenameEx $filePath`+".lock");
+        $dirPath = (`dirname $filePath`);
+        $lockFilePath = ($dirPath+"/"+$lockFile);
+        if (`filetest -r $lockFilePath`){
+            $fileId=`fopen $lockFilePath "r"`;
+                string $nextLine = `fgetline $fileId`;
+                $content[size($content)] = $nextLine;
+                while ( size( $nextLine ) > 0 ) {
+                    //print ( $nextLine );
+                    $nextLine = `fgetline $fileId`;
+                    $content[size($content)] = $nextLine;
+                }
+            fclose $fileId;
+
+            string $each;
+            
+
+            for ($each in $content){
+                string $tokenBuffer[];
+                tokenize $content[0] ":" $tokenBuffer;
+                if ($tokenBuffer[0] == "user"){
+                    int $size = size($tokenBuffer[1]) - 1;
+                    $result = `substring $tokenBuffer[1] 1 $size`;
+                }
+            }
+        }
+    }
+    return $result;
+}
+
+
+
+// delete the lock file
+global proc abxLockFileCheckOut (string $filePath){
+
+    // TODO: Make this not release the .lock if it belongs to someone else
+    if ($filePath == ""){
+        $filePath = `file -q -sn`;
+        print ("abxLockFileCheckOut: no file specified. releasing currently open scene: "+$filePath+"\n");
+    }
+
+    if (`filetest -r $filePath`){
+        string $lockFile = ("."+`basenameEx $filePath`+".lock");
+        $dirPath = (`dirname $filePath`);
+        $lockFilePath = ($dirPath+"/"+$lockFile); 
+        print ("abxLockFileCheckOut: lockFilePath="+$lockFilePath+"\n");
+        if (`filetest -r $lockFilePath`){
+            string $lockUser = `abxLockFileGetUser $filePath`;
+            if ($lockUser == `getenv USER`)
+                evalEcho("sysFile -delete \""+$lockFilePath+"\"");
+        }  
+    $abxLockFileTStamp = "";
+    }
+}
+
+// write the lock file with the user data and time stamp
+global proc abxLockFileCheckIn (string $filePath){
+
+
+
+    global string $abxLockFileTStamp;
+    global int $abxLockFileRequireRename;
+
+    string $lockFilePath = "";
+
+    abxLockFileCheckOut("");
+    if (`filetest -r $filePath`){
+        $lockFile = ("."+`basenameEx $filePath`+".lock");
+        $dirPath = (`dirname $filePath`);
+        $lockFilePath = ($dirPath+"/"+$lockFile);   
+        $user = `getenv USER`;
+
+        int $fileId=`fopen $lockFilePath "w"`;
+            fprint $fileId ("user:"+$user+"\n");
+        fclose $fileId;
+    }  
+    // require rename if the flag is set
+    //global int $abxLockFileRequireRename;
+    if ($abxLockFileRequireRename){
+        file -rts true;
+        $abxLockFileRequireRename = false;
+    }
+    // set the lock file stamp internally to help identify if the lock was made by this current instance of maya
+    $abxLockFileTStamp = abxLockFileGetMDate($lockFilePath);
+}
+
+
+global proc string abxLockFileGetMDate(string $file){
+
+    if (`filetest -r $file`){
+        string $pyCmd = ("import os; import time; time.ctime(os.path.getmtime('"+$file+"'));");
+        string $result = python($pyCmd);
+        return $result;
+    }
+    else {
+        return "Never";
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//
+//
+//
+//           AUTODESK FACTORY SCRIPT OVERRIDES
+//           THIS ALLOWS US TO INTERUPT THE FILE OPEN AND SAVE MENU ITEMS 
+//
+//
+//
+
+
+proc string[] pv_ActionSetup ( string $newAction )
+//
+//  Description:
+//      This proc sets up the viewer to perform the action specified when the
+//      action button is pressed by the user.
+//
+{
+    global string $gv_operationMode;
+    $gv_operationMode = $newAction;
+
+    string $saveType;
+    string $readType;
+    string $workspace = `workspace -fn`;
+
+    string $actionOptions[11];
+    //$actionOptions[0] == Localized label for the action. eg. "Save As"
+    //$actionOptions[1] == File type for the action.  eg. "mayaBinary", "Best Guess" 
+    //$actionOptions[2] == File mode for the dialog.
+    //                  Value:    Returns
+    //                    0          Any file.  The name of a file, whether it exists or not.
+    //                    1          Existing file.  The name of a single existing file.
+    //                    2          Directory.  The name of a directory. Both files and directories are displayed in the dialog.
+    //                    3          Directory only.  The name of a directory. The file dialog will only display directories.
+    //                    4          Existing files.  The names of zero or more existing files.
+    //
+    //$actionOptions[3] == Callback for options UI creation.  The Maya dialog will call this procedure to allow the UI for
+    //                     the actions options to be inserted into the dialog.
+    //$actionOptions[4] == Callback to intialize the values of the options UI.
+    //$actionOptions[5] == Callback for when a new file has been chosen in the dialog.
+    //$actionOptions[6] == Callback for options UI after a selection has been made but before the dialog goes away.  In our case this is
+    //                     used to make sure that the optionVar's match what is in the UI.
+    //$actionOptions[7] == Callback for when the file filter changes
+    //$actionOptions[8] == File filters list.  Each entry is separated by double semi-colons  eg. "All Files (*.*);;Maya Scenes (*.mb *.mb)"
+    //$actionOptions[9] == Directory to open the dialog in.
+
+    $saveType = "mayaBinary";
+    $readType = (uiRes("m_fileOptions.kBestGuess"));
+    string $reference = (uiRes("m_projectViewer.kReference"));
+
+    switch ($newAction) {
+      case "Open": {
+        if (`optionVar -exists defaultFileOpenType`) {
+            $readType = `optionVar -q defaultFileOpenType`;
+        }
+        $actionOptions[0] = (uiRes("m_projectViewer.kOpen"));
+        $actionOptions[1] = $readType;
+        $actionOptions[2] = "1";
+        $actionOptions[3] = "fileOperationsOptionsUISetup Open";
+        $actionOptions[4] = "fileOperationsOptionsUIInitValues Open";
+        $actionOptions[5] = "fileOperationsSelectionChangedCallback Open";
+        $actionOptions[6] = "fileOperationsOptionsUICallback Open";
+        $actionOptions[7] = "setCurrentFileTypeOption Open";
+        $actionOptions[8] = buildDefaultMayaOpenFilterList();
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+        break;
+      }
+      case "Reference": {
+        if (`optionVar -exists defaultFileReferenceType`) {
+            $readType = `optionVar -q defaultFileReferenceType`;
+        }
+        $actionOptions[0] = $reference;
+        $actionOptions[1] = $readType;
+        $actionOptions[2] = "1";
+        $actionOptions[3] = "fileOperationsOptionsUISetup Reference";
+        $actionOptions[4] = "fileOperationsOptionsUIInitValues Reference";
+        $actionOptions[5] = "fileOperationsSelectionChangedCallback Reference";
+        $actionOptions[6] = "fileOperationsOptionsUICallback Reference";
+        $actionOptions[7] = "setCurrentFileTypeOption Reference";
+        $actionOptions[8] = buildReadableFileFilterList();
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+        break;
+      }
+      case "Import": {
+        if (`optionVar -exists defaultFileImportType`) {
+            $readType = `optionVar -q defaultFileImportType`;
+        }
+        $actionOptions[0] = (uiRes("m_projectViewer.kImport"));
+        $actionOptions[1] = $readType;
+        $actionOptions[2] = "1";
+        $actionOptions[3] = "fileOperationsOptionsUISetup Import";
+        $actionOptions[4] = "fileOperationsOptionsUIInitValues Import";
+        $actionOptions[5] = "fileOperationsSelectionChangedCallback Import";
+        $actionOptions[6] = "fileOperationsOptionsUICallback Import";
+        $actionOptions[7] = "setCurrentFileTypeOption Import";
+        $actionOptions[8] = buildReadableFileFilterList();
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+        break;
+      }
+      case "ReplaceReference": {
+        if (`optionVar -exists defaultFileReferenceType`) {
+            $readType = `optionVar -q defaultFileReferenceType`;
+        }
+        $actionOptions[0] = $reference;
+        $actionOptions[1] = $readType;
+        $actionOptions[2] = "1";
+        $actionOptions[8] = buildReadableFileFilterList();
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+
+        break;
+      }
+      case "Proxy": {
+        if (`optionVar -exists defaultFileReferenceType`) {
+            $readType = `optionVar -q defaultFileReferenceType`;
+        }
+        $actionOptions[0] = (uiRes("m_projectViewer.kProxy"));
+        $actionOptions[1] = $readType;
+        $actionOptions[2] = "1";
+        $actionOptions[3] = "fileOperationsOptionsUISetup Proxy";
+        $actionOptions[4] = "fileOperationsOptionsUIInitValues Proxy";
+        $actionOptions[5] = "fileOperationsSelectionChangedCallback Proxy";
+        $actionOptions[6] = "fileOperationsOptionsUICallback Proxy";
+        $actionOptions[7] = "setCurrentFileTypeOption Proxy";
+        $actionOptions[8] = buildReadableFileFilterList();
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+        break;
+      }
+      case "Save": 
+      {
+        $gv_operationMode = "SaveAs";
+        if (`optionVar -exists defaultFileSaveType`) 
+        {
+            $saveType = `optionVar -q defaultFileSaveType`;
+        }
+        $actionOptions[0] = (uiRes("m_projectViewer.kSave"));
+        $actionOptions[1] = $saveType;
+        $actionOptions[2] = 0;
+        $actionOptions[8] = buildDefaultMayaSaveFilterList();
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+        break;
+      }
+      case "SaveAs": 
+      {
+        if (`optionVar -exists defaultFileSaveType`) 
+        {
+            $saveType = `optionVar -q defaultFileSaveType`;
+        }
+        $actionOptions[0] = (uiRes("m_projectViewer.kSaveAs"));
+        $actionOptions[1] = $saveType;
+        $actionOptions[2] = 0;
+        $actionOptions[3] = "fileOperationsOptionsUISetup SaveAs";
+        $actionOptions[4] = "fileOperationsOptionsUIInitValues SaveAs";
+        $actionOptions[5] = "fileOperationsSelectionChangedCallback SaveAs";
+        $actionOptions[6] = "fileOperationsOptionsUICallback SaveAs";
+        $actionOptions[7] = "setCurrentFileTypeOption SaveAs";
+        $actionOptions[8] = buildDefaultMayaSaveFilterList();
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+        break;
+      }
+      case "ExportAll": {
+        if (`optionVar -exists defaultFileExportAllType`) {
+            $saveType = `optionVar -q defaultFileExportAllType`;
+        }
+        $actionOptions[0] = (uiRes("m_projectViewer.kExportAll"));
+        $actionOptions[1] = $saveType;
+        $actionOptions[2] = "0";
+        $actionOptions[3] = "fileOperationsOptionsUISetup ExportAll";
+        $actionOptions[4] = "fileOperationsOptionsUIInitValues ExportAll";
+        $actionOptions[5] = "fileOperationsSelectionChangedCallback ExportAll";
+        $actionOptions[6] = "fileOperationsOptionsUICallback ExportAll";
+        $actionOptions[7] = "setCurrentFileTypeOption ExportAll";
+        $actionOptions[8] = buildWritableFileFilterList();
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+        break;
+      }
+      case "ExportActive": {
+        if (`optionVar -exists defaultFileExportActiveType`) {
+            $saveType = `optionVar -q defaultFileExportActiveType`;
+        }
+        $actionOptions[0] = (uiRes("m_projectViewer.kExportSelection"));
+        $actionOptions[1] = $saveType;
+        $actionOptions[2] = "0";
+        $actionOptions[3] = "fileOperationsOptionsUISetup ExportActive";
+        $actionOptions[4] = "fileOperationsOptionsUIInitValues ExportActive";
+        $actionOptions[5] = "fileOperationsSelectionChangedCallback ExportActive";
+        $actionOptions[6] = "fileOperationsOptionsUICallback ExportActive";
+        $actionOptions[7] = "setCurrentFileTypeOption ExportActive";
+        $actionOptions[8] = buildWritableFileFilterList();
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+        break;
+      }
+    case "ExportOfflineFileFromRefEd":        
+      case "ExportOfflineFile": {
+        if (`optionVar -exists defaultFileExportEditsType`) {
+            $saveType = `optionVar -q defaultFileExportEditsType`;
+        }
+        $actionOptions[0] = (uiRes("m_projectViewer.kExportOfflineFile"));
+        $actionOptions[1] = $saveType;
+        $actionOptions[2] = "0";
+        $actionOptions[3] = "fileOperationsOptionsUISetup " + $newAction;
+        $actionOptions[4] = "fileOperationsOptionsUIInitValues " + $newAction;
+        $actionOptions[5] = "fileOperationsSelectionChangedCallback " + $newAction;
+        $actionOptions[6] = "fileOperationsOptionsUICallback " + $newAction;
+        $actionOptions[7] = "setCurrentFileTypeOption " + $newAction;
+        $actionOptions[8] = buildDefaultReadWriteOfflineEditFilterList();
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "offlineEdit"`;
+        break;
+      }
+      case "ApplyOfflineFileFromRefEd":
+      case "ApplyOfflineFile":
+      {
+        if (`optionVar -exists defaultFileApplyEditsType`) {
+            $readType = `optionVar -q defaultFileApplyEditsType`;
+        }
+        $actionOptions[0] = (uiRes("m_projectViewer.kAssignOfflineFile"));
+        $actionOptions[1] = $readType;
+        $actionOptions[2] = "1";
+        $actionOptions[3] = "fileOperationsOptionsUISetup " + $newAction;
+        $actionOptions[4] = "fileOperationsOptionsUIInitValues " + $newAction;
+        $actionOptions[5] = "fileOperationsSelectionChangedCallback " + $newAction;
+        $actionOptions[6] = "fileOperationsOptionsUICallback " + $newAction;
+        $actionOptions[7] = "setCurrentFileTypeOption " + $newAction;
+        $actionOptions[8] = buildDefaultReadWriteOfflineEditFilterList();       
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+        break;
+      }
+      case "CreateReference":
+      {
+        if (`optionVar -exists defaultFileCreateReferenceType`) {
+            $saveType = `optionVar -q defaultFileCreateReferenceType`;
+        }
+        $actionOptions[0] = $reference;
+        $actionOptions[1] = $saveType;
+        $actionOptions[2] = "1";
+        $actionOptions[9] = `setWorkingDirectory $workspace $readType "scene"`;
+        break;
+      }
+      case "AssignTemplate":
+      {
+        $actionOptions[0] = (uiRes("m_projectViewer.kAssignTemplate"));
+        $actionOptions[1] = "";
+        $actionOptions[2] = "1";
+        $actionOptions[3] = "fileOperationsOptionsUISetup AssignTemplate";
+        $actionOptions[4] = "fileOperationsOptionsUIInitValues AssignTemplate";
+        $actionOptions[5] = "fileOperationsSelectionChangedCallback AssignTemplate";
+        $actionOptions[6] = "fileOperationsOptionsUICallback AssignTemplate";
+        $actionOptions[7] = "setCurrentFileTypeOption AssignTemplate";
+        $actionOptions[8] = buildContainerTemplateFilterList();     
+        $actionOptions[9] = `setWorkingDirectory $workspace "templates" ""`;
+        break;
+      }
+    }
+
+    return $actionOptions;
+}
+
+// override of autodesk procedure found in C:\Program Files\Autodesk\Maya2012\scripts\others\projectViewer.mel
+global proc int projectViewer ( string $startUpAction )
+//
+//  Description:
+//      This is the main procedure for the projectViewer.
+//
+{
+    int $doFileLock = false;
+    string $actionOptions[];
+
+    if (!`exists performFileAction`){
+        source "C:/Program Files/Autodesk/Maya2012/scripts/others/performFileAction.mel";
+    }
+
+    $actionOptions = `pv_ActionSetup $startUpAction`;
+    //!! adam@panda checks to see if its a reference
+    if (stringArrayContains("Save As",$actionOptions)){
+        $doFileLock = true;
+    }
+    else if (stringArrayContains("Open",$actionOptions)){
+        $doFileLock = true;
+    }
+
+    print ("// START project viewer Startup Actions //\n");
+    print ($actionOptions);
+    print ("// END project viewer Startup Actions //\n");
+
+    $actionOptions[1] = fileTypeToFilterDescription($actionOptions[1]);
+
+    string $cmd = ("fileDialog2 -returnFilter 1 -caption \"" + $actionOptions[0] + "\" -fileMode " + $actionOptions[2]);
+    $cmd += (" -okCaption \"" + $actionOptions[0] + "\"");
+    if ("" != $actionOptions[3])
+        $cmd += (" -optionsUICreate \"" + $actionOptions[3] + "\"");
+    if ("" != $actionOptions[4])
+        $cmd += (" -optionsUIInit \"" + $actionOptions[4] + "\"");
+    if ("" != $actionOptions[5])
+        $cmd += (" -selectionChanged \"" + $actionOptions[5] + "\"");
+    if ("" != $actionOptions[6])
+        $cmd += (" -optionsUICommit \"" + $actionOptions[6] + "\"");
+    if ("" != $actionOptions[7])
+        $cmd += (" -fileTypeChanged \"" + $actionOptions[7] + "\"");
+    if ("" != $actionOptions[8])
+        $cmd += (" -fileFilter \"" + $actionOptions[8] + "\"");
+    if ("" != $actionOptions[1])
+    {
+        $cmd += (" -selectFileFilter \"" + $actionOptions[1] + "\"");
+    }
+    if ("" != $actionOptions[9])
+        $cmd += (" -startingDirectory \"" + $actionOptions[9] + "\"");
+
+    global string $gOptBoxForm;
+    if ("" != $gOptBoxForm && `layout -exists $gOptBoxForm`)
+    {
+        hideOptionBoxNow();
+    }
+
+    string $file[] = `eval $cmd`;
+    int $len = size($file);
+    if( $len > 0 && $file[0] != "" )
+    {
+        string $path = fromNativePath($file[0]);
+        string $type = filterDescriptionToFileType($file[$len-1]);
+        if ($doFileLock){
+            // adams custom code
+            print ("abxLockFile path checking="+$path+"\n");
+            int $status = abxLockFileGetStatus($path,1);
+            if ($status != 1){
+                abxLockFileCheckOut(`file -q -sn`);
+                if ($status != 2)
+                    abxLockFileCheckIn($path);
+                if (!`exists performFileAction`){
+                    source "C:/Program Files/Autodesk/Maya2012/scripts/others/performFileAction.mel";
+                }
+                eval ("performFileAction \"" + $path + "\" " + $actionOptions[2] + " \"" + $type + "\"");
+            }
+        }
+        else{
+            eval ("performFileAction \"" + $path + "\" " + $actionOptions[2] + " \"" + $type + "\"");
+        }   
+    }
+
+    return 1;
+}
+
+
+// override of autodesk procedure found in C:/Program Files/Autodesk/Maya2012/scripts/startup/FileMenu.mel
+global proc FileMenu_SaveItem()
+//
+// If the current file is named, save it.  If it
+// is still untitled, then bring up the Save As
+// dialog.
+//
+{
+    string $sceneName = `file -q -sceneName`;
+
+    // Get the name of the scene File.
+    if ( size($sceneName) == 0 ) {
+        // Then the name can't be set.
+        projectViewer SaveAs;
+    // bug fix 89970 file save
+    } else if ((`file -q -amf`) || (`file -q -ex` == 0)) {
+        int $incrementalSave = false;
+
+        // adam@panda ensures render layer is always set to default before saving
+        catch(eval("editRenderLayerGlobals -currentRenderLayer defaultRenderLayer"));
+
+        if(`optionVar -exists isIncrementalSaveEnabled`)
+            $incrementalSave = `optionVar -q isIncrementalSaveEnabled`;
+        if ( $incrementalSave ) {
+            // Save the scene using the Incremental Save feature.
+            //
+            // adam@panda fixed this so that incremental save is only run if the requires save as flag is not true
+            if (!`file -q -rts`)
+                if (abxLockFileGetStatus($sceneName,2) == 0)
+                    incrementalSaveScene;
+            else 
+                confirmDialog -title "Incremental Save" -message ("This Scene Requires you to use Save As to save the scene.") -button "OK";
+        } else {
+            if (abxLockFileGetStatus($sceneName,2) == 0){
+                string $compressedSave = 0;
+                string $preserveName = 0;
+
+                string $cmd = "file -save";
+                if(`optionVar -exists isCompressedSaveEnabled`)
+                    $compressedSave = `optionVar -q isCompressedSaveEnabled`;
+            
+                if ($compressedSave == 1 )
+                {
+                    $cmd = $cmd + " -compress";
+                }
+        
+                if(`optionVar -exists isCompressedPreserveName`)
+                    $preserveName = `optionVar -q isCompressedPreserveName`;
+            
+                if ($preserveName == 1 )
+                {
+                    $cmd = $cmd + " -preserveName";
+                }
+                evalEcho($cmd);
+            }
+        }
+    } else {
+        warning (uiRes("m_FileMenu.kNoChangesToSave"));
+    }
+}

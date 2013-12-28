@@ -1,24 +1,60 @@
-global string $gPPScripts = "//MONKEY/Resources/Maya/2012-x64/scripts";
+// userSetup.mel
+// this mel script is called upon maya startup. configure what happens at startup by editing this file.
 
+string $ppTools = `getenv MAYA_PPTOOLS`;
+string $ppResource = `getenv PP_RESOURCE`;
+
+
+
+// load the panda panther menu procedure pandapantherMenu.mel
 pandapantherMenu;
-eval ("source \""+$gPPScripts+"/production/ppNewScene.mel\"");
-eval ("source \""+$gPPScripts+"/production/ppFileBrowse.mel\"");
-eval ("source \""+$gPPScripts+"/production/ppForcePrefs.mel\"");
 
-// these override original maya scripts with vray modified versions to prevent render global UI bugs
-source "//MONKEY/resources/vray/vray22001/maya_vray/scripts/others/createMayaSoftwareCommonGlobalsTab.mel";
-source "//MONKEY/resources/vray/vray22001/maya_vray/scripts/others/shouldAppearInNodeCreateUI.mel";
-source "//MONKEY/resources/vray/vray22001/maya_vray/scripts/others/unifiedRenderGlobalsWindow.mel";
+// early declaration of Autodesk Proc "performNewScene" so that our overrides in ppNewScene.mel work correctly
+source "C:/Program Files/Autodesk/Maya2012/scripts/startup/performNewScene.mel";
+
+
+evalEcho ("source \""+$ppTools+"/scripts/production/abxLockFile.mel\"");
+evalEcho ("source \""+$ppTools+"/scripts/production/ppNewScene.mel\"");
+evalEcho ("source \""+$ppTools+"/scripts/production/ppNewCam.mel\"");
+evalEcho ("source \""+$ppTools+"/scripts/production/ppFileBrowse.mel\"");
+evalEcho ("source \""+$ppTools+"/scripts/production/ppForcePrefs.mel\"");
+evalEcho ("source \""+$ppTools+"/scripts/production/vrayUtils.mel\"");
+
 
 // enable the playblast HUD for now
 
-evalDeferred("if (`exists playblastHUD`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/playblastHUD.mel\";if (`exists playblastHUD`) playblastHUD;");
-evalDeferred("if (`exists timewarpHUD`==0) source \""+$gPPScripts+"/Toolbox/Pipeline/timewarpHUD.mel\";if (`exists timewarpHUD`) timewarpHUD;");
+evalDeferred("if (`exists playblastHUD`==0) source \""+$ppTools+"/scripts/Toolbox/Pipeline/playblastHUD.mel\";if (`exists playblastHUD`) playblastHUD;");
+//evalDeferred("if (`exists timewarpHUD`==0) source \""+$ppTools+"/scripts/Toolbox/Pipeline/timewarpHUD.mel\";if (`exists timewarpHUD`) timewarpHUD;");
+evalDeferred("ppPlayblast;");
 
+// not implemented but it allows us to force maya preferences
 evalDeferred("ppForcePrefs;");
-//evalDeferred("loadPlugin stereoCamera;");
-//evalDeferred("loadPlugin Mayatomr;");
-//evalDeferred("headsUpMessage (\"Current Project:   \"+`workspace -q -rd`) -time 3;");
-evalDeferred("if (`exists abxAssets`==0) source \""+`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Pipeline/abxProject.mel\";if (`exists abxProject`) abxProject");
 
+// loads the Project Manager
+evalDeferred("if (`exists abxAssets`==0) source \""+$ppTools+"/scripts/production/abxProject.mel\";if (`exists abxProject`) abxProject");
+
+// sometimes plug-ins turn off undo queue, this would enforce it to be on each time maya starts
 //evalDeferred("int $state = `undoInfo -q -state`; if (!$state){undoInfo -state 1; print (\"undoQueue turned on\\n\");}");
+
+// these override original maya scripts with vray modified versions to prevent render global UI bugs
+evalEcho ("source \""+$ppResource+"/bin/win32/vray/vray22001/maya_vray/scripts/others/createMayaSoftwareCommonGlobalsTab.mel\"");
+evalEcho ("source \""+$ppResource+"/bin/win32/vray/vray22001/maya_vray/scripts/others/shouldAppearInNodeCreateUI.mel\"");
+evalEcho ("source \""+$ppResource+"/bin/win32/vray/vray22001/maya_vray/scripts/others/unifiedRenderGlobalsWindow.mel\"");
+
+// this checks to see if the local machine has zbrush, if so, it loads a custom script for working with zbrush
+if (`filetest -d "C:/Users/Public/Pixologic"`){
+	evalEcho ("source \""+$ppTools+"/scripts/goZBrush/GoZScript.mel\"");
+}
+
+// this alters existing Maya Menus to include our own studio specific menu items
+evalDeferred("pandapantherMenuAlterMenus;");
+evalDeferred("abxLockFile()");
+
+if(`optionVar -exists ppSwatchUpdate` ) 
+    renderThumbnailUpdate `optionVar -q "ppSwatchUpdate"`;
+
+// autoload is disabled on maya startup so we must load certain ones
+string $loadPlugs[] = {"objExport","fbxmaya"};
+for ($each in $loadPlugs){
+    evalEcho("loadPlugin "+$each);
+}

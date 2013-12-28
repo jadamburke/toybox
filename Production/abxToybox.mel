@@ -37,9 +37,10 @@
 
 global proc abxToybox() {
 
-	if (`optionVar -exists "toyboxLoadedFolder"`)
-		toyboxSetOptionVars 0;
-	else
+
+	//if (`optionVar -exists "toyboxLoadedFolder"`)
+		//toyboxSetOptionVars 0;
+	//else
 		toyboxSetOptionVars 1;
 	// create the window and UI for the Toybox
     if (`window -ex abxToyboxWindow` != true) {
@@ -383,7 +384,8 @@ global proc abxToyboxShelfResize (string $scrollLayout) {
 
 		// assuming its a grid layout resize the grid columns to window width / cell width
 		int $numCol = ($windowWidth-20) / $shelfCellWidth;
-		gridLayout -e -nc $numCol $childObjects[0];
+		if ($numCol > 0)
+			gridLayout -e -nc $numCol $childObjects[0];
 	}
 }
 
@@ -597,11 +599,11 @@ global proc abxOpenScript (string $abxScriptPath, int $abxAppNum){
 			exec ("open -a "+toNativePath($tboxScriptEditors[$abxAppNum])+" \""+toNativePath($abxScriptPath)+"\"");
 		}
 		else if (`about -os` == "win" || `about -os` == "win64"){
-			system ("start "+toNativePath($tboxScriptEditors[$abxAppNum])+" \""+toNativePath($abxScriptPath)+"\"");
+			system ("start \""+toNativePath($tboxScriptEditors[$abxAppNum])+"\" \""+toNativePath($abxScriptPath)+"\"");
 			print ("system start "+$tboxScriptEditors[$abxAppNum]+" \""+toNativePath($abxScriptPath)+"\"\n");
 		}
 		else{
-			system (toNativePath($tboxScriptEditors[$abxAppNum])+" \""+toNativePath($abxScriptPath)+"\" &");
+			system ("\""+toNativePath($tboxScriptEditors[$abxAppNum])+"\" \""+toNativePath($abxScriptPath)+"\" &");
 			print ("system "+$tboxScriptEditors[$abxAppNum]+" \""+toNativePath($abxScriptPath)+"\" &\n");
 		}
 	}
@@ -768,6 +770,7 @@ global proc toyboxSetOptionVars (int $forceFactorySettings) {
 				
 				optionVar -stringValue "toyboxLoadedFolder" `internalVar -userScriptDir`;
 				//optionVar -stringValue "toyboxLoadedFolder" "None";
+				optionVar -stringValueAppend "toyboxLoadedFolder" (`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Misc/");
 				optionVar -stringValueAppend "toyboxLoadedFolder" (`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Animation/");
 				optionVar -stringValueAppend "toyboxLoadedFolder" (`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Rigging/");
 				optionVar -stringValueAppend "toyboxLoadedFolder" (`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Lighting/");
@@ -1189,5 +1192,94 @@ global proc string[] abxDragScriptCB (string $dragControl, int $x, int $y, int $
 global proc toyBoxDropScriptCB (string $dragControl, string $dropControl, string $msgs[], int $x, int $y, int $type){
 	print "CallBack Called\n";
 	print ($dragControl+"\n"+$dropControl+"\n"+$msgs[0]+"\n"+$type+"\n");	
+}
+
+global proc abxToyboxEditorWindow () {
+	    if (`window -ex abxToyboxEditorWindow` != true) {
+	window -le 50 -te 50 -t "Toybox - Script Manager" -in "Toybox" -menuBar true -s true -tb true abxToyboxEditorWindow;
+
+
+
+		menu -label "File";
+			menuItem -label "Open...";
+			menuItem -label "Save";
+			menuItem -label "Save As...";
+		menu -label "Edit";
+			menuItem -label "Options..." -c "abxToyboxOptions";
+			menuItem -d true;
+			menuItem -label "New Script..." -c ("abxCreateNewScript (eval(\"gridLayout -q -ann `tabLayout -q -selectTab tabLyt`\"));");
+			menuItem -d true;
+			menuItem -label "Close" -c "window -e -vis 0 abxToyboxEditorWindow";
+		menu -label "Load" toyboxLoadMenu;
+
+			// cross platform compatibility
+			if (`about -os` != "win" && `about -os` != "win64")
+				menuItem -label "Browse..." -c "$tempFile = `fileDialog -m 0`; abxToolboxBrowsePath $tempFile \"\";";
+			else
+				menuItem -label "Browse..." -c "fileBrowserDialog -m 4 -fc \"abxToolboxBrowsePath\" -ft \"directory\" -an \"Select Custom Script Folder\" -ds 0;";
+			menuItem -d true;
+			menuItem -label "Unload Current Tab" -c "abxUnloadTab";
+		menu -label "View";
+			menuItem -label "Refresh" -c "abxRefreshShelf";
+			menuItem -d true;
+			menuItem -label "Icon" -c "abxToyboxChangeView 1";
+			menuItem -label "Icon/Text Below" -c "abxToyboxChangeView 2";
+			menuItem -label "Icon/Text Beside" -c "abxToyboxChangeView 3";
+			menuItem -d true;
+			menuItem -label "Open in Explorer" -c ("abxOpenScript (eval(\"gridLayout -q -ann `tabLayout -q -selectTab abxToyboxEditorTabLyt`\")) -1;");
+		menu -label "Help";
+			menuItem -label "How To Use..." -c "abxToyboxHelp";
+			menuItem -label "About" -c "abxToyboxAbout";
+	
+	setParent abxToyboxEditorWindow;
+
+	formLayout abxToyboxEditorMainForm;
+  	
+
+  	tabLayout -imw 0 -imh 0  abxToyboxEditorTabLyt;
+			
+	//cmdScrollFieldExecuter  abxToyboxEditorExc;
+	
+	formLayout -e
+
+	    -attachForm abxToyboxEditorTabLyt "left" 0 
+	    -attachForm abxToyboxEditorTabLyt "right" 0
+	    -attachForm abxToyboxEditorTabLyt "top" 5
+	    -attachForm abxToyboxEditorTabLyt "bottom" 5 
+	
+	    abxToyboxEditorMainForm ;
+
+
+	showWindow abxToyboxEditorWindow;
+	}
+    	else
+    	{
+		showWindow abxToyboxEditorWindow;
+	}
+
+}
+
+global proc abxToyboxEditorLoadFile(string $file){
+	if (`filetest -r $file`){
+	
+		abxToyboxEditorWindow;
+		setParent abxToyboxEditorTabLyt;
+		string $newEditor = `cmdScrollFieldExecuter -sln 1` ;
+		string $baseFileName = `basename $file ""`;
+		int $fileId;
+		string $fileText = "";
+		$fileId=`fopen $file "r"`;
+			string $nextLine = `fgetline $fileId`;
+			 //cmdScrollFieldExecuter-at $nextLine $newEditor;
+			 $fileText +=$nextLine;
+			while ( size( $nextLine ) > 0 ) {
+				//print ( $nextLine );
+				$nextLine = `fgetline $fileId`;
+				$fileText +=$nextLine;
+			}
+ 		fclose $fileId;
+		cmdScrollFieldExecuter -e -text $fileText $newEditor;
+	}
+	
 }
  

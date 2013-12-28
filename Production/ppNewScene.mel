@@ -7,40 +7,70 @@
 // it then restores the option vars to their original values before returning
 
 
+//source "C:/Program Files/Autodesk/Maya2012/scripts/startup/performNewScene.mel";
+
 global proc ppNewScene () {
 
 }
 
 global proc ppDoNewScene (string $which) {
+	ppDoNewSceneVerbosity($which, true);
+}
 
+global proc ppDoNewSceneQuiet (string $which) {
+	ppDoNewSceneVerbosity($which, false);
+}
 
+global proc ppDoNewSceneVerbosity (string $which, int $verbose) {
+	if ($verbose) print ("DOING THE NEW ONE\n");
+	string $ppTools = `getenv MAYA_PPTOOLS`;
 	//get the old newFile name variable if it exists so it can be restored later.
 	//string $OldnewFileName = `optionVar -q "newFileName"`;
 
 	// get the option var flag value so it can be restored later
 	//int $OldnewFileEnabled = `optionVar -q "newFileEnabled"`;
 
+	// scene config
+	// frame rate
+	// default resolution
+	// scene scale
+	string $dept = "";
+
+
 	string $newFile = "";
 	
 	switch ($which){
 		case "empty":
-			$newFile = "//MONKEY/Resources/maya/sceneTemplates/newEmpty.ma";
-		case "hd24fps":
-			$newFile = "//MONKEY/Resources/maya/sceneTemplates/newHD24fps.ma";
+			$newFile = ($ppTools+"/sceneTemplates/new_empty.ma");
+			$dept = "";
 			break;
-		case "sd24fps":
-			$newFile = "//MONKEY/Resources/maya/sceneTemplates/newSD24fps.ma";
+		case "anm":
+			$newFile = ($ppTools+"/sceneTemplates/new_anm.ma");
+			$dept = "anm";
+			break;
+		case "lgt":
+			$newFile = ($ppTools+"/sceneTemplates/new_lgt.ma");
+			$dept = "lgt";
+			break;
+		case "fx":
+			$newFile = ($ppTools+"/sceneTemplates/new_fx.ma");
+			$dept = "fx";
+			break;
+		case "geo":
+			$newFile = ($ppTools+"/sceneTemplates/new_geo.ma");
+			$dept = "geo";
 			break;
 		case "rig":
-			$newFile = "//MONKEY/Resources/maya/sceneTemplates/newRigEmpty.ma";
+			$newFile = ($ppTools+"/sceneTemplates/new_rig.ma");
+			$dept = "rig";
 			break;	
 		default: 
 			break;
 	}
 
 
-	print ("$newFile ="+$newFile+"\n");
-	if ($newFile != ""){
+	if ($verbose) print ("$newFile ="+$newFile+"\n");
+	if ($newFile != "")  {
 		//optionVar -intValue "newFileEnabled" 1;
 		//optionVar -stringValue "newFileName" $newFile;
 	}
@@ -50,7 +80,7 @@ global proc ppDoNewScene (string $which) {
 	}
 
 
-	ppPerformNewScene $newFile;
+	ppPerformNewScene $newFile $dept $verbose;
 	//string $tmpCmd = "ppPerformNewScene 0 ";
 	//addToRecentCommandQueue $tmpCmd "New Panda Panther Scene";
 
@@ -58,6 +88,7 @@ global proc ppDoNewScene (string $which) {
 	// restore option var to their previous settings
 	//optionVar -intValue "newFileEnabled" $OldnewFileEnabled;
 	//optionVar -stringValue "newFileName" $OldnewFileName;
+	evalEcho("file -mf false");
 }
 
 
@@ -65,28 +96,35 @@ global proc ppDoNewScene (string $which) {
 
 
 
-global proc ppPerformNewScene (string $fileToOpen) {
+global proc ppPerformNewScene (string $fileToOpen, string $dept, int $verbose) {
+
+	$result = saveChanges("abxLockFileCheckOut(\"\");file -f -new;");
 
 	checkForUnknownNodes();
-	$result = saveChanges("file -f -new");
-	if ($result){
-		
+	if ($result)  {
+		abxLockFileCheckOut(`file -q -sn`);
 
 		$fileId= `fopen $fileToOpen "r"`;
 		string $nextLine = `fgetline $fileId`;
 
 		string $cmd = $nextLine;
 
-		if (`gmatch $cmd "*;\n"`){
-			catchQuiet(evalEcho($cmd));
+		if (`gmatch $cmd "*;\n"`)  {
+			if ($verbose)
+				catchQuiet(evalEcho($cmd));
+			else
+				catchQuiet(eval($cmd));
 			$cmd = "";
 		}
 		
 		while ( size( $nextLine ) > 0 ) {
 			$nextLine = `fgetline $fileId`;
 			$cmd += $nextLine;
-			if (`gmatch $nextLine "*;\n"`){
-				catchQuiet(evalEcho($cmd));
+			if (`gmatch $nextLine "*;\n"`)  {
+				if ($verbose)
+					catchQuiet(evalEcho($cmd));
+				else
+					catchQuiet(eval($cmd));
 				$cmd = "";
 			}
 
@@ -104,5 +142,605 @@ global proc ppPerformNewScene (string $fileToOpen) {
 		if (`objExists uiConfigurationScriptNode`)
 			scriptNode -executeBefore uiConfigurationScriptNode;
 
+		ppNewSceneConfigDefaults ($dept);
+
+		evalEcho("file -mf false");
+		evalDeferred("evalEcho(\"file -mf false;\")");
+	}
+}
+
+// check the defaults section for 
+
+global proc ppNewSceneConfigDefaults(string $dept){
+
+	string $workspace = `workspace -q -rd`;
+
+	string $lock = "";
+	float $fps = 0;
+	float $w = 0;
+	float $h = 0;
+	float $hA = 0;
+	float $vA =  0;
+	float $aspect = 0;
+	string $sceneScale = "";
+	string $renderer = "";
+
+	if ($workspace != ""){
+		string $prjDetails[] = abxProjectGetShotDetails($workspace);
+		if (size($prjDetails)>7){
+			//print ("// startDetails\n");
+			//print $prjDetails;
+			$lock = $prjDetails[0];
+			$fps = $prjDetails[1];
+			$w = $prjDetails[2];
+			$h = $prjDetails[3];
+			$hA = $prjDetails[5];
+			$vA =  $prjDetails[6];
+			$aspect = $prjDetails[4];
+			$sceneScale = $prjDetails[7];
+			$renderer = $prjDetails[8];
+		}
+	}
+
+	playbackOptions -e -min 101;
+	playbackOptions -e -ast 101;
+	playbackOptions -e -max 301;
+	playbackOptions -e -aet 301;
+
+	float $startF = `playbackOptions -q -min`;
+	float $startA = `playbackOptions -q -ast`;
+	float $endF = `playbackOptions -q -max`;
+	float $endA = `playbackOptions -q -aet`;
+	float $curF = `currentTime -q`;
+
+
+	// set the frame rate
+	if ($fps > 0) currentUnit -ua false -t `fpsNumericToUnit $fps `;
+
+	playbackOptions -e -min $startF;
+	playbackOptions -e -max $endF;
+	playbackOptions -e -ast $startA;
+	playbackOptions -e -aet $endA;
+
+	setAttr "defaultRenderGlobals.startFrame" $startF;
+	setAttr "defaultRenderGlobals.endFrame" $endF;
+
+	currentTime -e $curF;
+
+
+	// set the default resolution
+	if ($w > 0) setAttr defaultResolution.width $w;
+	if ($h > 0) setAttr defaultResolution.height $h;
+	if ($w > 0) setAttr defaultResolution.width $w;
+	if ($h > 0) setAttr defaultResolution.height $h;	
+
+	if ($aspect > 0){
+		setAttr "defaultResolution.pixelAspect" $aspect;
+		setAttr "defaultResolution.deviceAspectRatio" ($w/$h);
+	}
+
+
+	if ($hA > 0) {
+		if (`objExists renderCam`)
+			setAttr renderCamShape.horizontalFilmAperture $hA;
+	}
+	if ($vA > 0) {
+		if (`objExists renderCam`)
+			setAttr renderCamShape.verticalFilmAperture $vA;
+	}
+
+	// scale the scene by 75
+	if ($sceneScale == "realWorld"){
+			
+		// scale camera clipping planes
+		$cams = `ls -type camera`;
+		for ($each in $cams) {
+			$camXform = `listRelatives -parent $each`;
+			float $tx = `getAttr ($camXform[0]+".tx")`;
+			float $ty = `getAttr ($camXform[0]+".ty")`;
+			float $tz = `getAttr ($camXform[0]+".tz")`;
+			setAttr ($camXform[0]+".tx") ($tx*75);
+			setAttr ($camXform[0]+".ty") ($ty*75);
+			setAttr ($camXform[0]+".tz") ($tz*75);
+			setAttr ($each+".locatorScale") 35;
+			setAttr ($each+".nearClipPlane") 7.5;
+			setAttr ($each+".farClipPlane") 75000;
+			setAttr ($each+".centerOfInterest") (49.727751 *75.5);
+		}
+		// size the grid
+		grid -size 900 -spacing 375;
+
+		// scale 
+		if ($dept == "rig"){
+			if (`objExists ROOT`){
+				select -clear;
+				select ROOT;
+				scale 35 35 35;
+				makeIdentity -apply true -t 1 -r 1 -s 1 -n 0;
+				select -clear;
+			}
+		}
+
+	}
+	// 
+
+}
+
+
+
+global proc float fpsNumeric () {
+
+	string $frameRateUnit = `currentUnit -q -f -t`;
+
+	string $validTimes[] = {"game","film","pal","ntsc","show","palf","ntscf","milliseconds","seconds","minutes","hours","2fps","3fps","4fps","5fps","6fps","8fps","10fps","12fps","16fps","20fps","40fps","75fps","80fps","100fps","120fps","125fps","150fps","200fps","240fps","250fps","300fps","375fps","400fps","500fps","600fps","750fps","1200fps","1500fps","2000fps","3000fps","6000fps"};
+	if (`gmatch $frameRateUnit "*fps"`){
+		int $isValid = stringArrayContains ($frameRateUnit,$validTimes);
+		if ($isValid) {
+			string $num =  `match "[0-9]+" $frameRateUnit`;
+			float $numFloat = $num;
+			return $numFloat;
+		}
+		else {
+			warning ("Unknown time format: "+$frameRateUnit+" Defaulting to 24 fps (film)");
+		}
+	}
+	else {
+		switch ($frameRateUnit){
+			case "pal":
+				return 25;
+				break;
+			case "film":
+				return 24;
+				break;
+			case "ntsc":
+				return 30;
+				break;
+			case "game":
+				return 60;
+				break;
+			case "show": 
+				return 48;
+				break;
+			case "palf":
+				return 50;
+				break;
+			case "ntscf":
+				return 60;
+				break;
+			case "milliseconds":
+				return 1000;
+				break;		
+			case "seconds":
+				return 1;
+				break;	
+			case "minutes":
+				return 0.0166666;
+				break;	
+			case "hours":
+				return 0.0002777;
+				break;		
+			default:
+				return 0;
+				break;
+		}
+	}
+	
+
+}
+
+global proc string fpsNumericToUnit (float $fps){
+	
+	// 1 = 1 frame per second;
+	// 
+	string $validTimes[] = {"game","film","pal","ntsc","show","palf","ntscf","milliseconds","seconds","minutes","hours","2fps","3fps","4fps","5fps","6fps","8fps","10fps","12fps","16fps","20fps","40fps","75fps","80fps","100fps","120fps","125fps","150fps","200fps","240fps","250fps","300fps","375fps","400fps","500fps","600fps","750fps","1200fps","1500fps","2000fps","3000fps","6000fps"};
+	string $fpsString = ($fps+"fps");
+
+	switch ($fps){
+		case 25.0:
+			return "pal";
+			break;
+		case 24.0:
+			return "film";
+			break;
+		case 48.0:
+			return "show";
+			break;
+		case 30.0:
+			return "ntsc";
+			break;
+		case 50:
+			return "palf";
+			break;
+		case 60:
+			return "ntscf";
+			break;
+		case 1000:
+			return "milliseconds";
+			break;
+		case 1.0:
+			return "seconds";
+			break;
+		case 0.0166666:
+			return "minutes";
+			break;
+		case 0.0002777:
+			return "hours";
+			break;
+		default:
+			if (stringArrayContains($fpsString,$validTimes)){
+				return $fpsString;
+			}
+			else {
+				return "unknown";
+			}
+			break;
+	}
+
+
+}
+
+// redeclaration of performNewScene so that we can override it. the local procs (not global proc) 
+// below are included but not modified to allow the override of performNewScene to work properly.
+// only performNewScene has been modified.
+
+// not modified from autodesk performNewScene.mel
+proc newFileOptions ()
+{
+	string $commandName = "newFile";
+	string $callback = ($commandName + "Callback");
+	string $setup = ($commandName + "Setup");
+	//	STEP 1:  Get the option box.
+	//	============================
+	//
+	string $layout = getOptionBox();
+	setParent $layout;
+	//	STEP 2:  Pass the command name to the option box.
+	//	=================================================
+	//
+	setOptionBoxCommandName("New Scene Options");
+	//	STEP 3:  Activate the default UI template.
+	//	==========================================
+	//
+	setUITemplate -pushTemplate DefaultTemplate;
+	//	STEP 4: Create option box contents.
+	//	===================================
+	//
+	waitCursor -state 1;
+	
+	string $parent = `columnLayout -adjustableColumn 1 -columnAttach "both" 5`;
+
+	columnLayout;
+
+	//checkbox for default on/off
+	checkBoxGrp
+		-label ""
+		-label1 (uiRes("m_performNewScene.kEnableDefaultScene")) 
+		-numberOfCheckBoxes 1
+		-offCommand ("text -edit -enable 0 newFileText;"+
+			"textField -edit -enable 0 newFileName;" +
+			"symbolButton -edit -enable 0 newFileSymbolButton;" +
+			"frameLayout -edit -enable 1 workingUnitsLayout;" + 
+			"frameLayout -edit -enable 1 timelineSettingsLayout")
+		-onCommand ("text -edit -enable 1 newFileText;"+
+			"textField -edit -enable 1 newFileName;" +
+			"symbolButton -edit -enable 1 newFileSymbolButton;" +
+			"frameLayout -edit -enable 0 workingUnitsLayout;" +
+			"frameLayout -edit -enable 0 timelineSettingsLayout")
+	newFileEnabled;
+
+	rowLayout -numberOfColumns 3
+		-columnWidth 2 212 
+		-columnWidth 3 25
+		defaultSceneLayout;
+		text -label (uiRes("m_performNewScene.kDefaultScene"))  
+			-enable `optionVar -query "newFileEnabled"`
+			newFileText;
+		textField 
+			-enable `optionVar -query "newFileEnabled"`
+			newFileName;
+		symbolButton 
+			-image "navButtonBrowse.png"
+			-enable `optionVar -query "newFileEnabled"`
+			-command "string $newFileName = `fileDialog`; textField -edit -text $newFileName newFileName"
+			newFileSymbolButton;
+		setParent ..;
+
+	
+	separator -style "none";
+
+	frameLayout -label (uiRes("m_performNewScene.kDefaultWorkingUnits")) 
+			-labelVisible true 
+			-labelIndent 5 
+			-borderVisible true
+			-borderStyle "etchedIn"
+			-collapsable false
+			-marginWidth 5 -marginHeight 5
+			workingUnitsLayout;
+
+		columnLayout -adj true;
+
+			optionMenuGrp -label (uiRes("m_performNewScene.kLinear"))  
+				-cc ("setDefaultUnits \"linear\" ")
+				linearOpts;
+
+			    menuItem -label (uiRes("m_performNewScene.kMillimeter"));	// menu 1
+			    menuItem -label (uiRes("m_performNewScene.kCentimeter"));	// menu 2
+			    menuItem -label (uiRes("m_performNewScene.kMeter"));				// menu 3
+			    menuItem -label (uiRes("m_performNewScene.kInch"));				// menu 4
+			    menuItem -label (uiRes("m_performNewScene.kFoot"));				// menu 5
+			    menuItem -label (uiRes("m_performNewScene.kYard"));				// menu 6
+
+			separator -style "none" -h 5;
+			separator -style "none" -h 5;
+
+			optionMenuGrp -label (uiRes("m_performNewScene.kAngular")) 
+				-cc ("setDefaultUnits \"angular\" ")
+				angularOpts;
+
+			    menuItem -label (uiRes("m_performNewScene.kDegrees"));
+			    menuItem -label (uiRes("m_performNewScene.kRadians"));
+
+			separator -style "none" -h 5;
+			separator -style "none" -h 5;
+
+			optionMenuGrp -label (uiRes("m_performNewScene.kTime")) 
+				-cc ("setDefaultUnits \"time\" ")
+				timeOpts;
+
+			    menuItem -label (uiRes("m_performNewScene.kFps"));
+			    menuItem -label (uiRes("m_performNewScene.kFilm"));
+			    menuItem -label (uiRes("m_performNewScene.kPAL"));
+			    menuItem -label (uiRes("m_performNewScene.kNTSC"));
+			    menuItem -label (uiRes("m_performNewScene.kShow"));
+			    menuItem -label (uiRes("m_performNewScene.kPALField"));
+			    menuItem -label (uiRes("m_performNewScene.kNTSCField"));
+			    menuItem -label (uiRes("m_performNewScene.kMilliseconds"));
+			    menuItem -label (uiRes("m_performNewScene.kSeconds"));
+			    menuItem -label (uiRes("m_performNewScene.kMinutes"));
+			    menuItem -label (uiRes("m_performNewScene.kHours"));
+				menuItem -label (uiRes("m_performNewScene.kTwoFps"));
+				menuItem -label (uiRes("m_performNewScene.kThreeFps"));
+				menuItem -label (uiRes("m_performNewScene.kFourFps"));
+				menuItem -label (uiRes("m_performNewScene.kFiveFps"));
+				menuItem -label (uiRes("m_performNewScene.kSixFps"));
+				menuItem -label (uiRes("m_performNewScene.kEightFps"));
+				menuItem -label (uiRes("m_performNewScene.kTenFps"));
+				menuItem -label (uiRes("m_performNewScene.kTwelveFps"));
+				menuItem -label (uiRes("m_performNewScene.kSixteenFps"));
+				menuItem -label (uiRes("m_performNewScene.kTwentyFps"));
+				menuItem -label (uiRes("m_performNewScene.kFortyFps"));
+				menuItem -label (uiRes("m_performNewScene.kSeventyfiveFps"));
+				menuItem -label (uiRes("m_performNewScene.kEightyFps"));
+				menuItem -label (uiRes("m_performNewScene.kHundredFps"));
+				menuItem -label (uiRes("m_performNewScene.kOneTwentyFps"));
+				menuItem -label (uiRes("m_performNewScene.kOneTwentyFiveFps"));
+				menuItem -label (uiRes("m_performNewScene.kOneFiftyFps"));
+				menuItem -label (uiRes("m_performNewScene.kTwoHundredFps"));
+				menuItem -label (uiRes("m_performNewScene.kTwoFortyFps"));
+				menuItem -label (uiRes("m_performNewScene.kTwoFiftyFps"));
+				menuItem -label (uiRes("m_performNewScene.kThreeHundredFps"));
+				menuItem -label (uiRes("m_performNewScene.kThreeSeventyFiveFps"));
+				menuItem -label (uiRes("m_performNewScene.kFourHundredFps"));
+				menuItem -label (uiRes("m_performNewScene.kFiveHundredFps"));
+				menuItem -label (uiRes("m_performNewScene.kSixHundredFps"));
+				menuItem -label (uiRes("m_performNewScene.kSevenFiftyFps"));
+				menuItem -label (uiRes("m_performNewScene.kTwelveHundredFps"));
+				menuItem -label (uiRes("m_performNewScene.kFifteenHundredFps"));
+				menuItem -label (uiRes("m_performNewScene.kTwoThousandFps"));
+				menuItem -label (uiRes("m_performNewScene.kThreeThousandFps"));
+				menuItem -label (uiRes("m_performNewScene.kSixThousandFps"));
+
+	setParent $parent;
+	
+	frameLayout -label (uiRes("m_performNewScene.kDefaultViewCubeSettings")) 
+			-labelVisible true 
+			-labelIndent 5 
+			-borderVisible true
+			-borderStyle "etchedIn"
+			-collapsable false
+			-marginWidth 5 -marginHeight 5
+			viewCubeDefaultsLayout;
+
+	    columnLayout -adj true;
+
+			checkBoxGrp -label ""
+				-label1 (uiRes("m_performNewScene.kShowCompass"))
+				-on1 ("optionVar -iv viewCubeShowCompassDefault on; floatSliderGrp -e -enable on viewCubeCompassAngleDefault")
+				-of1 ("optionVar -iv viewCubeShowCompassDefault off; floatSliderGrp -e -enable off viewCubeCompassAngleDefault")
+				viewCubeShowCompassDefault;
+
+			floatSliderGrp -field true
+				-label (uiRes("m_performNewScene.kCompassAngle")) 
+				-extraLabel (uiRes("m_performNewScene.kCompassAngleUnits"))
+				-cc ("optionVar -fv viewCubeCompassAngleDefault #1")
+				-min 0 -max 360
+				-cw 1 118
+				-cw 4 64
+				viewCubeCompassAngleDefault;
+
+	setParent $parent;
+
+	frameLayout -label (uiRes("m_performNewScene.kDefaultTimeSliderSettings")) 
+			-labelVisible true 
+			-labelIndent 5 
+			-borderVisible true
+			-borderStyle "etchedIn"
+			-collapsable false
+			-marginWidth 5 -marginHeight 5
+			timelineSettingsLayout;
+
+	    columnLayout -adj true;
+
+			// Changing the playback range can sometimes affect the start/end
+			// range.  Update it in the callback.
+			//
+		    floatFieldGrp
+				-label (uiRes("m_performNewScene.kPlaybackStart"))  
+				-cal 1 "right"
+				-nf 2 
+				-pre 2
+				-cc ( "optionVar -fv playbackMinDefault #1; " +
+					  "optionVar -fv playbackMaxDefault #2; ")
+				timeSliderBounds;
+	
+			// Changing the start/end range can sometimes affect the playback
+			// range.  Update it in the callback.
+			//
+			floatFieldGrp
+				-label (uiRes("m_performNewScene.kAnimationStart"))  
+				-cal 1 "right"
+				-nf 2 
+				-pre 2
+				-cc ( "optionVar -fv playbackMinRangeDefault #1; " +
+					  "optionVar -fv playbackMaxRangeDefault #2; ")
+				rangeSliderBounds;
+	
+	setParent ..;
+
+	setParent ..;
+	
+	setParent -menu ..;
+
+	waitCursor -state 0;
+	//	Step 5: Deactivate the default UI template.
+	//	===========================================
+	//
+	setUITemplate -popTemplate;
+
+	//	Step 6: Customize the buttons.  
+	//	==============================
+	//
+	string $applyBtn = getOptionBoxApplyBtn();
+	button -edit 
+		-label (uiRes("m_performNewScene.kApply")) 
+		-command ($callback + " " + $parent + " " + 1) 
+		$applyBtn;
+	
+	string $applyAndCloseBtn = getOptionBoxApplyAndCloseBtn();
+	button -edit 
+		-label (uiRes("m_performNewScene.kNew")) 
+		$applyAndCloseBtn;
+
+	string $saveBtn = getOptionBoxSaveBtn();
+	button -edit 
+		-command ($callback + " " + $parent + " " + 0 + " " +"; hideOptionBox")
+		$saveBtn;
+
+	string $resetBtn = getOptionBoxResetBtn();
+	button -edit 
+		-command ($setup + " " + $parent + " " + 1)
+		$resetBtn;
+
+	//	Step 7: Set the option box title.
+	//	=================================
+	//
+	string $title = (uiRes("m_performNewScene.kNewSceneOptions"));
+	setOptionBoxTitle( $title );
+	//	Step 8: Customize the 'Help' menu item text.
+	//	============================================
+	//
+	setOptionBoxHelpTag("NewSceneOptions");
+	//	Step 9: Set the current values of the option box.
+	//	=================================================
+	//
+	eval (($setup + " " + $parent + " " + 0));
+	//	Step 10: Show the option box.
+	//	=============================
+	//
+	showOptionBox();
+}
+
+// not modified from autodesk performNewScene.mel
+proc setOptionVars (int	$forceFactorySettings)
+{
+	if ($forceFactorySettings || !`optionVar -exists "newFileEnabled"`)
+		optionVar -intValue "newFileEnabled" 0;
+
+	if ($forceFactorySettings || !`optionVar -exists "newFileName"`)
+		optionVar -stringValue "newFileName" "";
+
+	// Force factory settings on the following vars is different from the case when vars do not exist
+	if ($forceFactorySettings) {
+		optionVar -stringValue "workingUnitLinearDefault" "cm";
+		optionVar -stringValue "workingUnitAngularDefault" "deg";
+		optionVar -stringValue "workingUnitTimeDefault" "film";
+		optionVar -intValue "viewCubeShowCompassDefault" 0;
+		optionVar -floatValue "viewCubeCompassAngleDefault" 0.0;
+		optionVar -floatValue "playbackMinDefault" 1.0;
+		optionVar -floatValue "playbackMaxDefault" 24.0;
+		optionVar -floatValue "playbackMinRangeDefault" 1.0;
+		optionVar -floatValue "playbackMaxRangeDefault" 48.0;
+	} else {
+		if(!`optionVar -exists "workingUnitLinearDefault"`) 
+			optionVar -stringValue "workingUnitLinearDefault" `currentUnit -q -l`;
+		if(!`optionVar -exists "workingUnitAngularDefault"`)
+			optionVar -stringValue "workingUnitAngularDefault" `currentUnit -q -a`;
+		if(!`optionVar -exists "workingUnitTimeDefault"`)
+			optionVar -stringValue "workingUnitTimeDefault" `currentUnit -q -t`;
+		if(!`optionVar -exists "viewCubeShowCompassDefault"`)
+			optionVar -intValue "viewCubeShowCompassDefault" `viewManip -q -dc`;
+		if(!`optionVar -exists "viewCubeCompassAngleDefault"`)
+			optionVar -floatValue "viewCubeCompassAngleDefault" `viewManip -q -ca`;
+		if(!`optionVar -exists "playbackMinDefault"`)
+			optionVar -floatValue "playbackMinDefault" `playbackOptions -q -min`;
+		if(!`optionVar -exists "playbackMaxDefault"`)
+			optionVar -floatValue "playbackMaxDefault" `playbackOptions -q -max`;
+		if(!`optionVar -exists "playbackMinRangeDefault"`)
+			optionVar -floatValue "playbackMinRangeDefault" `playbackOptions -q -animationStartTime`;
+		if(!`optionVar -exists "playbackMaxRangeDefault"`)
+			optionVar -floatValue "playbackMaxRangeDefault" `playbackOptions -q -animationEndTime`;
+	}
+}
+
+// not modified from autodesk performNewScene.mel
+proc string assembleCmd()
+{
+	setOptionVars (false);
+
+	//int $doHistory = `constructionHistory -q -toggle`;
+
+	string $cmd = "checkForUnknownNodes(); saveChanges(\"abxLockFileCheckOut(\\\"\\\");file -f -new;\");";
+	
+	if ((`optionVar -query "newFileEnabled"` == 1) && (`optionVar -query "newFileName"` != "")){
+		$cmd += "file -import \"";
+		$cmd += `optionVar -query "newFileName"`;
+		$cmd += " \";";
+	}
+
+	return $cmd;	
+}
+
+// MODIFIED from autodesk performNewScene.mel
+global proc string performNewScene (int $option)
+{
+
+	$result = `confirmDialog -title "PP New Scene" -message "Choose Which New Scene Method You Want to Use.\n Use PandaPanther New Scene if you are not sure." -button "Original New Scene" -button "PandaPanther New Scene"  -button "Cancel" -defaultButton "PandaPanther New Scene" -cancelButton "Cancel" -dismissString "Cancel"`;
+	if ($result == "PandaPanther New Scene"){
+		eval("ppDoNewScene (\"empty\")");
+		return "";
+	}
+	// do the original new scene procedures
+	else if ($result == "Original New Scene"){
+
+		string $cmd="";
+		print("Removing File Lock on "+`file -q -sn`+"\n");
+		abxLockFileCheckOut(`file -q -sn`);
+		switch ($option) 
+		{
+			case 0:
+				$cmd = `assembleCmd`;
+				eval($cmd);
+				break;
+			case 1:
+				newFileOptions;
+				break;
+			case 2:
+				$cmd = `assembleCmd`;
+				break;
+		}
+		return $cmd;
+	}
+	else{
+		return "";
 	}
 }

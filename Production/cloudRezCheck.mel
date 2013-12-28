@@ -1,0 +1,13 @@
+global proc cloudRezCheck()
+{
+    string $clouds[] = `ls -type fluidShape`;
+    for($tmp in $clouds)
+    {
+       int $c = `getAttr ($tmp+".resolutionW")`;
+       
+        if($c < 100)
+        {
+            setAttr ($tmp+".resolution") 160 80 160;
+        }
+    }
+}

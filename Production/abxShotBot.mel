@@ -1,0 +1,905 @@
+// abxShotCopy
+// copies shots while replacing shot based variables in the scene file
+// 1. swaps any reference path that is shot specific to the destination specific place
+// 2. swap frame ranges to the destination frame ranges
+// 3. do a diagnostic check and review that looks for missing assets and lets users ignore or fix or remind me later.
+
+
+// tools for moving stuff around
+global proc abxShotBot (){
+    string $ppTools = `getenv MAYA_PPTOOLS`;
+    if (!`window -exists abxShotBotWindow`)  {
+        window -t ("Shot Bot") -width 600 -height 320 -menuBar true abxShotBotWindow;
+
+        formLayout abxShotBotUIFrmLyt;
+        frameLayout -lv 0 -borderStyle "out" abxShotBotFrmeLyt;
+
+        formLayout abxShotBotSourceFrmLyt;
+            columnLayout -cat "both" 0 -adj 1 abxShotsDtlColLyt;
+            frameLayout -cll 1 -bs "etchedIn" -l "Source Shot";
+                rowLayout -numberOfColumns 2 -rat 2 "top" 0 -adj 2;
+                    frameLayout -lv 0 abxShotBotDetailImgFrmLyt;
+                        image -h 100 -w 177 -i ($ppTools+"/icons/shotThumb.png") abxShotBotDetailImg;
+                        popupMenu;
+                            menuItem -label "Capture Thumbnail" -c "abxShotsCaptureThumbnail \"\"";
+                    setParent..;
+                columnLayout -adj true;
+                    
+                    rowLayout -nc 3;
+                        textFieldGrp -cw 1 80 -cw 2 100 -adj 2 -label "Folder:" -text  "" -changeCommand "abxShotsUpdateFileField" abxShotBotShotFolderName;
+                        textFieldGrp -cw 1 60 -cw 2 85 -adj 2 -label "Sequence:" -text  "" -changeCommand "abxShotsUpdateFileField" abxShotBotSeqName;
+                        textFieldGrp -cw 1 60 -cw 2 150 -adj 2 -label "Shot:" -text  "" -changeCommand "abxShotsUpdateFileField" abxShotBotShotName;
+                        setParent..;
+                    rowLayout -nc 2;
+                        textFieldGrp -cw 1 80 -cw 2 100 -adj 2 -label "Department:" -text  "" -changeCommand "abxShotsUpdateFileField" abxShotBotDeptName;
+                        textFieldGrp -cw 1 60 -cw 2 200 -adj 2 -label "Take:" -text  "" -changeCommand "abxShotsUpdateFileField" abxShotBotTakeName;
+                        setParent..;
+                    textFieldButtonGrp -cw 1 80 -cw 2 400-label "Full Path:" -text "" -buttonLabel "Browse..." abxShotBotFilePath;
+                    //floatFieldGrp -en1 1 -en2 1 -cw 1 80 -cw 2 60 -cw 3 60 -nf 2  -label "Start/End:" -v1 0 -v2 0 abxShotBotDtlRange;
+                    setParent..;
+                setParent..;
+            frameLayout -cll 1 -bs "etchedIn" -l "Destination Shot";
+                rowLayout -numberOfColumns 2 -rat 2 "top" 0 -adj 2;
+                    frameLayout -lv 0 abxShotBotDetailImgFrmLyt;
+                        image -h 100 -w 177 -i ($ppTools+"/icons/shotThumb.png") abxShotBotDetailImg;
+                        popupMenu;
+                            menuItem -label "Capture Thumbnail" -c "abxShotsCaptureThumbnail \"\"";
+                    setParent..;
+                columnLayout -adj true;
+                    
+                    rowLayout -nc 3;
+                        textFieldGrp -cw 1 80 -cw 2 100 -adj 2 -label "Folder:" -text  "" -changeCommand "abxShotsUpdateDestFileField" abxShotBotDestShotFolderName;
+                        textFieldGrp -cw 1 60 -cw 2 85 -adj 2 -label "Sequence:" -text  "" -changeCommand "abxShotsUpdateDestFileField" abxShotBotDestSeqName;
+                        textFieldGrp -cw 1 60 -cw 2 150 -adj 2 -label "Shot:" -text  "" -changeCommand "abxShotsUpdateDestFileField" abxShotBotDestShotName;
+                        setParent..;
+                    rowLayout -nc 2;
+                        textFieldGrp -cw 1 80 -cw 2 100 -adj 2 -label "Department:" -text  "" -changeCommand "abxShotsUpdateDestFileField" abxShotBotDestDeptName;
+                        textFieldGrp -cw 1 60 -cw 2 300 -adj 2 -label "Take:" -text  ""  -changeCommand "abxShotsUpdateDestFileField" abxShotBotDestTakeName;
+                        setParent..;
+                    textFieldButtonGrp -cw 1 80 -cw 2 400-label "Full Path:" -text "" -buttonLabel "Browse..." abxShotBotDestFilePath;
+                    //floatFieldGrp -en1 1 -en2 1 -cw 1 80 -cw 2 60 -cw 3 60 -nf 2  -label "Start/End:" -v1 0 -v2 0 abxShotBotDestDtlRange;
+                    setParent..;
+                setParent..;
+
+        setParent abxShotBotUIFrmLyt;
+
+        rowLayout -numberOfColumns 3 -columnWidth3 160 160 160 -columnAttach 1 "both" 0 -columnAttach 2 "both" 0 -columnAttach 3 "both" 0 abxShotBotRL;
+        button -label "Copy Take and Close" -h 25 -c "abxShotBotUIDoIt;window -e -vis 0 abxShotBotWindow" ;
+        button -label "Copy Take" -h 25 -c "abxShotBotUIDoIt";
+        button -label "Cancel" -h 25 -c "window -e -vis 0 abxShotBotWindow";
+
+        formLayout -e 
+            -af abxShotBotFrmeLyt "left" 5
+            -af abxShotBotFrmeLyt "top" 5
+            -af abxShotBotFrmeLyt "bottom" 34
+            -af abxShotBotFrmeLyt "right" 5
+
+            -af abxShotBotRL "left" 5
+            -ac abxShotBotRL  "top" 5 abxShotBotFrmeLyt
+            -af abxShotBotRL "bottom" 5
+            -af abxShotBotRL "right" 5
+            abxShotBotUIFrmLyt;
+
+        abxShotBotUpdateWindow();
+    }
+    showWindow "abxShotBotWindow";
+}
+
+global proc abxShotBotLoad(string $sourcePath, string $destPath){
+    if (!`window -exists abxShotBotWindow`){
+        abxShotBot();
+    }
+    if (`textFieldGrp -exists abxShotBotFilePath`){
+        textFieldGrp -e -text $sourcePath abxShotBotFilePath;
+
+    }
+    if (`textFieldGrp -exists abxShotBotDestFilePath`){
+        textFieldGrp -e -text $destPath abxShotBotDestFilePath;
+    }
+    abxShotBotUpdateWindow();
+}
+
+global proc abxShotBotUpdateWindow(){
+
+    string $ppTools = `getenv PP_TOOLS`;
+    if (`window -exists abxShotBotWindow`){
+        if (`textFieldGrp -exists abxShotBotFilePath`){
+            // 0:Server 1:Job 2:ShotFolder 3:Seq 4:Shot 5:dept 6:subDept 7:take 8:version 9:ext
+            string $shotInfo[] = abxShotBotGetFromPath(`textFieldGrp -q -text abxShotBotFilePath`);
+            image -e -i ($ppTools+"/icons/shotThumb.png") abxShotBotDetailImg;
+            string $imgPath =(abxShotBotGetShotPathFromInfo($shotInfo)+$shotInfo[3]+"_"+$shotInfo[4]+".png");
+            image -e -i $imgPath abxShotBotDetailImg;
+            textFieldGrp -e -text $shotInfo[2] abxShotBotShotFolderName;
+            textFieldGrp -e -text $shotInfo[3] abxShotBotSeqName;
+            textFieldGrp -e -text $shotInfo[4] abxShotBotShotName;
+            textFieldGrp -e -text $shotInfo[5] abxShotBotDeptName;
+            textFieldGrp -e -text $shotInfo[7] abxShotBotTakeName;
+
+            // 0:Server 1:Job 2:ShotFolder 3:Seq 4:Shot 5:dept 6:subDept 7:take 8:version 9:ext
+            string $destInfo[] = abxShotBotGetFromPath(`textFieldGrp -q -text abxShotBotDestFilePath`);
+            textFieldGrp -e -text $destInfo[2] abxShotBotDestShotFolderName;
+            textFieldGrp -e -text $destInfo[3] abxShotBotDestSeqName;
+            //textFieldGrp -e -text $shotInfo[4] abxShotBotDestShotName;
+            textFieldGrp -e -text $destInfo[5] abxShotBotDestDeptName;
+            textFieldGrp -e -text $destInfo[7] abxShotBotDestTakeName;
+        }
+    }
+}
+
+global proc abxShotsUpdateFileField(){
+    string $shotInfo[] = abxShotBotGetFromPath(`textFieldGrp -q -text abxShotBotFilePath`);
+    $shotInfo[2] = `textFieldGrp -q -text abxShotBotShotFolderName`;
+    $shotInfo[3] = `textFieldGrp -q -text abxShotBotSeqName`;
+    $shotInfo[4] = `textFieldGrp -q -text abxShotBotShotName`;
+    $shotInfo[5] = `textFieldGrp -q -text abxShotBotDeptName`;
+    $shotInfo[7] = `textFieldGrp -q -text abxShotBotTakeName`;
+    $shotInfo[9] = "ma";
+    string $filePath = abxShotBotGetPathFromInfo($shotInfo);
+    textFieldGrp -e -text $filePath abxShotBotFilePath;
+    if (!`filetest -r $filePath`)
+        textFieldGrp -e -bgc .7 .3 .3 -ebg 1 abxShotBotFilePath;
+    else
+        textFieldGrp -e -bgc .27 .27 .27 -ebg 1 abxShotBotFilePath;
+}
+
+global proc abxShotsUpdateDestFileField(){
+    string $shotInfo[] = abxShotBotGetFromPath(`textFieldGrp -q -text abxShotBotDestFilePath`);
+    $shotInfo[2] = `textFieldGrp -q -text abxShotBotDestShotFolderName`;
+    $shotInfo[3] = `textFieldGrp -q -text abxShotBotDestSeqName`;
+    $shotInfo[4] = `textFieldGrp -q -text abxShotBotDestShotName`;
+    $shotInfo[5] = `textFieldGrp -q -text abxShotBotDestDeptName`;
+    $shotInfo[7] = `textFieldGrp -q -text abxShotBotDestTakeName`;
+    $shotInfo[9] = "ma";
+    string $filePath = abxShotBotGetPathFromInfo($shotInfo);
+    textFieldGrp -e -text $filePath abxShotBotDestFilePath;
+    if (!`filetest -r $filePath`)
+        textFieldGrp -e -bgc .7 .3 .3 -ebg 1 abxShotBotDestFilePath;
+    else
+        textFieldGrp -e -bgc .27 .27 .27 -ebg 1 abxShotBotDestFilePath;
+}
+
+// 0:Server 1:Job 2:ShotFolder 3:Seq 4:Shot 5:dept 6:subDept 7:take 8:version 9:ext
+global proc string[] abxShotBotGetFromPath (string $filePath){
+
+    if ($filePath == "")
+        $filePath = `file -q -sn`;
+
+    if ($filePath != ""){
+        string $basename = `basenameEx $filePath`;
+        string $pathParts[] = stringToStringArray($filePath, "/");
+        string $fileParts[] = stringToStringArray($basename, "_");
+        string $job = $pathParts[1];
+        string $folder = $pathParts[5];
+        string $sequence = $fileParts[0];
+        string $name = $fileParts[1];
+        string $dept = $fileParts[2];
+        string $subDept = $pathParts[size($pathParts)-2];
+        string $version = `match "v[0-9]+" $basename`;
+        string $take = "";
+        if (!`gmatch $fileParts[3] ($version+"*")`){
+            if ($fileParts[3]!="master")
+                $take = $fileParts[3];
+        }
+
+        string $extension = `fileExtension $filePath`;
+        return {$job,$folder,$sequence,$name,$dept,$subDept,$take,$version,$extension};
+    }
+    else{
+        return {};
+    }
+}
+
+global proc string abxShotBotGetPathFromInfo (string $shotInfo[]){
+    // 0:Server 1:Job 2:ShotFolder 3:Seq 4:Shot 5:dept 6:subDept 7:take 8:version 9:ext
+    string $tokenBuffer[];
+    tokenize $shotInfo[1] "_" $tokenBuffer;
+    string $MayaJobName = ($tokenBuffer[0]+"_maya");
+    string $sceneName = "";
+    if ($shotInfo[7] == "" || $shotInfo[7] == "master")
+        $sceneName = ($shotInfo[3]+"_"+$shotInfo[4]+"_"+$shotInfo[5]+"_"+$shotInfo[8]+"."+$shotInfo[9]);
+    else
+        $sceneName = ($shotInfo[3]+"_"+$shotInfo[4]+"_"+$shotInfo[5]+"_"+$shotInfo[7]+"_"+$shotInfo[8]+"."+$shotInfo[9]);
+
+    return ($shotInfo[0]+"/"+$shotInfo[1]+"/3D/"+$MayaJobName+"/scenes/"+$shotInfo[2]+"/"+$shotInfo[3]+"/"+$shotInfo[3]+"_"+$shotInfo[4]+"/"+toupper($shotInfo[5])+"/"+$shotInfo[6]+"/"+$sceneName);
+}
+
+global proc string abxShotBotGetShotPathFromInfo (string $shotInfo[]){
+    // 0:Server 1:Job 2:ShotFolder 3:Seq 4:Shot 5:dept 6:subDept 7:take 8:version 9:ext
+    string $tokenBuffer[];
+    tokenize $shotInfo[1] "_" $tokenBuffer;
+    string $MayaJobName = ($tokenBuffer[0]+"_maya");
+    string $sceneName = "";
+    if ($shotInfo[7] == "" || $shotInfo[7] == "master")
+        $sceneName = ($shotInfo[3]+"_"+$shotInfo[4]+"_"+$shotInfo[5]+"_"+$shotInfo[8]+"."+$shotInfo[9]);
+    else
+        $sceneName = ($shotInfo[3]+"_"+$shotInfo[4]+"_"+$shotInfo[5]+"_"+$shotInfo[7]+"_"+$shotInfo[8]+"."+$shotInfo[9]);
+
+    return ($shotInfo[0]+"/"+$shotInfo[1]+"/3D/"+$MayaJobName+"/scenes/"+$shotInfo[2]+"/"+$shotInfo[3]+"/"+$shotInfo[4]+"_"+$shotInfo[5]+"/");
+}
+/*
+global proc string[] abxShotBotShotInfoFromPath(string $filePath){
+
+    string $shotNameGuess = "";
+    string $shotTakeGuess = "";
+    string $shotVersionGuess = "";
+    string $shotDeptGuess = "";
+    string $shotSubDeptGuess = ""; // master or work
+    string $shotSequenceGuess = "";
+    string $shotFolderGuess = "";
+    string $extension = `fileExtension $filePath`;
+    string $currentSceneName = `basenameEx $filePath`;
+    string $validDepts[] = {"anm", "fx", "lgt", "pre"};
+    
+    string $tokenBuffer[];
+    tokenize $filePath "/" $tokenBuffer;
+    if (size($tokenBuffer) > 1){
+        $shotSubDeptGuess = $tokenBuffer[size($tokenBuffer)-2];
+        if (size($tokenBuffer) > 2 ) {
+            $shotDeptGuess = tolower($tokenBuffer[size($tokenBuffer)-3]);
+            if (size($tokenBuffer) > 3 ) {
+                $shotNameGuess = $tokenBuffer[size($tokenBuffer)-4];
+                if (size($tokenBuffer) > 4){
+                    if ($tokenBuffer[size($tokenBuffer)-5] != "_ALL_SHOTS" && $tokenBuffer[size($tokenBuffer)-5] != "_PREVIS"){
+                        $shotSequenceGuess = $tokenBuffer[size($tokenBuffer)-5];
+                        if (size($tokenBuffer) > 5){
+                            if ($tokenBuffer[size($tokenBuffer)-6] == "_ALL_SHOTS" || $tokenBuffer[size($tokenBuffer)-6] == "_PREVIS" ){
+                                $shotFolderGuess = $tokenBuffer[size($tokenBuffer)-6];
+                            }   
+                        }
+                    }
+                    else{
+                        $shotFolderGuess = $tokenBuffer[size($tokenBuffer)-5];
+                    }
+                }
+            }
+        }
+    }   
+    string $tokenBuffer1[];
+    tokenize $shotNameGuess "_" $tokenBuffer1;
+    if (size($tokenBuffer1) > 1)
+        $shotNameGuess = $tokenBuffer1[1];
+
+    string $noExt = `basenameEx $currentSceneName`;
+    string $tokenBuffer2[];
+    tokenize $noExt "_" $tokenBuffer2;
+    if (size($tokenBuffer2)>2){
+
+        if ($shotSubDeptGuess == "master"){
+
+
+            // if the 3rd from last token is a valid dept name
+            if (stringArrayContains($tokenBuffer2[(size($tokenBuffer2)-3)], $validDepts))
+                $shotTakeGuess = "";
+            else 
+                $shotTakeGuess = $tokenBuffer2[(size($tokenBuffer2)-3)];
+
+            // check to make sure the previous token is string "master"
+            if ($tokenBuffer2[(size($tokenBuffer2)-2)] == "master")
+                $shotVersionGuess = $tokenBuffer2[(size($tokenBuffer2)-1)];
+        }
+        else {
+
+            if (stringArrayContains($tokenBuffer2[(size($tokenBuffer2)-2)], $validDepts))
+                $shotTakeGuess = "";
+            else 
+                $shotTakeGuess = $tokenBuffer2[(size($tokenBuffer2)-2)];
+
+            $shotVersionGuess = $tokenBuffer2[(size($tokenBuffer2)-1)];
+        }
+
+    }
+
+    string $result[] = {$shotFolderGuess,$shotSequenceGuess,$shotNameGuess,$shotDeptGuess,$shotTakeGuess,$shotVersionGuess,$shotSubDeptGuess};
+    return $result;
+
+}
+*/
+
+// reads the source and destination file from the UI and runs the shot copy
+global proc abxShotBotUIDoIt(){
+    abxShotBotCopyShot(`textFieldGrp -q -text abxShotBotFilePath`, `textFieldGrp -q -text abxShotBotDestFilePath`,0);
+}
+
+
+// specify a shot group name and it will query Rainbow and get a list of the shots to operate on
+global proc abxShotBotGenerateFromShotGroup (string $shotGroupName, string $dept, int $force){
+    global int $dbExists;
+    if ($dbExists){
+        int $sgCount = python("len(activeJob.lgt_groups)");
+        for ($sg=0;$sg<$sgCount;$sg++){
+            string $shotGroup = python("activeJob.lgt_groups["+$sg+"].name");
+            // if the shot group specified in the argument matches a found shot group
+            if ($shotGroup == $shotGroupName){
+                // get the mother shot
+                string $motherShot = python("activeJob.lgt_groups["+$sg+"].mother_shot['natural_key']");
+
+                string $tokenBuffer[];
+                tokenize $motherShot "_" $tokenBuffer;
+                string $srcSeqName = $tokenBuffer[0];
+                string $motherShotFullName = ($tokenBuffer[0]+"/"+$motherShot);
+
+                // load the member shots for the shot group
+                python("shotList = activeJob.lgt_groups["+$sg+"].get_shots()");
+                int $shotListCount = python("len(shotList)");
+                string $destShotName[];
+                for ($c=0;$c<$shotListCount;$c++){
+                    $destShotName[$c] = python("shotList["+$c+"].name");
+                }
+                abxShotBotGenerateFromShotList ($motherShot, $destShotName, $dept, $force, "");
+            }
+        }
+    }
+}
+
+global proc abxShotBotGenerateFromShotList (string $motherShot, string $shotList[], string $dept, int $force, string $takeName){
+
+    //global int $dbExists;
+   // if ($dbExists){
+    //    int $sgCount = python("len(activeJob.lgt_groups)");
+    //    for ($sg=0;$sg<$sgCount;$sg++){
+            //string $shotGroup = python("activeJob.lgt_groups["+$sg+"].name");
+            // if the shot group specified in the argument matches a found shot group
+            //if ($shotGroup == $shotGroupName){
+
+    // get the mother shot
+    //string $motherShot = python("activeJob.lgt_groups["+$sg+"].mother_shot['natural_key']");
+    int $singleTakeOnly = false;
+    if ($takeName != "")
+         $singleTakeOnly = true;
+
+    string $tokenBuffer[];
+    tokenize $motherShot "_" $tokenBuffer;
+    string $srcSeqName = $tokenBuffer[0];
+    string $motherShotFullName = ($tokenBuffer[0]+"/"+$motherShot);
+
+    // load the member shots for the shot group
+    //python("shotList = activeJob.lgt_groups["+$sg+"].get_shots()");
+    //int $shotListCount = python("len(shotList)");
+    $shotListCount = size($shotList);
+
+    // get the full path of the mother shot
+    string $motherShotDirPath = (`workspace -q -rd`+"scenes/_ALL_SHOTS/"+$srcSeqName+"/"+$motherShot);
+
+    // get a list of all the latest versions of all takes for the mother shot
+    string $takeScenes[] = `abxShotsGetScenes $motherShotFullName $dept`;
+    
+    // for each take found in the mother shot
+    for ($i=0;$i<size($takeScenes);$i++){
+
+        print ("Mother Shot:"+$motherShot+" found take:"+$takeScenes[$i]+"\n");
+
+        // if $takeName was not specified as a param then just set it to each found take
+        if ($singleTakeOnly == false)
+            $takeName = $takeScenes[$i];
+
+        string $tokenBuffer2[];
+        tokenize $takeScenes[$i] "_" $tokenBuffer2;
+
+
+        print ("singleTakeOnly="+$singleTakeOnly+" takeName="+$takeName+"\n");
+        // matches it against the current take name or if the default take (identified by having only 4 parts in name)
+        if (`gmatch $takeScenes[$i] ("*_"+$takeName+"_*")` || size($tokenBuffer2) == 4){
+            // this skips any take called SCREEN (skylanders2013 workaround to skip magic mirror takes when using shotcopy)
+            
+            if (`gmatch $takeScenes[$i] "*_SCREEN*"` && $singleTakeOnly == false){
+
+            }
+            else{
+
+                string $sourceTakeFullPath = (`workspace -q -rd`+"scenes/_ALL_SHOTS/"+$srcSeqName+"/"+$motherShot+"/"+toupper($dept)+"/work/"+$takeScenes[$i]);
+                print ("Source MotherShot Take = "+$sourceTakeFullPath+"\n");
+                // get the shotInfo
+                //string $srcShotInfo[] = abxShotBotShotInfoFromPath($sourceTakeFullPath);
+
+                // 0:Server 1:Job 2:ShotFolder 3:Seq 4:Shot 5:dept 6:subDept 7:take 8:version 9:ext
+                string $srcShotInfo[] = abxShotBotGetFromPath($sourceTakeFullPath);
+
+                for ($c=0;$c<$shotListCount;$c++){
+
+                    //string $destShotName = python("shotList["+$c+"].name");
+                    string $destShotName = $shotList[$c];
+
+                    // make sure not to act on the mother shot itsef since it is also a member of the shot group
+                    if ($destShotName != $motherShot){
+                        //print ("Looking for "+$destShotName+"\n");
+
+                        string $destShotToken[];
+                        tokenize $destShotName "_" $destShotToken;
+                        string $destSeqName = $destShotToken[0];
+
+                        // replace the shot specific variables from the take path to get the new dest path
+                        string $regExpr = ($srcSeqName+"/"+$motherShot);
+                        string $replaceStr = ($destSeqName+"/"+$destShotName);
+                        string $destTakeDirName = `substitute $regExpr $sourceTakeFullPath $replaceStr`;
+
+                        // replace the shot specific string from the file name string to get the FINAL dest path
+                        $regExpr = ("/"+$motherShot+"_");
+                        $replaceStr = ("/"+$destShotName+"_");
+                        string $destTakeFullPath = `substitute $regExpr $destTakeDirName $replaceStr`;
+                        //print ("destTakeFullPath ="+$destTakeFullPath+"\n");
+
+                        //string $destShotInfo[] = abxShotBotShotInfoFromPath($destTakeFullPath);
+
+                        // 0:Server 1:Job 2:ShotFolder 3:Seq 4:Shot 5:dept 6:subDept 7:take 8:version 9:ext
+                        string $destShotInfo[] = abxShotBotGetFromPath($sourceTakeFullPath);
+
+                        string $destShotNameFull = ($destShotInfo[3]+"/"+$destShotInfo[3]+"_"+$destShotInfo[4]);
+                        //print ("destShotNameFull="+$destShotNameFull+"\n");
+
+                        // find the latest workshop version of the dest path
+                        string $latestDestWorkVersion = abxShotsGetLatestWorkVersion($destShotInfo[2], $destShotNameFull, $destShotInfo[5], $destShotInfo[7], $destShotInfo[6],0);
+                        print ("abxShotsGetLatestWorkVersion("+$destShotInfo[2]+", "+$destShotNameFull+", "+$destShotInfo[5]+", "+$destShotInfo[7]+", "+$destShotInfo[6 ]+")\n");
+                        print ("\n\n\n\nLatest Found Version ="+$latestDestWorkVersion+"\n\n\n\n");
+
+                        // increment the found version to the next available
+                        int $verAsNum = int(`match "[0-9]+" $latestDestWorkVersion`);
+                        $verAsNum++;
+                        string $nextAvailVersion = "_";
+                        if ($verAsNum > 99){
+                            $nextAvailVersion = ("_v"+$verAsNum);
+                        }
+                        else if ($verAsNum > 9){
+                            $nextAvailVersion = ("_v0"+$verAsNum);
+                        }
+                        else {
+                            $nextAvailVersion = ("_v00"+$verAsNum);
+                        }
+
+                        $regExpr = ("_v[0-9]+");
+                        string $finalDestFilePath = `substitute $regExpr $destTakeFullPath $nextAvailVersion`;
+                        print ("Dest Shot Group Take = "+$finalDestFilePath+"\n");
+
+                        // run abxShotBotCopyShot for each
+                        abxShotBotCopyShot ($sourceTakeFullPath,$finalDestFilePath,0);
+                    }
+                }
+            }
+        }
+    }
+            //}
+        //}
+    //}           
+}
+
+
+
+// copies shots while replacing shot based variables in the scene file
+// 1. swaps any reference path that is shot specific to the destination specific place
+// 2. swap frame ranges to the destination frame ranges
+// 3. do a diagnostic check and review that looks for missing assets and lets users ignore or fix or remind me later.
+
+//abxShotBotCopyShot("M:/Sky_2013_RnD_PP10097/3D/Sky_2013_RnD_maya/scenes/_ALL_SHOTS/FMV6TEST/FMV6TEST_107/LGT/work/FMV6TEST_107_lgt_cockpit_v008.ma","M:/Sky_2013_RnD_PP10097/3D/Sky_2013_RnD_maya/scenes/_ALL_SHOTS/FMV6TEST/FMV6TEST_100/LGT/work/FMV6TEST_100_lgt_cockpit_v001.ma")
+global proc abxShotBotCopyShot (string $sourceFilePath, string $destFilePath, int $force) {
+
+    string $doPrompt = 1;
+    if ($force)
+        $doPrompt = 0;
+
+    // based on the arguments of the funciton, guess the scene file name and test to see if it exists.
+    //string $sourceInfo[] = abxShotBotShotInfoFromPath($sourceFilePath);
+    //string $destInfo[] = abxShotBotShotInfoFromPath($destFilePath);
+
+    // 0:Server 1:Job 2:ShotFolder 3:Seq 4:Shot 5:dept 6:subDept 7:take 8:version 9:ext
+    string $sourceInfo[] = abxShotBotGetFromPath($sourceFilePath);
+    string $destInfo[] = abxShotBotGetFromPath($destFilePath);
+
+    string $refNodesToCheck[];
+    
+    // if the file exists
+    if (`filetest -r $sourceFilePath`){
+
+        // if the file is not already open, then open the shot
+        if (`file -q -sn` != $sourceFilePath){
+            abxLockFileCheckOut("");
+            file -f -o $sourceFilePath;
+        }
+
+        // make sure the shot is on the default render layer
+        editRenderLayerGlobals -currentRenderLayer defaultRenderLayer;
+
+        print ("getting references\n");
+        // get a list of file references
+        string $refFiles[] = `file -q -r`;
+
+        // for each reference file found, replace the shot specific strings in the path names with the destination shot values
+        string $each;
+        for ($each in $refFiles){
+            print ("testing "+$each+"\n");
+            string $refNode = `referenceQuery -rfn $each`;
+            string $filepath = `referenceQuery -f -wcn $refNode`;
+            string $ext = `fileExtension $filepath`;
+            string $basename = `basenameEx $filepath`;
+            string $dirname = `dirname $filepath`;
+
+            print ($refNode+"\n");
+            string $testdirname = ("/scenes/"+$sourceInfo[1]+"/"+$sourceInfo[2]+"/"+$sourceInfo[2]+"_"+$sourceInfo[3]);
+            string $replacedirname =  ("/scenes/"+$destInfo[1]+"/"+$destInfo[2]+"/"+$destInfo[2]+"_"+$destInfo[3]);
+
+            string $testbasename = ($sourceInfo[2]+"_"+$sourceInfo[3]+"_");
+            string $replacebasename = ($destInfo[2]+"_"+$destInfo[3]+"_");
+
+
+            //print ("replacing \""+$testdirname+"\" with \""+$replacedirname+"\" on path:"+$filepath+"\n");
+            //print ("replacing \""+$testbasename+"\" with \""+$replacebasename+"\" on path:"+$filepath+"\n");
+            // if the file reference contains the source shotName in its path then 
+            print ("Checking for shot local path:"+$dirname+" against "+$testdirname+"\n");
+            if (`gmatch $dirname ("*"+$testdirname+"*")`){
+                // swap the ref path to the destShotName and test to see if the file exists
+                string $regularExpr = $testdirname;
+                string $filePathReplacedDirName = `substitute $regularExpr $filepath $replacedirname`;
+                string $regularExpr = $testbasename;
+                string $newFilePathGuess =  `substitute $regularExpr $filePathReplacedDirName $replacebasename`;
+                
+                print ("Checking for updated version on "+$newFilePathGuess+"\n");
+                // find the latest found version of the file
+                string $latestFoundFile = abxShotBotCheckRefForUpdate($newFilePathGuess);
+                print ("Trying to Replace Reference With:"+$latestFoundFile+"\n");
+
+                // if the file exists
+                if (`filetest -r $latestFoundFile`){
+                    // replace the reference
+                     file -loadReference $refNode $latestFoundFile;
+                     string $newFileName = `referenceQuery -f -wcn $refNode`;
+                    // flag the reference for diagnostic checks
+                    $refNodesToCheck[size($refNodesToCheck)] = $newFileName;
+                }
+                else {
+                    print ("Could not find :"+$latestFoundFile+"\n");
+                    if (!$force)
+                        $result = `confirmDialog -title "ShotBot Copy Shots" -message ("Could not swap reference to "+$latestFoundFile+". No Version exists. ") -button "OK"`;
+
+                }
+            }
+        }
+    }
+
+    // adjust the frame range to the shot specific range
+    int $frRange[] = abxShotsGetFrameRange(($destInfo[2]+"/"+$destInfo[2]+"_"+$destInfo[3]), $destInfo[1]);
+    //if ($frRange[0] > 0 && $frRange[1] > 0)
+        evalEcho("playbackOptions -ast "+$frRange[0]+" -aet "+$frRange[1]+" -min "+$frRange[0]+" -max "+$frRange[1]);
+
+
+    // if the shot doesn't exist, ask the user to confirm its creation or force if running batch mode
+    string $testShotPath = (`workspace -q -rd`+"/scenes/"+$destInfo[1]+"/"+$destInfo[2]+"/"+$destInfo[2]+"_"+$destInfo[3]);
+    if (!evalEcho("filetest -r \""+$testShotPath+"\"")){
+          if (!$force)
+            confirmDialog -message ("Shot Specified Does Not Exists: "+$testShotPath+" Skipping Shot Copy for this shot.") -button "OK";
+        warning ($testShotPath+" Shot Specified Does Not Exists. Skipping shot copy for this shot. please resolve issues and try again.");      
+    }
+    else {
+
+        // do a diagnostic check on specified reference nodes
+        if (!$force)
+            abxShotBotRefDiagnostic($refNodesToCheck);
+
+        // if the file is not already locked then check out the source file and check in the dest file
+        if (!abxLockFileGetStatus($destFilePath,$doPrompt)){
+
+            // check out the file lock on the original file
+            abxLockFileCheckOut($sourceFilePath);
+
+            // rename the scene file but don't save yet
+            evalEcho("file -rename \""+$destFilePath+"\"");
+
+            // save the scene
+            evalEcho("file -f -save");
+
+            // check out the file lock on the original file
+            abxLockFileCheckIn($destFilePath);
+
+        }
+        else {
+            if (!$force)
+                confirmDialog -message ("Could not save to destination path because that file is locked as in-use. "+$destFilePath) -button "OK";
+            warning ($destFilePath+" is locked as in use. Skipping shot copy for this shot. please resolve issues and try again.");
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+global proc abxShotBotRefDiagnostic(string $refNodes[]){
+
+
+    // for each reference node
+    for ($each in $refNodes){
+
+        global string $missingNodeList[];
+        global string $missingAssetList[];
+        clear($missingNodeList);
+        clear($missingAssetList);
+        //print ("Checking Ref "+$each+"\n");
+        // get a list of failed edits
+        //string $failedEdits[] = `referenceQuery -failedEdits true -successfulEdits false -editStrings $each`;
+        string $missingNodes[] = evalEcho("referenceQuery -failedEdits true -successfulEdits false -editNodes \""+$each+"\"");
+        string $namespace = `file -q -namespace $each`;
+        string $refNodeName = `referenceQuery -rfn $each`;
+
+        string $every;
+        for ($every in $missingNodes){
+            string $tokenBuffer[];
+            tokenize $every "|" $tokenBuffer;
+            string $rootObjName;
+            $rootObjName = $tokenBuffer[size($tokenBuffer)-1];
+
+            string $extractedAssetName;
+            string $tokenBuffer2[];
+            tokenize $rootObjName ":" $tokenBuffer2;
+            //print ("splitting "+$rootObjName+" for namespace "+$namespace+"\n");
+            if ($tokenBuffer2[0] == $namespace && size($tokenBuffer2) > 2 ){
+                $extractedAssetName = $tokenBuffer2[1];
+            }
+            else{
+                // add the missing object as a non-asset missing object
+                if (!`objExists $every`)
+                    if (!stringArrayContains($every,$missingNodeList))
+                        $missingNodeList[size($missingNodeList)] = $every;
+            }
+
+            // namespace -exists "anm:Kaos";
+            // if the extracted Namespace does not have a ROOT node, then add it to the missing asset list
+            //print ("looking for ROOT node \""+$namespace+":"+$extractedAssetName+":ROOT\"\n");
+            if ($extractedAssetName != ""){
+                string $assetRootName = ($namespace+":"+$extractedAssetName+":ROOT");
+                if (!`objExists $assetRootName`){
+                    // flag missing asset
+                    if (!stringArrayContains($extractedAssetName,$missingAssetList)){
+                        $missingAssetList[size($missingAssetList)] = $extractedAssetName;
+                    }
+                }
+            }
+            // if an asset namespace was not detected
+            // check failed edits for missing dag objects that are not assets
+                // flag missing dag objects
+            // check the failed edits for missing shaders that are not assets
+                // flag missing shaders
+        }
+
+
+        for ($every in $missingAssetList){
+            print ($refNodeName+" Missing Asset "+$every+"\n");
+        }
+        for ($every in $missingNodeList){
+            print ($refNodeName+" Missing Node "+$every+"\n");
+        }
+
+        string $result = "";
+        // loop until all files are ignored or resolved
+        while ($result != "Abort" && (size($missingNodeList) > 0 || size($missingAssetList) > 0)){
+
+            $result = `layoutDialog -title ("Shot Bot: Reference Diagnostics") -ui ("refReportPrompt \""+$each+"\";")`;
+            print ("size of missingNodeList="+size($missingNodeList)+" size of missingAssetList="+size($missingAssetList)+"\n");
+        }
+
+        if ($result == "Abort")
+            return;
+
+        //refReportPrompt($refNodeName);
+       
+        //$result = "Remove";
+        /*
+        if ($result == "Remove")
+            abxShotBotRefIgnoreMissingNodes($each,`textScrollList -q -si reportPromptSF1`,`textScrollList -q -si reportPromptSF2`,0);
+        else if ($result == "Ignore")
+            abxShotBotRefIgnoreMissingNodes($each,`textScrollList -q -si reportPromptSF1`,`textScrollList -q -si reportPromptSF2`,1);
+        else if ($result == "Retarget")
+            abxShotBotRefRetargetMissingNodes($each,`textScrollList -q -si reportPromptSF1`,`textScrollList -q -si reportPromptSF2`);
+            */
+
+        
+
+
+
+    }
+
+    // once all failed items have been flagged
+    // bring up a report view where it lists each missing asset, object, or shader
+    // give the user the option to resolve missing items by either retarget, ignoring permanant, or remind on next file load.
+    // rerun the diagnostic after the changes to ensure problems are resolved
+}
+
+
+
+
+
+global proc abxShotBotRefIgnoreMissingNodes(string $ref, string $assetsToClear[], string $nodesToClear[], int $isTemporary) {
+
+    global string $missingNodeList[];
+    global string $missingAssetList[];
+    
+    if ($isTemporary == 0){
+        // clear any missing nodes first
+        for ($each in $nodesToClear){
+            evalEcho("referenceEdit -failedEdits true -successfulEdits false -removeEdits \""+$each+"\"");
+        }
+        // for missing assets we must list the missing nodes for that asset
+        string $missingNodes[] = evalEcho("referenceQuery -failedEdits true -successfulEdits false -editNodes \""+$ref+"\"");
+        for ($each in $missingNodes){
+            // if the node name contains the missing asset name
+            for ($every in $assetsToClear){
+                if (`gmatch $each ("*"+$every+"*")`)
+                    // this may not work as it could confuse the source with the target?
+                    evalEcho("referenceEdit -failedEdits true -successfulEdits false -removeEdits \""+$each+"\"");
+            }
+        }
+    }
+
+    // for each item in the nodes to clear, remove it from the global list
+    for ($each in $nodesToClear){
+        string $newArray[] = stringArrayRemove($nodesToClear, $missingNodeList);
+        $missingNodeList = $newArray;
+    }
+    for ($each in $assetsToClear){
+        string $newArray[] = stringArrayRemove($assetsToClear, $missingAssetList);
+        $missingAssetList = $newArray;
+    }
+
+}
+
+global proc abxShotBotRefRetargetMissingNodes(string $ref, string $assetsToRetarget[], string $nodesToRetarget[]) {
+
+    // clear the failed edits on the missing node
+
+}
+
+
+global proc refReportPrompt(string $refNodeName) {
+
+
+    global string $missingNodeList[];
+    global string $missingAssetList[];
+    $refFilePath = `referenceQuery -filename $refNodeName`;
+
+    string $form = `setParent -q`;
+        //$form = `formLayout abxShotBotDiagnosticForm`;
+
+        formLayout -e -width 500 -height 300 $form;
+
+        string $c = `columnLayout -adj 1`;
+
+            string $lbl = `text -ww 1 -label ("The Following Items were missing in remapped Reference Scene:"+$refNodeName)`;
+            //string $lbl = `text -ww 1 -label $refFilePath`;
+
+            string $lb2 = `text -ww 1 -label "Missing Assets:"`;
+            string $t = `textScrollList -h 100 -ams 1 reportPromptSF1`;
+            string $lbl3 = `text -ww 1 -label "Missing Other Nodes:"`;
+            string $t2 = `textScrollList -ams 1 reportPromptSF2`;
+
+            for ($each in $missingAssetList){
+                textScrollList -e -append $each $t;
+            }
+            //textScrollList -e -append "" $t;
+            
+            for ($each in $missingNodeList){
+                textScrollList -e -append $each $t2;
+            }
+            //textScrollList -e -append "" $t2;
+
+            string $lbl = `text -ww 1 -label "Select Items Above and Choose an Action Below. The prompt will continue to appear until all items are resolved."`;
+
+            setParent..;
+
+        string $b1 = `button -l "Ignore Permanantly" -c ("abxShotBotRefIgnoreMissingNodes(\""+$refNodeName+"\",`textScrollList -q -si reportPromptSF1`,`textScrollList -q -si reportPromptSF2`,0);layoutDialog -dismiss \"Remove\"")`;
+        string $b2 = `button -l "Remind Me Next Time" -c ("abxShotBotRefIgnoreMissingNodes(\""+$refNodeName+"\",`textScrollList -q -si reportPromptSF1`,`textScrollList -q -si reportPromptSF2`,1);layoutDialog -dismiss \"Ignore\"")`;
+        string $b3 = `button -en 0 -l "Retarget" -c ";layoutDialog -dismiss \"Retarget\""`;
+        string $b4 = `button -l "Abort" -c ";layoutDialog -dismiss \"Abort\""`;
+
+        int $spacer = 5;
+        int $top = 5;
+        int $edge = 5;
+
+        formLayout -edit
+
+            -attachForm            $c   "top"    $top 
+            -attachForm            $c   "left"   $edge
+            -attachControl         $c   "bottom" $spacer $b1
+            -attachForm            $c   "right"  $edge
+
+            -attachOppositeForm    $b1  "top"    (-25-$spacer)
+            -attachForm            $b1  "left"   $edge
+            -attachNone            $b1  "bottom"
+            -attachPosition        $b1  "right"  $spacer 25
+
+            -attachOppositeForm    $b2  "top"    (-25-$spacer)
+            -attachPosition        $b2  "left"   $spacer 25
+            -attachNone            $b2  "bottom"
+            -attachPosition        $b2  "right" $edge 50
+
+            -attachOppositeForm    $b3  "top"    (-25-$spacer)
+            -attachPosition        $b3  "left"   $spacer 50
+            -attachNone            $b3  "bottom"
+            -attachPosition        $b3  "right" $edge 75
+
+            -attachOppositeForm    $b4  "top"    (-25-$spacer)
+            -attachPosition        $b4  "left"   $spacer 75
+            -attachNone            $b4  "bottom"
+            -attachForm            $b4  "right" $edge
+
+        $form;
+    //}
+    //showWindow "abxShotBotDiagnosticWindow";
+}
+
+
+
+
+global proc string abxShotBotCheckRefForUpdate (string $referencePath){
+    // get the version number
+    string $tokenBuffer[];
+    string $filename = `basenameEx $referencePath`;
+    tokenize $filename "_" $tokenBuffer;
+    $curVersion = $tokenBuffer[size($tokenBuffer)-1];
+
+    //string $shotInfo[] = abxShotBotShotInfoFromPath($referencePath);
+    // 0:Server 1:Job 2:ShotFolder 3:Seq 4:Shot 5:dept 6:subDept 7:take 8:version 9:ext
+    string $shotInfo[] = abxShotBotGetFromPath($referencePath);
+
+    string $extension = fileExtension($referencePath);
+    string $masterFolderPath = `dirname $referencePath`;
+    $shotName = ($shotInfo[3]+"/"+$shotInfo[3]+"_"+$shotInfo[4]);
+    $shotFileName = ($shotInfo[3]+"_"+$shotInfo[4]);
+
+    string $latestMasterVersion = abxShotsGetLatestWorkVersion($shotInfo[2], $shotName, $shotInfo[5], $shotInfo[7], "master",0);
+    print ("abxShotsGetLatestWorkVersion(\""+$shotInfo[2]+"\", \""+$shotName+"\", \""+$shotInfo[5]+"\", \""+ $shotInfo[7]+"\", \"master\",0)"+"\n");
+
+    string $newPath = $masterFolderPath;
+    if ($shotInfo[7] != "")
+        $newPath += ("/"+$shotFileName+"_"+$shotInfo[5]+"_"+$shotInfo[7]);
+    else 
+        $newPath += ("/"+$shotFileName+"_"+$shotInfo[5]);
+
+    print ("\n\nSHOTBOT latestMaster ="+$latestMasterVersion+"\n\n\n");
+    if ($latestMasterVersion != "v000"){
+        if (`filetest -r ($newPath+"_master_"+$latestMasterVersion+".mb")`)
+            $newPath += ("_master_"+$latestMasterVersion+".mb");
+        else
+            $newPath += ("_master_"+$latestMasterVersion+".ma");
+    }
+    else {
+        if (`filetest -r ($newPath+"_master.mb")`)
+            $newPath += ("_master.mb");
+        else
+            $newPath += ("_master.ma");
+    }
+
+
+
+    return $newPath;
+
+    
+}

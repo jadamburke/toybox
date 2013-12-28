@@ -1,0 +1,335 @@
+
+global proc abxStatus(){
+
+
+}
+
+global proc abxStatusPrompt(string $shotName, string $shotFolder, string $deptName,int $mode){
+
+    // Get the dialog's formLayout.
+    string $form = `setParent -q`;
+        frameLayout -lv 1 -label ($deptName+" Status") -borderStyle "out" abxStatusStatusFrmeLyt;
+            columnLayout;
+                separator -vis 1 -h 20;
+                rowLayout -cw 1 20 -cw 2 200 -cw 2 200 -cw 3 200 -cw 4 20 -numberOfColumns 4;
+                    separator -vis 1;
+                    rowLayout -cw 1 20 -cw 2 205 -numberOfColumns 2 abxStatusStatWinStageLyt;
+                        columnLayout;
+                            separator -vis 0 -h 5;
+                            intSlider -h 100 -horizontal false -min 0 -max 2 -value 0 -step 1 abxStatusStatusWindowStageSlider;
+                        setParent ..;
+                        columnLayout -rs 5;
+                            button -w 120 -h 40 -label "Polishing" -ann "Polish: Smoothing has been approved, adding finishing touches" -c ("intSlider -e -value 2 abxStatusStatusWindowStageSlider;");  
+                            button -w 120 -h 40 -label "Splining" -ann "Splining: Block has been approved. Animation is now being Smoothed out" -c ("intSlider -e -value 1 abxStatusStatusWindowStageSlider;");
+                            button -w 120 -h 40 -label "Blocking" -ann "Blocking: Rough Timing of Animation. " -c ("intSlider -e -value 0 abxStatusStatusWindowStageSlider;");
+                        setParent ..;
+                    setParent ..;
+                    rowLayout -cw 1 20 -cw 2 350 -numberOfColumns 2;
+                        columnLayout;
+                            //separator -vis 1 -h 3;
+                            intSlider -h 176 -horizontal false -min -2 -max 5 -value 0 -step 1 abxStatusStatusWindowSlider;
+                        setParent ..;
+                        columnLayout -rs 1;
+                        //rowLayout -cw 1 95 -cw 2 95 -cw 3 95 -cw 4 95 -cw 5 95 -cw 6 95 -cw 7 95 -numberOfColumns 8;
+                            button -w 120 -label "Client Approved" -ann "Client Approved: Item has been approvd by the client" -bgc .15 .83 .77 -ebg 0 -c ("intSlider -e -value 5 abxStatusStatusWindowSlider;");
+                            button -w 120 -label "Internal Approved" -ann "Internal Approved:  Item has been approved by in-house directors and is awaiting final client approval" -bgc .3 .7 .4 -ebg 0 -c ("intSlider -e -value 4 abxStatusStatusWindowSlider;");
+                            button -w 120 -label "Pending Review" -ann "Review Needed: Item has had all notes and comments addressed and it is awaiting review for approval" -bgc .9 .85 .34 -ebg 0 -c ("intSlider -e -value 3 abxStatusStatusWindowSlider;");
+                            button -w 120 -label "In Progress" -ann "Work In Progress: Item is actively being worked on" -bgc .7 .5 .3 -ebg 0 -c ("intSlider -e -value 2 abxStatusStatusWindowSlider;");
+                            button -w 120 -label "Revision Needed" -ann "Revision Needed: Item requires changes to be addressed" -bgc .7 .3 .3 -ebg 0 -c ("intSlider -e -value 1 abxStatusStatusWindowSlider;");
+                            button -w 120 -label "Not Started" -ann "Not Started: Item Has not been worked yet." -bgc .2 .2 .2 -ebg 0 -c ("intSlider -e -value 0 abxStatusStatusWindowSlider;");
+                            button -w 120 -label "On Hold" -ann "On Hold: Work on the item is temporarily suspended." -bgc .2 .4 .7 -ebg 0 -c ("intSlider -e -value -1 abxStatusStatusWindowSlider;");
+                            button -w 120 -label "Dead" -ann "Dead: Items set to this means Do Not Use them." -bgc .15 .15 .15 -ebg 0 -c ("intSlider -e -value -2 abxStatusStatusWindowSlider;");
+                        setParent ..;
+                    setParent ..;
+                separator -vis 1;
+                setParent ..;
+                separator -vis 1 -h 20;
+            setParent ..;
+        setParent ..;
+        frameLayout -lv 1 -label "Revision Notes" -borderStyle "out" abxStatusStatusNoteFrmeLyt;
+            columnLayout -h 60 -adj 1 -cal "left" -cat "both" 3 -rs 3;
+                text -label "Describe what you changed:";
+                scrollField -h 80 -wordWrap true -text "" -editable true abxStatusStatusNotesField;
+            setParent..;
+        setParent $form;
+        string $cmd = ("layoutDialog -dismiss (`intSlider -q -v abxStatusStatusWindowSlider`+\"|\"+`intSlider -q -v abxStatusStatusWindowStageSlider`+\"|\"+`scrollField -q -text abxStatusStatusNotesField`);");
+        button -h 40 -label ("Update Status and Notes") -c $cmd abxStatusStatWinOKBtn;
+        button -h 40 -label "Cancel" -c "layoutDialog -dismiss \"Cancel\"" abxStatusStatWinCBtn;
+
+        formLayout -e 
+
+            -af abxStatusStatusFrmeLyt "left" 3
+            -af abxStatusStatusFrmeLyt "top" 3 
+            -an abxStatusStatusFrmeLyt "bottom"
+            -af abxStatusStatusFrmeLyt "right" 3
+
+            -af abxStatusStatusNoteFrmeLyt "left" 3
+            -ac abxStatusStatusNoteFrmeLyt "top" 3 abxStatusStatusFrmeLyt
+            -af abxStatusStatusNoteFrmeLyt "bottom" 55
+            -af abxStatusStatusNoteFrmeLyt "right" 3
+
+            -af abxStatusStatWinOKBtn "left" 0
+            -an abxStatusStatWinOKBtn  "top" 
+            -af abxStatusStatWinOKBtn "bottom" 3
+            -ap abxStatusStatWinOKBtn "right" 3 50
+
+            -ap abxStatusStatWinCBtn "left" 0 50
+            -an abxStatusStatWinCBtn  "top" 
+            -af abxStatusStatWinCBtn "bottom" 3
+            -af abxStatusStatWinCBtn "right"  3
+
+            $form;
+
+    if ($deptName != "anm")
+        rowLayout -e -enable 0 abxStatusStatWinStageLyt;
+
+    if ($mode == 1 || $mode == 2){
+        button -e -vis 0 abxStatusStatWinCBtn;
+        formLayout -e -ap abxStatusStatWinOKBtn "right" 3 100 $form;
+    }
+
+    if ($mode == 2){
+        scrollField -e -text (`getenv USERNAME`+" is too lazy to leave a useful note. Just assume they tumbled in thier viewport for 3 hours and then clicked save.") abxStatusStatusNotesField;
+        button -e -label ("Last Chance To Leave a Note") abxStatusStatWinOKBtn;
+    }
+    // set the slider to the current status
+    
+    string $shotDetails[] = `abxStatusGetShotDetails $shotName $shotFolder`;
+    if (size($shotDetails) > 4){
+        //print $shotDetails;
+        if ($deptName == "pre"){
+            if ($shotDetails[5] != "") {
+                int $val = int($shotDetails[5]);
+                intSlider -e -v $val abxStatusStatusWindowSlider;
+            }
+        }
+        else if ($deptName == "anm"){
+            if ($shotDetails[6] != "") {
+                string $anmStatBuff[];
+                tokenize $shotDetails[6] "," $anmStatBuff;
+                int $val = int($anmStatBuff[0]);
+                intSlider -e -v $val abxStatusStatusWindowSlider;
+                $val = int($anmStatBuff[1]);
+                intSlider -e -v $val abxStatusStatusWindowStageSlider;
+            }
+        }
+        else if ($deptName == "fx"){
+            if ($shotDetails[7] != "") {
+                int $val = int($shotDetails[7]);
+                intSlider -e -v $val abxStatusStatusWindowSlider;
+            }
+        }
+        else if ($deptName == "lgt"){
+            if ($shotDetails[8] != "") {
+                int $val = int($shotDetails[8]);
+                intSlider -e -v $val abxStatusStatusWindowSlider;
+            }
+        }
+        else if ($deptName == "cmp"){
+            if ($shotDetails[9] != "") {
+                int $val = int($shotDetails[9]);
+                intSlider -e -v $val abxStatusStatusWindowSlider;
+            }
+        }
+    }
+}
+
+global proc string abxStatusStatusWindowShowUI (string $shotName, string $shotFolder, string $deptName, int $mode){
+
+    string $result = "";
+    $result = `layoutDialog -title ($shotName+" Status Update and Notes") -ui ("abxStatusPrompt(\""+$shotName+"\",\""+$shotFolder+"\",\""+$deptName+"\","+$mode+")")`;
+    
+    if ($result != "Cancel" && $result != "dismiss") {
+        string $tokenBuffer[];
+        tokenize $result "|" $tokenBuffer;
+        int $status =  $tokenBuffer[0];
+        int $stage = $tokenBuffer[1];
+        $note = $tokenBuffer[2];
+        abxStatusStatusWindowSetStatus $shotName $shotFolder $deptName $mode $status $stage $note;
+        return $note;
+    }
+    else {
+        return "";
+    }
+}
+
+// mode=0: ignore the status
+global proc abxStatusStatusWindowSetStatus (string $shotName, string $shotFolder, string $deptName, int $mode, int $status, int $stage, string $note){
+
+    string $updateWhat;
+
+    string $listControl;
+    if ($shotFolder == "_ALL_SHOTS")
+        $listControl = "abxStatusList";
+    else if ($shotFolder == "_PREVIS")
+        $listControl = "abxPrevisList";
+
+    //int $status = `intSlider -q -value abxStatusStatusWindowSlider`;
+    //int $stage = `intSlider -q -value abxStatusStatusWindowStageSlider`;
+    string $color = `abxStatusStatAsColor $status`;
+    string $label = `abxStatusStageAsLabel $stage`;
+    string $setColorCmd = ("treeView -e ");
+    $setColorCmd += ("-btc \""+$shotName+"\" ");
+
+    switch ($deptName){
+        case "geo":
+            $updateWhat = "geo status";
+            $setColorCmd += "1";
+            break;
+        case "rig":
+            $updateWhat = "rig status";
+            $setColorCmd += "2";
+            break;
+        case "shd":
+            $updateWhat = "shd status";
+            $setColorCmd += "3";
+            break;
+        case "pub":
+            $updateWhat = "pub status";
+            $setColorCmd += "4";
+            break;
+        case "pre":
+            $updateWhat = "pre status";
+            $setColorCmd += "1";
+            break;
+        case "anm":
+            $updateWhat = "anm status";
+            $setColorCmd += "1";
+            break;
+        case "fx":
+            $updateWhat = "fx status";
+            $setColorCmd += "2";
+            break;
+        case "lgt":
+            $updateWhat = "lgt status";
+            $setColorCmd += "3";
+            break;
+        case "cmp":
+            $updateWhat = "cmp status";
+            $setColorCmd += "4";
+            break;
+    }
+    $setColorCmd += (" "+$color+" ");
+
+    // if its anm status update then apply the stage label as well
+    if ($deptName == "anm")
+        $setColorCmd += ("-i \""+$shotName+"\" 1 \""+$label+"\" ");
+    
+    $setColorCmd += $listControl;
+    evalEcho $setColorCmd;  
+
+
+    string $updateValue = $status;
+    if ($deptName == "anm")
+        $updateValue = ($status+","+$stage);
+
+    // get the UI value and set the details
+    evalEcho ("abxStatusUpdateDetailsFromScene \""+$shotName+"\" \""+$shotFolder+"\" \""+$updateWhat+"\" \""+$updateValue+"\" ");
+
+    // log the status change
+    if ($mode == 0){
+        $note = (abxStatusStatAsLabel($status)+": "+$note);
+        evalEcho("abxStatusWriteShotLog \""+$shotFolder+"\" \""+$shotName+"\" \""+$updateWhat+"\" \"---\" \"---\" \""+$note+"\"");
+    }
+
+    string $filePath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/"+$shotName);
+    print ("FilePath="+$filePath+"   shotName="+$shotName+"\n");
+    // edit the shot details on the server database
+    //pprainbow();
+    //int $dbExists = python("import rainbow.utils as U; U.checkDB();");
+
+    global int $dbExists;
+    print ($filePath+"\n");
+    string $cmd = ("R.Shot.getFromPath('"+$filePath+"').save();");
+    print ($cmd+"\n");
+
+    if ($dbExists == true){
+        $fail = catch(python($cmd));
+    }
+}
+
+global proc string abxStatusStatAsColor (int $status){
+    string $strStatus = $status;
+    string $result = "";
+    
+    switch ($strStatus){
+        case "-2":
+            $result = ".15 .15 .15";
+            break;
+        case "-1":
+            $result = ".2 .4 .7";
+            break;
+        case "0":
+            $result = ".27 .27 .27";
+            break;
+        case "1":
+            $result = ".7 .3 .3"; //179 77 77
+            
+            break;
+        case "2":
+            $result = ".7 .5 .3";
+            break;
+        case "3":
+            $result = ".9 .85 .34"; // 230 217 87
+            break;
+        case "4":
+            $result = ".3 .7 .4";
+            break;
+        case "5":
+            $result = ".15 .83 .77"; //38 212 197
+            break;
+        }
+    return $result;
+}
+
+global proc string abxStatusStageAsLabel(int $stage){
+    string $strStage = $stage;
+    string $result = "";
+    string $ppTools = `getenv MAYA_PPTOOLS`;
+    
+    switch ($strStage){
+        case "0":
+            $result = ($ppTools+"/icons/stat1.png"); // Blocking
+            break;
+        case "1":
+            $result = ($ppTools+"/icons/stat2.png"); // Splining
+            break;
+        case "2":
+            $result = ($ppTools+"/icons/stat3.png"); // Polish
+            break;
+    }
+    return $result;
+}
+
+global proc string abxStatusStatAsLabel(int $status){
+    string $strStatus = $status;
+    string $result = "";
+    
+    switch ($strStatus){
+        case "-2":
+            $result = "Dead";
+            break;
+        case "-1":
+            $result = "On Hold";
+            break;
+        case "0":
+            $result = "Not Started"; //".27 .27 .27";
+            break;
+        case "1":
+            $result = "Revision Needed";
+            break;
+        case "2":
+            $result = "In Progress";
+            break;
+        case "3":
+            $result = "Pending Review";
+            break;
+        case "4":
+            $result = "Internal Approved";
+            break;
+        case "5":
+            $result = "Client Approved";
+            break;
+        }
+    return $result;
+}

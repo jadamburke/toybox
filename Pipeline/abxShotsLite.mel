@@ -29,25 +29,49 @@
 // * add safe file importing methods
 // 
 
-eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/abxAssets.mel\"");
-eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Lighting/abxExportShaderMel.mel\"");
-eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/callMayaBG.mel\"");
-eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/abxShotBot.mel\"");
-eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Misc/autoCache.mel\"");
+//*eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/abxAssets.mel\"");
+//*eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Lighting/abxExportShaderMel.mel\"");
+//*eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/callMayaBG.mel\"");
+//*eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/abxShotBot.mel\"");
+//*eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/Toolbox/Misc/autoCache.mel\"");
+
+// CONFIGURE global vars
+//global string $abxShots_ShotNamePattern = "<seq>_<shot>"
+
+
+global string $abxShots_SceneFileNamePattern = "<shotName>_<dept>_<version>.<ext>";
+global string $abxShots_MasterSceneFileNamePattern = "<shotName>_<dept>_MASTER.<ext>";
+global string $abxShots_ShotsFolder = "";
+global string $abxShots_PrevisFolder = "Previs";
+global string $abxShots_AnimFolder = "animation";
+global string $abxShots_FXFolder = "dynamics";
+global string $abxShots_LgtFolder = "lighting";
+global string $abxShots_MDLFolder = "modeling";
+global string $abxShots_CamFolder = "camera";
+global string $abxShots_workFolder = "";
+global string $abxShots_masterFolder = "_MASTER";
+
+global string $abxShots_versionRegEx = "[a-z][0-9][0-9]";
+global string $abxShots_ShotNameRegEx = "SH[0-9][0-9][0-9]_.*";
+
+global string $abxShots_AssetsFolder = "scenes/ASSETS/";
 
 
 
+global proc abxShotsLite () {
 
-global proc abxShots () {
+	global string $abxShots_ShotsFolder;
+	global string $abxShots_PrevisFolder;
+
 	string $abxShotsVersionString = "1.5b";
 	global int $dbExists = 0;
-	$dbExists = pprainbow();
+	if (`exists pprainbow`) $dbExists = pprainbow();
 	global int $jobLoaded = 0;
-	$jobLoaded = rain_loadJob("");
-	eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/abxShotBot.mel\"");
+	if ($dbExists) $jobLoaded = rain_loadJob("");
+	//*eval("source \""+`getenv MAYA_PPTOOLS`+"/scripts/production/abxShotBot.mel\"");
 
 	if (!`window -exists abxShotsWindow`)  {
-		window -t ("Shot Manager v" + $abxShotsVersionString + " - PandaPanther") -width 710 -height 600 -menuBar true abxShotsWindow;
+		window -t ("Shot Manager v" + $abxShotsVersionString + "") -width 710 -height 600 -menuBar true abxShotsWindow;
 
 		menu -label "File" -tearOff 1;
 			menuItem -en 1 -sm 1 -label "New Scene";
@@ -104,7 +128,7 @@ global proc abxShots () {
 			setParent -menu ..;
 
 		menu -label "Help";
-			menuItem -l "PandaPanther Wiki" -c "system \"start \\\"C:/Program Files (x86)/Mozilla Firefox/firefox.exe\\\" \\\"http://wiki.pandapanther.com/groups/pandapantherproductionwiki/wiki/4c330/Shot_Manager.html\\\"\"";
+			menuItem -l "Wiki" -c "system \"start \\\"C:/Program Files (x86)/Mozilla Firefox/firefox.exe\\\" \\\"\\\"\"";
 
 		formLayout abxShotsWindowMainForm;
 
@@ -135,7 +159,7 @@ global proc abxShots () {
 		abxShotsBuildMenu  $shotGroupsLister;
 
 		//evalDeferred ("abxShotsPopulateList \"_PREVIS\" \"abxPrevisList\"");
-		evalDeferred ("abxShotsPopulateList \"_ALL_SHOTS\" \"abxShotsList\"");
+		evalDeferred ("abxShotsPopulateList \""+$abxShots_ShotsFolder+"\" \"abxShotsList\"");
 		//evalDeferred ("abxShotsPopulateList \"_ALL_SHOTS\" \"abxShotGroupsList\"");
 
 		treeView -e -addItem "Loading..." "" "abxShotsList";
@@ -171,8 +195,8 @@ global proc abxShots () {
 			abxShotGroupsLibForm;
 
 		tabLayout -e 
-			-tabLabel abxPrevisLibForm "_PREVIS"
-			-tabLabel abxShotsLibForm "_ALL_SHOTS"
+			-tabLabel abxPrevisLibForm "Previs"
+			-tabLabel abxShotsLibForm "Shots"
 			-tabLabel abxShotGroupsLibForm "Lgt Groups"
 			abxShotsListTabLyt;
 
@@ -221,6 +245,9 @@ global proc string[] abxShotsNumericalSort(string $inputArray[]){
 // this procedure looks at the latest shot (either currently open shot or the last opened file)
 // and tries to automatically select the shot in the shot manager
 global proc abxShotsShowLatestShot (string $sceneFilePath) {
+
+		global string $abxShots_ShotsFolder;
+	global string $abxShots_PrevisFolder;
 	
 	string $currentScene = $sceneFilePath;
 	
@@ -306,13 +333,14 @@ global proc abxShotsShowLatestShot (string $sceneFilePath) {
 // called when a use changes between PREVIS and ALLSHOTS tabs just enables and disables certain UI
 global proc abxShotsListTabChange () {
 
-
+global string $abxShots_ShotsFolder;
+global string $abxShots_PrevisFolder;
 	
 	if (`tabLayout -q -st abxShotsListTabLyt` == "abxPrevisLibForm"){
 		if (size(`treeView -q -ch "" abxPrevisList`)<2){
 			//treeView -e -addItem "Loading..." "" "abxPrevisList";
 			print ("loading previs list\n");
-			evalDeferred ("abxShotsPopulateList \"_PREVIS\" \"abxPrevisList\"");
+			evalDeferred ("abxShotsPopulateList \""+$abxShots_ShotsFolder+"\" \"abxPrevisList\"");
 		}
 		if (`formLayout -q -exists abxShotsPreFrmLyt`){
 			formLayout -e -en 1 abxShotsPreFrmLyt;
@@ -327,7 +355,7 @@ global proc abxShotsListTabChange () {
 			if (size(`treeView -q -ch "" abxShotGroupsList`)<2){
 				print ("loading shot_group list\n");
 				//treeView -e -addItem "Loading..." "" "abxShotGroupsList";
-				evalDeferred ("abxShotsPopulateList \"_ALL_SHOTS\" \"abxShotGroupsList\"");
+				evalDeferred ("abxShotsPopulateList \""+$abxShots_ShotsFolder+"\" \"abxShotGroupsList\"");
 			}
 		}
 		if (`formLayout -q -exists abxShotsPreFrmLyt`){
@@ -393,7 +421,11 @@ global proc abxShotsPopulateList (string $shotFolder, string $listControl) {
 	string $projectPath = `workspace -q -rd`;
 	string $shotTab = `abxShotsGetActiveShotTab`;
 
-
+	global string $abxShots_ShotsFolder;
+	global string $abxShots_PrevisFolder;
+	global string $abxShots_AnimFolder;
+	global string $abxShots_FXFolder;
+	global string $abxShots_LgtFolder;
 	// if its Shot Groups we need to query rainbow
 	if ($listControl =="abxShotGroupsList"){
 		
@@ -465,8 +497,10 @@ global proc abxShotsPopulateList (string $shotFolder, string $listControl) {
 	}
 	else{
 
+		string $fldPath = ($projectPath+"/scenes/"+$shotFolder+"/");
+		if ($shotFolder == "") $fldPath = ($projectPath+"/scenes/");
 
-		string $shotsFolder[] = `getFileList -folder ($projectPath+"/scenes/"+$shotFolder+"/")`;
+		string $shotsFolder[] = `getFileList -folder $fldPath`;
 
 		string $sorted[] = abxShotsNumericalSort($shotsFolder);
 		//string $sorted[] = abxShotsSort($shotsFolder);
@@ -474,30 +508,30 @@ global proc abxShotsPopulateList (string $shotFolder, string $listControl) {
 
 		for ($each in $sorted){
 
-			if (`filetest -d ($projectPath+"/scenes/"+$shotFolder+"/"+$each+"/")`){
+			if (`filetest -d ($fldPath+$each+"/")`){
 				//textScrollList -e -append $each $listControl;
 
-				if ($each != ".DS_Store" && $each != "old"){
+				if ($each != ".DS_Store" && $each != "old" && $each != "Styleframe" && $each != "SH###_shot" && $each != "ASSETS" && $each != "RnD" && $each != "Previs"){
 					if ($each == "TESTING" && `getenv MODE` == "pub") {
 					}
 					else{
 						// determine if it is a scene subfolder
-						string $subFolders[] = `getFileList -folder ($projectPath+"/scenes/"+$shotFolder+"/"+$each+"/")`;
+						string $subFolders[] = `getFileList -folder ($fldPath+$each+"/")`;
 						string $sortedSub[] = sort($subFolders);
 
 						int $isShotFolder = 0;
-						//if (size($sortedSub)>5){
-						//	for ($every in $sortedSub){
-						//		if ($isShotFolder == 0){
-						//			if  ($every == "ANM" || $every == "LGT" || $every == "FX"){
-						//				$isShotFolder = 1;
-						//			}
-						//		}
-						//		else {
-						//			break;
-						//		}
-						//	}
-						//}
+						if (size($sortedSub)>3){
+							for ($every in $sortedSub){
+								if ($isShotFolder == 0){
+									if  ($every == $abxShots_AnimFolder || $every == $abxShots_LgtFolder || $every == $abxShots_FXFolder){
+										$isShotFolder = 1;
+									}
+								}
+								else {
+									break;
+								}
+							}
+						}
 
 						if ($isShotFolder == 0){
 							// create sequence list tiem
@@ -528,7 +562,7 @@ global proc abxShotsPopulateList (string $shotFolder, string $listControl) {
 							//treeView -e -bto $each 1 true -bto $each 2 true -bto $each 3 true $listControl;
 							//treeView -e -btc $each 1 .3 .7 .4 -btc $each 2 .7 .5 .3 -btc $each 3 .7 .3 .3 $listControl;
 						}
-						if ($shotFolder == "_PREVIS"){
+						if ($shotFolder == $abxShots_PrevisFolder){
 							treeView -e -textColor $each .3 .9 .4 $listControl;
 						}
 					}
@@ -558,6 +592,9 @@ global proc int abxShotsExpandWrapper (string $itemName,int $state){
 
 // Expands the list by loading the rest of the shots in a sequence for display
 global proc int abxShotsExpandList (string $itemName, int $state) {
+
+global string $abxShots_ShotsFolder;
+global string $abxShots_PrevisFolder;
 	if ($state == 1){
 		string $projectPath = `workspace -q -rd`;
 		string $shotFolder = `abxShotsGetActiveShotFolder`;
@@ -616,14 +653,23 @@ global proc int abxShotsExpandList (string $itemName, int $state) {
 		}
 		// if the tab is the ALL_SHOTS or PREVIS tab
 		else{
+
+			global string $abxShots_AnimFolder ;
+			global string $abxShots_FXFolder;
+			global string $abxShots_LgtFolder ;
+
 			string $each = $itemName;
-			string $subFolders[] = `getFileList -folder ($projectPath+"/scenes/"+$shotFolder+"/"+$each+"/")`;
+
+			string $fldPath = ($projectPath+"/scenes/"+$shotFolder+"/");
+			if ($shotFolder == "") $fldPath = ($projectPath+"/scenes/");
+
+			string $subFolders[] = `getFileList -folder ($fldPath+$each+"/")`;
 			string $sortedSub[] = sort($subFolders);
 
 			int $isShotFolder = 0;
 			for ($every in $sortedSub){
 				if ($isShotFolder == 0){
-					if  ($every == "ANM" || $every == "LGT" || $every == "FX"){
+					if  ($every == $abxShots_AnimFolder || $every == $abxShots_LgtFolder || $every == $abxShots_FXFolder){
 						$isShotFolder = 1;
 					}
 				}
@@ -642,13 +688,13 @@ global proc int abxShotsExpandList (string $itemName, int $state) {
 			// load the rest of the items in the sequence when it is expanded
 			for ($i=0;$i<size($sortedSub);$i++){
 				$every = $sortedSub[$i];
-				if (`filetest -d ($projectPath+"/scenes/"+$shotFolder+"/"+$each+"/"+$every)` && $sortedSub[$i] != "old"){
+				if (`filetest -d ($fldPath+$each+"/"+$every)` && $sortedSub[$i] != "old"){
 
 					$fullname = ($each+"/"+$every);
 					if (!`treeView -q -itemExists $fullname $listControl`){
 						treeView -e -addItem $fullname $each $listControl;
 						treeView -e -selectionColor $fullname .8 .8 .8 -lbc $fullname .2 .2 .2 $listControl;
-						if ($shotFolder == "_PREVIS"){
+						if ($shotFolder == $abxShots_PrevisFolder){
 							treeView -e -bti $fullname 1 "P" -textColor $fullname .3 .9 .4 $listControl;
 						}
 						else {
@@ -1560,15 +1606,17 @@ global proc string abxShotsGetShortName (string $shotName){
 }
 
 global proc string abxShotsGetActiveShotFolder () {
+	global string $abxShots_ShotsFolder;
+	global string $abxShots_PrevisFolder;
 	if (`window -exists abxShotsWindow`){
 		string $tabName = `tabLayout -q -st abxShotsListTabLyt`;
 		string $result;
 		if ($tabName == "abxPrevisLibForm")
-			$result = "_PREVIS";
+			$result = $abxShots_PrevisFolder;
 		else if ($tabName == "abxShotsLibForm")
-			$result = "_ALL_SHOTS";
+			$result = $abxShots_PrevisFolder;
 		else if ($tabName == "abxShotGroupsLibForm")
-			$result = "_ALL_SHOTS";
+			$result = $abxShots_PrevisFolder;
 		return $result;
 	}
 	else{
@@ -1581,20 +1629,28 @@ global proc string abxShotsGetActiveShotTab (){
 }
 
 global proc string abxShotsGetActiveDeptTab (){
+
+	global string $abxShots_AnimFolder;
+	global string $abxShots_FXFolder;
+	global string $abxShots_LgtFolder ;
+	global string $abxShots_PrevisFolder;
+
 	string $dept = `tabLayout -q -st abxShotsDeptTabLyt`;
 	if ($dept == "abxShotsAnmFrmLyt")
-		$dept = "anm";
+		$dept = $abxShots_AnimFolder;
 	else if ($dept == "abxShotsFxFrmLyt")
-		$dept = "fx";
+		$dept = $abxShots_FXFolder;
 	else if ($dept == "abxShotsLgtFrmLyt")
-		$dept = "lgt";
+		$dept = $abxShots_LgtFolder;
 	else if ($dept == "abxShotsPreFrmLyt")
-		$dept = "pre";
+		$dept = $abxShots_PrevisFolder;
 	return $dept;
 }
 
 // main procedure called when a shot is selected. This gets the shot data and it updates the UI
 global proc abxShotsRefreshDetailsUI (string $shotName){
+
+	global string $abxShots_workFolder;
 
 	string $ppResource = `getenv PP_RESOURCE`;
 	string $ppTools =`getenv MAYA_PPTOOLS`;
@@ -1616,14 +1672,16 @@ global proc abxShotsRefreshDetailsUI (string $shotName){
 	button -e -en 1 -c ("abxShotsSetShotFrameRange \""+$shotName+"\"") abxShotsEditRangeBtn;
 
 	//print ("department is "+$dept+"\n");
-	string $shotsFolder[] = `getFileList -folder ($shotsPath+$shotFileName+"/"+toupper($dept)+"/work/")`;
+	string $fldPath = ($shotsPath+$shotFileName+"/"+$dept+"/"+$abxShots_workFolder+"/");
+	if ($abxShots_workFolder == "") $fldPath = ($shotsPath+$shotFileName+"/"+$dept+"/");
+	string $shotsFolder[] = `getFileList -folder fldPath`;
 
 	string $shotImg = ($shotsPath+$shotName+"/"+$shotFileName+"_comp.png");
 	if (!`filetest -r $shotImg`) $shotImg = ($shotsPath+$shotName+"/"+$shotFileName+"_lgt.png");
 	if (!`filetest -r $shotImg`) $shotImg = ($shotsPath+$shotName+"/"+$shotFileName+".png");
 	if (!`filetest -r $shotImg`) $shotImg = ($ppTools +"/icons/shotThumb.png");
 
-	iconTextStaticLabel -e -image $shotImg -di $shotImg abxShotsDetailImg;
+	catch(`iconTextStaticLabel -e -image $shotImg -di $shotImg abxShotsDetailImg`);
 
 	//iconTextStaticLabel -e -i ($ppTools +"/icons/shotThumb.png") -di ($ppTools +"/icons/shotThumb.png") abxShotsDetailImg;
 	
@@ -1726,7 +1784,7 @@ global proc abxShotsRefreshDetailsUI (string $shotName){
 	textField -e -text $lwDate abxShotsDtlRndDate;
 
 	// If the job is story show the custom hair and cloth cache details
-	if (`workspace -q -rd` == "M:/STORY2012_PP10088/3D/STORY2012_maya/"){
+	if (`workspace -q -rd` == "M:/###"){
 		// get the latest cache folders
 		$fxHairFile = abxShotsGetLatestWorkVersion($shotFolder, $shotName, "fx", "hairSim", "work",1);
 		$fCacheFolder = abxShotsGetLatestCache($fxHairFile, "hairSim");
@@ -4703,7 +4761,7 @@ global proc abxShotsCameraMaster (string $cameraName[]) {
 	}
 
 	//if (`currentUnit -q -time` != "ntsc"){
-	//	string $result = `confirmDialog -title "Camera Master Error" -message ("Your Scene is not at 30 FPS. Camera Mastering Cancelled. Please adjust your frame rate to 30 using the abxFPS.mel found in PandaPanther->Scripts->Animation to adjust your frame rate correctly!!!") -button "OK"`;
+	//	string $result = `confirmDialog -title "Camera Master Error" -message ("Your Scene is not at 30 FPS. Camera Mastering Cancelled. Please adjust your frame rate to 30 using the abxFPS.mel found in StudioName->Scripts->Animation to adjust your frame rate correctly!!!") -button "OK"`;
 	//	return;		
 	//}
 
@@ -5056,13 +5114,17 @@ global proc string abxShotsGetSceneTakeName (string $sceneFile) {
 
 global proc string abxShotsGetLatestWorkVersion (string $shotFolder, string $shotName, string $dept, string $takeName, string $whichOne, int $getFullPath) {
 
+
+		global string $abxShots_MasterSuffix;// = "<shotName>_<dept>_<version>.<ext>";
+
 		//print ("abxGetVesion ShotName Param="+$shotName+"\n");
 		string $shotFileName = `abxShotsGetShortName $shotName`;
 		//string $shotFolder = `abxShotsGetActiveShotFolder`;
 		//print ("abxGetVesion $takeName="+$takeName+"\n");
 		
 
-		string $workPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/"+$shotName+"/"+toupper($dept)+"/"+$whichOne+"/");
+		string $workPath = (`workspace -q -rd`+"scenes/"+$shotFolder+"/"+$shotName+"/"+$dept+"/"+$whichOne+"/");
+		if ($shotFolder == "") $workPath = (`workspace -q -rd`+"scenes/"+$shotName+"/"+$dept+"/"+$whichOne+"/");
 		// get the contents of the work directory
 		//print ("latest version workPath="+$workPath+"\n");
 
@@ -5071,7 +5133,7 @@ global proc string abxShotsGetLatestWorkVersion (string $shotFolder, string $sho
 			$filePrefix += ($takeName+"_");
 
 		if ($whichOne == "master")
-			$filePrefix += ("master_");
+			$filePrefix += ($abxShots_MasterSuffix);
 
 		string $workFolderFiles[] = `getFileList -fs ($filePrefix+"*") -folder $workPath`;
 		string $workScenes[];

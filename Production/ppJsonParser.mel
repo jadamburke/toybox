@@ -1,0 +1,13 @@
+// ppJsonParser
+// Created by: adam
+// Date: 2012/03/14 13:09:31
+
+global proc ppJsonParser(){
+	
+}
+
+global proc string  getJSON () {
+	
+	
+}
+

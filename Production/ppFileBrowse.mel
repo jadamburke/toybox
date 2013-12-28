@@ -1,4 +1,5 @@
 // ppFileBrowse
+// handles opening of OS specific file browsers for various needs
 
 
 global proc ppBrowseProject
@@ -46,4 +47,15 @@ global proc ppBrowseJob
 	else 
 		system(("start explorer "+$jobPath));
 
+}
+
+global proc ppBrowsePath (string $path){
+	$path = toNativePath($path);
+	print ("Path = "+$path+"\n");
+	if (`about -os ` == "mac")
+		
+		exec ("open -a finder \""+$path+"\"");
+	
+	else 
+		system(("start explorer "+$path));
 }

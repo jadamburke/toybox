@@ -1,0 +1,77 @@
+global proc makeLowRezTextures()
+{
+	string $fileNodes[] = `ls -type file`;
+	for($tmp in $fileNodes)
+	{
+ 	   // if (`attributeExists "useFrameExtension" $tmp`)
+ 	   // {
+ 	       string $wholeFilePath = `getAttr ($tmp+".fileTextureName")`;
+           if(! `gmatch $wholeFilePath "*.hdr"`){
+               string $dirPath = dirname($wholeFilePath);
+            	string $baseFileName = `basenameEx($wholeFilePath)`;
+    	        string $ext = fileExtension($wholeFilePath);
+                string $newFileName = ($baseFileName+"_LOW."+$ext);
+                string $newFileNameB = ($baseFileName+"_MED."+$ext);
+
+                // if the low res existed and was found to be newer than the hi res texture, then skip converting it
+                int $loIsNewer = 0;
+                if (`filetest -r ($dirPath+"/MED/"+$newFileNameB)`){
+                    int $hiModS = `getModDateS $wholeFilePath`;
+                    int $loModS = `getModDateS ($dirPath+"/MED/"+$newFileNameB)`;
+                    if ($hiModS < $loModS)
+                        $loIsNewer = 1;
+                }
+
+                int $medIsNewer = 0;
+                if (`filetest -r ($dirPath+"/LOW/"+$newFileName)`){
+                    int $hiModS = `getModDateS $wholeFilePath`;
+                    int $loModS = `getModDateS ($dirPath+"/LOW/"+$newFileName)`;
+                    if ($hiModS < $loModS)
+                        $medIsNewer = 1;
+                }
+
+                if (($loIsNewer == 0) || ($medIsNewer == 0)){
+                	string $pathParts[];
+                	tokenize($wholeFilePath,"/",$pathParts);
+                	int $file = `size $pathParts`-1;
+                	string $filePath = substitute($pathParts[$file],$wholeFilePath,"");
+                	print $filePath;
+                
+                    // dirname
+                    if (!`sysFile -makeDir ($filePath + "LOW")`)  {
+                        print("makeDir failed\n");
+                        return;
+                    }
+                    if (!`sysFile -makeDir ($filePath + "MED")`)  {
+                        print("makeDir failed\n");
+                        return;
+                    }
+
+                	string $newFile = ("imconvert.exe "+$wholeFilePath+" -resize 20% " + $filePath + "LOW/" + $newFileName);
+                    string $newFileB = ("imconvert.exe "+$wholeFilePath+" -resize 60% " + $filePath + "MED/" + $newFileNameB);
+                	print ($newFile+"\n");
+                    print $newFileB;
+                	system($newFile);
+                    system($newFileB);
+                }
+                else {
+                    print ("Skipping MedRes and LoRes creation on "+$wholeFilePath+". A LoRes was found to be newer than the hiRes\n");
+                }
+        	//}
+        }
+	}
+}
+
+
+// returns the modifed date of the file in seconds from the beginning of computer time
+global proc string getModDateS(string $file){
+
+    if (`filetest -r $file`){
+        string $pyCmd = ("import os; import time;os.path.getmtime('"+$file+"');");
+        string $result = python($pyCmd);
+        return $result;
+    }
+    else {
+        return "0";
+    }
+}

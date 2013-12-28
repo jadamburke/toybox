@@ -1,0 +1,42 @@
+global proc int rain_loadRainbow(){
+    if (python("import rainbow.objects as R;import rainbow.utils as U;reload(R);reload(U);")){
+        return 1;
+    }
+    return 0;
+}
+
+global proc int rain_dbShotCheck(){
+    if (python("R.Shot.get()")){
+        return 1;
+    }
+    return 0;
+}
+
+global proc int rain_checkFrameRange(){
+	if (rain_dbShotCheck()){
+		return python("U.checkFrameFrange()");
+	}
+}
+
+global proc int pprainbow(){
+	
+    if (rain_loadRainbow()){
+        return 1;
+    }
+    return 0;
+}
+
+global proc int rain_loadJob(string $jobPath){
+    if ($jobPath == ""){
+        string $currentProj = `workspace -q -rd`;
+        string $tokenBuffer[];
+        tokenize $currentProj "/" $tokenBuffer;
+        $jobPath = ($tokenBuffer[0]+"/"+$tokenBuffer[1]);
+    }
+    int $fail = catch(python("activeJob = R.Job.getFromPath(\""+$jobPath+"\")"));
+    if ($fail){
+        print ("Could Not Load Rainbow Job: "+$jobPath+"\n");
+        return 0;
+    }
+    return 1;
+}
