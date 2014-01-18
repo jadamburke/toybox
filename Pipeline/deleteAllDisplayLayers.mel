@@ -1,0 +1,15 @@
+// deleteAllDisplayLayers
+// Created by: freelanceny18
+// Date: 2014/01/15 11:11:52
+
+global proc deleteAllDisplayLayers(){
+
+	// BUG: need to have it remove 'lookAt' and 'camera' objects as members before deleteing otherwise it actually deletes the cam
+	select -clear;
+	string $renderLayers[] = `ls -type displayLayer`;
+	for ($each in $renderLayers){
+		if (!`gmatch $each "defaultLayer"`)
+			delete $each;
+	}
+
+}

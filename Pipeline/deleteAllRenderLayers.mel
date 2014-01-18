@@ -1,0 +1,31 @@
+// deleteAllRenderLayers
+// Created by: freelanceny18
+// Date: 2014/01/15 11:11:11
+
+global proc deleteAllRenderLayers(){
+	select -clear;
+	string $renderLayers[] = `ls -type renderLayer`;
+
+	for ($each in $renderLayers){
+		if (!`gmatch $each "*defaultRenderLayer*"`){
+			if (!`about -batch`){
+				renderLayerEditorDeleteLayer RenderLayerTab $each;
+				//delete $each;
+				updateEditorRenderLayer RenderLayerTab;
+				print ("Deleting Render Layer "+$each+"\n");
+			}
+			else {
+				delete $each;
+			}
+		}
+	}
+
+
+	$renderLayers = `ls -type renderLayer`;
+	
+	for ($each in $renderLayers){
+		if (!`gmatch $each "defaultRenderLayer"`)
+			delete $each;
+	}
+
+}

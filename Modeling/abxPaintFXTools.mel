@@ -1,0 +1,267 @@
+// timeOffset
+global proc abxPaintFXTools() {
+if (`window -ex abxPaintFXTubesWindow` != true)
+	{
+		window -w 150 -h 200 -t "abxPaintFXTubes" -in "abxPaintFXTubes" -s true -tb true abxPaintFXTubesWindow;
+
+		columnLayout -rs 1 -w 400 -cal "center" -cat "both" 0 -adj true abxTimeOffsetColLyt;
+
+
+		button -label "Attach Selected Curves" -h 20 -w 60 -c abxPaintFXToolsSetupTubesToSel;
+		button -label "Match Stroke Pressure Graph" -h 20 -w 60 -c "abxPaintFXToolsCopyStrokeGraph";
+		button -label "Scale Clip Speed to ArcLength" -h 20 -w 60 -c "abxPaintFXToolsScaleClipSpeedToLen 1";
+		button -label "Add SubCurve to Curves" -h 20 -w 60 -c "abxPaintFXToolsAddSubCurvesToSel";
+		button -label "Uber-res Segments" -h 20 -w 60 -c "abxPaintFXToolsSetSegmentRes 100";
+		button -label "Hi-res Segments" -h 20 -w 60 -c "abxPaintFXToolsSetSegmentRes 50";
+		button -label "Med-res Segments" -h 20 -w 60 -c "abxPaintFXToolsSetSegmentRes 10";
+		button -label "Low-res Segments" -h 20 -w 60 -c "abxPaintFXToolsSetSegmentRes 1";
+		button -en 0 -label "Convert To Polys" -h 20 -w 60 -c "";
+		button -en 0 -label "Attach Object as MoPath" -h 20 -w 60 -c "";
+		button -en 0 -label "PolyEdges to Strokes" -h 20 -w 60 -c "abxPaintFXToolsPolyEdgesToStrokes";
+		button -label "Select Strokes From Curves" -h 20 -w 60 -c "abxPaintFXToolsStrokesFromCurves";
+		button -label "Select Curves From Strokes" -h 20 -w 60 -c "abxPaintFXToolsCurvesFromStrokes";
+		button -label "Flip Stroke Direction" -h 20 -w 60 -c "abxPaintFXToolsToggleOppositeCurves";
+
+		window -e -w 150 -h 200 abxPaintFXTubesWindow;
+		showWindow abxPaintFXTubesWindow;
+	}
+	else	// else just pop it up from being minimized again
+    	{
+		window -e -w 150 -h 200 abxPaintFXTubesWindow;
+		showWindow abxPaintFXTubesWindow;
+    	}
+
+}
+global proc abxPaintFXToolsSetupTubesToSel(){
+	$sel = `ls -sl`;
+	string $nurbsCurves[] = `listRelatives -shapes -noIntermediate`;
+	abxPaintFXToolsSetupTubes ($nurbsCurves);
+
+}
+
+global proc abxPaintFXToolsSetupTubes(string $curves[]){
+	int $i = 0;
+	for ($i=0;$i<size($curves);$i++){
+
+		string $subCurves[] = {$curves[$i]};
+		//abxPaintFXToolsAddSubCurves $subCurves;
+		// attach stroke to curve
+		AttachBrushToCurves;
+		//convertCurvesToStrokes;
+		// group new strokes
+		// attach subcurve to original shape
+		// attach nurbscurve to subcurve
+		// parent the new curve shape
+
+	}
+
+}
+
+global proc abxPaintFXToolsSegmentCount (float $stroke, float $stepsPerUnit){
+	// get the curve attached to stroke
+	// measure its arc len
+	//$len = `acrlen $curve`;
+
+
+}
+
+
+global proc abxPaintFXToolsCopyStrokeGraph(){
+
+	$sel = `ls -sl -long`;
+	$strokes = `listRelatives -shapes -noIntermediate -fullPath -type stroke $sel`;
+	int $i = 0;
+	int $n = 0;
+	float $pPos[], $pVal[], $pIntp[];
+
+	float $ptCount = `getAttr -size ($strokes[$i]+".pressureScale")`;
+	for ($n =0;$n<$ptCount;$n++){
+		$pPos[$n] = `getAttr ($strokes[$i]+".pressureScale["+$n+"].pressureScale_Position")`;
+		$pVal[$n] = `getAttr ($strokes[$i]+".pressureScale["+$n+"].pressureScale_FloatValue")`;
+		$pIntp[$n] = `getAttr ($strokes[$i]+".pressureScale["+$n+"].pressureScale_Interp")`;
+	}
+
+	float $pm1 = `getAttr ($strokes[$i]+".pressureMap1")`;
+	float $pmn1 = `getAttr ($strokes[$i]+".pressureMin1")`;
+	float $pmx1 = `getAttr ($strokes[$i]+".pressureMax1")`;
+	float $pm2 = `getAttr ($strokes[$i]+".pressureMap2")`;
+	float $pmn2 = `getAttr ($strokes[$i]+".pressureMin2")`;
+	float $pmx2 = `getAttr ($strokes[$i]+".pressureMax2")`;
+	float $pm3 = `getAttr ($strokes[$i]+".pressureMap3")`;
+	float $pmn3 = `getAttr ($strokes[$i]+".pressureMin3")`;
+	float $pmx3 = `getAttr ($strokes[$i]+".pressureMax3")`;
+
+	// get the source pressure graph array size
+	for ($i = 1; $i<(size($strokes));$i++){
+		// get the dest pressure mapping size
+		// remove existing graph points
+		// create the new points with the correct values;
+		print ("Setting "+$strokes[$i]+"\n");
+		for ($n =0;$n<$ptCount;$n++){
+			setAttr ($strokes[$i]+".pressureScale["+$n+"].pressureScale_Position") $pPos[$n];
+			setAttr ($strokes[$i]+".pressureScale["+$n+"].pressureScale_FloatValue") $pVal[$n];
+			setAttr ($strokes[$i]+".pressureScale["+$n+"].pressureScale_Interp") $pIntp[$n];
+		}
+		// set the pressure map attribute values
+		setAttr ($strokes[$i]+".pressureMap1") $pm1;
+		setAttr ($strokes[$i]+".pressureMin1") $pmn1;
+		setAttr ($strokes[$i]+".pressureMax1") $pmx1;
+
+		setAttr ($strokes[$i]+".pressureMap2") $pm2;
+		setAttr ($strokes[$i]+".pressureMin2") $pmn2;
+		setAttr ($strokes[$i]+".pressureMax2") $pmx2;
+
+		setAttr ($strokes[$i]+".pressureMap3") $pm3;
+		setAttr ($strokes[$i]+".pressureMin3") $pmn3;
+		setAttr ($strokes[$i]+".pressureMax3") $pmx3;
+		// if keyframes are detected, then duplicate those and connect
+	}
+}
+
+global proc abxPaintFXToolsAddSubCurvesToSel (){
+	$sel = `ls -sl`;
+	$nurbsCurves = `listRelatives -shapes -noIntermediate`;
+	abxPaintFXToolsAddSubCurves ($nurbsCurves);
+
+}
+
+global proc abxPaintFXToolsAddSubCurves (string $curves[]){
+	int $i = 0;
+	for ($i=0;$i<size($curves);$i++){
+
+		// if curve.create is connected then add subcurve before shape
+		// else if curve.worldspace is connected to a stroke add subcurve before shape node
+		// else add it to the end of the curve construction history
+		$p = `listRelatives -p $curves[$i]`;
+		// add a subcurve to the curve (if it doesn't have one)
+		$n = `createNode -ss subCurve`;
+		setAttr ($n+".relative") 1;
+		setAttr ($n+".maxValue") 1;
+
+		connectAttr ($curves[$i]+".worldSpace") ($n+".inputCurve");
+		$s = `createNode -ss -p $p[0] nurbsCurve`;
+		connectAttr ($n+".outputCurve") ($s+".create");
+		setAttr ($curves[$i]+".intermediateObject") 1;
+
+	}
+
+}
+
+
+global proc abxPaintFXToolsPolyEdgesToStrokes (){
+	
+	// select some edges
+
+	// get the selected edges and expand to edgeloops
+
+	// store the missing edges for filling in later
+
+	// for each edgeloop
+
+		// select the edgeloop
+		// convert polyedges to curve with history
+		// run stroke down path
+		// key the min
+
+}
+
+global proc string[] abxPaintFXToolsGetCurve(string $stroke){
+	string $curves[] = `listConnections -s 1 -d 0 -p 0 -type nurbsCurve ($stroke+".pathCurve[0].curve")`;
+	return $curves;
+}
+
+global proc string[] abxPaintFXToolsGetStroke(string $curve){
+	string $strokes[] = `listConnections -s 0 -d 1 -p 0 -type stroke ($curve+".worldSpace[0]")`;
+	return $strokes;
+}
+
+global proc abxPaintFXToolsStrokesFromCurves(){
+	
+	string $sel[] = `ls -sl -long`;
+	string $shapes[] = `listRelatives -shapes -noIntermediate -fullPath $sel`;
+	string $nurbsCurves[] = `ls -type nurbsCurve -long $shapes`;
+	
+	select -clear;
+	for ($each in $nurbsCurves){
+		$strokes = `abxPaintFXToolsGetStroke $each`;
+		//$strokeTransforms = `listRelatives -parent $strokes`;
+		select -add $strokes;
+	}
+
+}
+
+global proc abxPaintFXToolsCurvesFromStrokes(){
+	
+	string $sel[] = `ls -sl -long`;
+	string $shapes[] = `listRelatives -shapes -noIntermediate -fullPath $sel`;
+	string $strokes[] = `ls -type stroke -long $shapes`;
+	
+	select -clear;
+	for ($each in $strokes){
+		$curves = `abxPaintFXToolsGetCurve $each`;
+		//$curveTransforms = `listRelatives -parent $curves`;
+		select -add $curves;
+	}
+}
+
+
+global proc abxPaintFXToolsSetSegmentRes(float $segmentsPerUnit){
+	$sel = `ls -sl`;
+	$strokes = `listRelatives -shapes -noIntermediate -type stroke -fullPath $sel`;
+	for ($each in $strokes){
+		string $curves[] = `abxPaintFXToolsGetCurve $each`;
+		$len = `arclen $curves[0]`;
+		$segmentCount = $segmentsPerUnit * $len;
+		setAttr ($each+".pathCurve[0].samples") $segmentCount;
+		setAttr ($each+".smoothing") 0;
+	}
+}
+
+
+global proc abxPaintFXToolsToggleOppositeCurves(){
+	$sel = `ls -sl`;
+	$strokes = `listRelatives -shapes -noIntermediate -type stroke -fullPath $sel`;
+	for ($each in $strokes){
+		$flip = `getAttr ($each+".pathCurve[0].opposite")`;
+		if ($flip == 1) $flip = 0;
+		else $flip = 1;
+		setAttr ($each+".pathCurve[0].opposite") $flip;
+	}
+}
+
+
+global proc abxPaintFXToolsScaleClipSpeedToLen(float $clipSpeed){
+	$sel = `ls -sl`;
+	$strokes = `listRelatives -shapes -noIntermediate -type stroke -fullPath $sel`;
+	for ($each in $strokes){
+		// get the curve's lenth
+		string $curves[] = `abxPaintFXToolsGetCurve $each`;
+		float $len = `arclen $curves[0]`;
+		float $clipFrameDuration = $clipSpeed*$len;
+		// get the keyframe curves for the min/max clip
+		
+		string $minClip[] = `keyframe -q -name ($each+".minClip")`;
+		string $maxClip[] = `keyframe -q -name ($each+".maxClip")`;
+		string $animCurves[] = {$minClip[0],$maxClip[0]};
+		// subtract last key value from first to get proportion of clip speed
+		for ($every in $animCurves){
+			if ($every != ""){
+				float $firstKeyTime[] = `keyframe -index 0 -q $every`;
+				float $firstKeyVal[] = `keyframe -index 0 -q -eval $every`;	
+				int $keyCount = `keyframe -q -kc $every`;
+				float $lastKeyVal[] = `keyframe -index ($keyCount-1) -q -eval $every`;
+				float $lastKeyTime[] = `keyframe -index ($keyCount-1) -q $every`;	
+
+				float $valueChange = $lastKeyVal[0] - $firstKeyVal[0];
+				// just scale non changing curves anyway
+				if ($valueChange == 0) $valueChange = 1;
+				float $oldDuration = $lastKeyTime[0] - $firstKeyTime[0];
+				float $newDuration = abs($clipFrameDuration * $valueChange);
+				float $scaleTime = $newDuration/$oldDuration;
+				$cmd = ("scaleKey -timePivot "+$firstKeyTime[0]+" -timeScale "+$scaleTime+" -valuePivot "+$firstKeyVal[0]+" "+$every);
+				evalEcho ($cmd);
+			}
+		}
+		
+	}
+}

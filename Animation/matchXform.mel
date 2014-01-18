@@ -1,8 +1,16 @@
 // matchXform
 // J. Adam Burke
 // matches the first objects position and rotation in worldspace with the second object
-$firsttwo = `selectedNodes`;
-$alignRot = `xform -q -a -ws -ro $firsttwo[1]`;
-$alignPos = `xform -q -a -ws -piv $firsttwo[1]`;
-rotate -a -ws $alignRot[0] $alignRot[1] $alignRot[2] $firsttwo[0];
-move -a -ws $alignPos[0] $alignPos[1] $alignPos[2] $firsttwo[0];
+// matchPivots
+global proc matchPivots() {
+string $sel[] = `ls -sl`;
+int $i = 0;
+float $alignPiv[] = `xform -q -a -ws -piv $sel[size($sel)-1]`;
+for ($i=0;$i<size($sel)-1;$i++){
+	
+	xform -a -ws -piv $alignPiv[0] $alignPiv[1] $alignPiv[2] $sel[$i];
+}
+//$firsttwo = `selectedNodes`;
+//$alignPiv = `xform -q -a -ws -piv $firsttwo[1]`;
+//xform -a -ws -piv $alignPiv[0] $alignPiv[1] $alignPiv[2] $firsttwo[0];
+}

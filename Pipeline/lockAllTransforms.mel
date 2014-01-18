@@ -1,0 +1,25 @@
+// lockAllTransforms
+// Created by: freelanceny18
+// Date: 2014/01/15 11:10:09
+
+global proc lockAllTransforms(){
+// for all geo or ctrl, lock anything called control's TRS
+
+	// lock all transforms
+	$xforms = `ls -exactType transform`;
+	for ($each in $xforms){
+		// unlock node
+		catch(`lockNode -l 0 $each`);
+		$attrsToLock = {"tx","ty","tz","rx","ry","rz","sx","sy","sz"};
+		$ignore = {"persp","top","front","side"};
+		if (!stringArrayContains($each, $ignore)){
+			for ($attrs in $attrsToLock){
+				// if the attr is connected then dont lock it
+				//if (size(`listConnections -d off -s on ($each+"."+$attrs)`)==0){
+					catch(`setAttr -lock true ($each+"."+$attrs)`);
+				//}
+			}
+		}
+	}
+}
+

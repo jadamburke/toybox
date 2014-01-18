@@ -33,6 +33,7 @@ global proc setAttributeEditorVisible(int $visible)
 		}
 		else {
 			createAEWindow( "", "auto" );
+			showWindow AEWindow;
 			editSelected;
 		}
 
