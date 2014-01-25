@@ -1,4 +1,5 @@
 // timeOffset
+abxPaintFXTools;
 global proc abxPaintFXTools() {
 if (`window -ex abxPaintFXTubesWindow` != true)
 	{
@@ -20,7 +21,11 @@ if (`window -ex abxPaintFXTubesWindow` != true)
 		button -en 0 -label "PolyEdges to Strokes" -h 20 -w 60 -c "abxPaintFXToolsPolyEdgesToStrokes";
 		button -label "Select Strokes From Curves" -h 20 -w 60 -c "abxPaintFXToolsStrokesFromCurves";
 		button -label "Select Curves From Strokes" -h 20 -w 60 -c "abxPaintFXToolsCurvesFromStrokes";
+		button -label "Select Brush From Strokes" -h 20 -w 60 -c "abxPaintFXToolsBrushFromStrokes";
 		button -label "Flip Stroke Direction" -h 20 -w 60 -c "abxPaintFXToolsToggleOppositeCurves";
+		button -label "Interp GlobalScale between brushes" -c "abxPaintFXToolsIncrementBrushWidth";
+		button -label "Swap Curve Dots to use stroke min/max" -c "abxPaintFXToolsParticleMinMaxFromStrokeClip";
+		button -label "Key Dot Particles Vis on strokeTime" -c "abxPaintFXToolsParticleVisKey";
 
 		window -e -w 150 -h 200 abxPaintFXTubesWindow;
 		showWindow abxPaintFXTubesWindow;
@@ -175,6 +180,11 @@ global proc string[] abxPaintFXToolsGetStroke(string $curve){
 	return $strokes;
 }
 
+global proc string[] abxPaintFXToolsGetBrush(string $stroke){
+	string $strokes[] = `listConnections -s 1 -d 0 -p 0 -type brush ($stroke+".brush")`;
+	return $strokes;
+}
+
 global proc abxPaintFXToolsStrokesFromCurves(){
 	
 	string $sel[] = `ls -sl -long`;
@@ -204,6 +214,19 @@ global proc abxPaintFXToolsCurvesFromStrokes(){
 	}
 }
 
+global proc abxPaintFXToolsBrushFromStrokes(){
+	
+	string $sel[] = `ls -sl -long`;
+	string $shapes[] = `listRelatives -shapes -noIntermediate -fullPath $sel`;
+	string $strokes[] = `ls -type stroke -long $shapes`;
+	
+	select -clear;
+	for ($each in $strokes){
+		$brushes = `abxPaintFXToolsGetBrush $each`;
+		//$curveTransforms = `listRelatives -parent $curves`;
+		select -add $brushes;
+	}
+}
 
 global proc abxPaintFXToolsSetSegmentRes(float $segmentsPerUnit){
 	$sel = `ls -sl`;
@@ -264,4 +287,93 @@ global proc abxPaintFXToolsScaleClipSpeedToLen(float $clipSpeed){
 		}
 		
 	}
+}
+
+
+global proc abxPaintFXToolsIncrementBrushWidth (){
+	$sel = `ls -sl `;
+	$brushes = $sel;//`listRelatives -shapes -noIntermediate -type brush -fullPath $sel`;
+	int $i = 0;
+	float $bWidthStart = `getAttr ($brushes[$i]+".globalScale")`;
+	float $bWidthEnd = `getAttr ($brushes[size($brushes)-1]+".globalScale")`;
+	float $dif = $bWidthEnd - $bWidthStart;
+	float $increment = $dif / size($brushes);
+
+	for ($i=1;$i<size($brushes)-1;$i++){
+		setAttr ($brushes[$i]+".globalScale ") ($bWidthStart+($increment*$i));
+
+	}
+}
+
+// swaps trenity's scripts connection from curve.minValue maxValue to stroke.minClip maxClip
+global proc abxPaintFXToolsParticleMinMaxFromStrokeClip (){
+
+	$sel = `ls -sl`;
+	$particles = `listRelatives -shapes -noIntermediate -type particle -fullPath $sel`;
+	for ($each in $particles){
+		if (`attributeExists "curveMinU" $each`){
+			// find the curve its connected to 
+			string $curves[] = `listConnections -s 1 -d 0 -p 0 -type nurbsCurve ($each+".curveMinU")`;
+			for ($ev in $curves){
+				string $strokes[] = abxPaintFXToolsGetStroke($ev);
+				if (size($strokes)!= 0){
+					disconnectAttr ($ev+".minValue") ($each+".curveMinU");
+					connectAttr ($strokes[0]+".minClip") ($each+".curveMinU");
+				}
+				else {
+					print ("No stroke found for min curve: "+$ev+ " connected to particle: "+$each+" skipping connection remap\n");
+				}
+			}
+		}
+		if (`attributeExists "curveMaxU" $each`){
+			// find the curve its connected to 
+			string $curves[] = `listConnections -s 1 -d 0 -p 0 -type nurbsCurve ($each+".curveMaxU")`;
+			for ($ev in $curves){
+				string $strokes[] = abxPaintFXToolsGetStroke($ev);
+				if (size($strokes)!= 0){
+					disconnectAttr ($ev+".maxValue") ($each+".curveMaxU");
+					connectAttr ($strokes[0]+".maxClip") ($each+".curveMaxU");
+				}
+				else {
+					print ("No stroke found for max curve: "+$ev+ " connected to particle: "+$each+" skipping connection remap\n");
+				}
+			}
+		}
+	}
+
+}
+
+global proc abxPaintFXToolsParticleVisKey (){
+
+	$sel = `ls -sl`;
+	for ($each in $sel){
+		string $particles[] = `listRelatives -shapes -noIntermediate -type particle -fullPath $each`;
+		if (`attributeExists "arclen" $particles[0]`){
+			// find the curve its connected to 
+			string $curves[] = `listConnections -s 1 -d 0 -p 0 -type nurbsCurve ($particles[0]+".goalGeometry[0]")`;
+			if (size ($curves)>0){
+				for ($ev in $curves){
+					string $strokes[] = abxPaintFXToolsGetStroke($ev);
+					if (size($strokes)!= 0){
+						string $strokeTrans[] = `listRelatives -parent $strokes[0]`;
+						float $offset = `getAttr ($strokes[0]+".offset")`;
+						float $keyTime[] = `keyframe -index 0 -q ($strokes[0]+".maxClip")`;
+						float $keyVisTime = $keyTime[0] - $offset;
+						setKeyframe -v 0 -t ($keyVisTime -1) -at "visibility" $each;
+						setKeyframe -v 1 -t $keyVisTime -at "visibility" $each;
+					}
+					else {
+						print ("No stroke found for min curve: "+$ev+ " connected to particle: "+$particles[0]+" skipping vis keyframes\n");
+					}
+				}
+			}
+			else{
+				print ("could not find curves on particle.goalGeometry[0]: "+$particles[0]+"\n");
+			}
+		}
+		else {
+			print ("could not find arclen on particle: "+$particles[0]+"\n");
+		}
+	}
+
 }
